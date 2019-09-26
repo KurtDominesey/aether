@@ -1,5 +1,5 @@
-#include "../discrete_to_moment.hpp"
-#include "../moment_to_discrete.hpp"
+#include "../discrete_to_moment.cpp"
+#include "../moment_to_discrete.cpp"
 #include "gtest/gtest.h"
 
 namespace {
