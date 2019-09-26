@@ -10,15 +10,16 @@ SET(TARGET "aether.exe")
 # the one step-X.cc file, but as you expand your project you may wish
 # to add other source files as well. If your project becomes much larger,
 # you may want to either replace the following statement by something like
-  FILE(GLOB_RECURSE TARGET_SRC  "src/*.cpp")
-  FILE(GLOB_RECURSE TARGET_INC  "src/*.hpp")
-  SET(TARGET_SRC ${TARGET_SRC}  ${TARGET_INC}) 
+  # FILE(GLOB_RECURSE TARGET_SRC  "src/*.cpp")
+  # FILE(GLOB_RECURSE TARGET_INC  "src/*.hpp")
+  # SET(TARGET_SRC ${TARGET_SRC}  ${TARGET_INC}) 
 # or switch altogether to the large project CMakeLists.txt file discussed
 # in the "CMake in user projects" page accessible from the "User info"
 # page of the documentation.
 # SET(TARGET_SRC
 #   ${TARGET}.cc
 #   )
+SET(TARGET_SRC "src/main.cpp")
 
 # SET(CMAKE_CXX_STANDARD 17)
 # SET(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,3 +42,20 @@ ENDIF()
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
 PROJECT(${TARGET})
 DEAL_II_INVOKE_AUTOPILOT()
+
+# Make GTest executable
+find_package(PkgConfig)
+pkg_search_module(GTEST REQUIRED gtest_main)
+include_directories(${GTEST_INCLUDE_DIRS})
+
+FILE(GLOB_RECURSE TEST_SRC  "src/[!main]*.cpp")
+FILE(GLOB_RECURSE TEST_INC  "src/*.hpp")
+SET(TEST_SRC ${TEST_SRC} ${TEST_INC}) 
+
+enable_testing()
+set(TEST "test.exe")
+add_executable(${TEST} ${TEST_SRC})
+target_compile_options(${TEST} PUBLIC ${GTEST_CFLAGS})
+target_link_libraries(${TEST} ${GTEST_LDFLAGS} gtest gtest_main)
+target_include_directories(${TEST} PUBLIC TEST_SRC)
+DEAL_II_SETUP_TARGET(${TEST})
