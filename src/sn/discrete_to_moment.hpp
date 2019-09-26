@@ -30,6 +30,9 @@ void DiscreteToMoment<qdim>::vmult(dealii::BlockVector<double> &dst,
   int num_moments = dst.n_blocks();
   int num_ordinates = src.n_blocks();
   Assert(num_moments == 1, dealii::ExcNotImplemented());
+  Assert(num_ordinates == quadrature.get_weights().size(),
+         dealii::ExcDimensionMismatch(num_ordinates,
+                                      quadrature.get_weights().size()));
   for (int ell = 0, lm = 0; lm < num_moments; ++ell) {
     for (int m = -ell; m <= ell; ++m, ++lm) {
       // Y_lm = std::bind(spherical_harmonics(ell, m, _1, _2))
