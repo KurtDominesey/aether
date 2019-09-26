@@ -1,0 +1,28 @@
+#include <deal.II/fe/fe_dgq.h>
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/dofs/dof_handler.h>
+
+#include "../scattering.hpp"
+#include "gtest/gtest.h"
+
+namespace {
+
+TEST(ScatteringTest, OneMaterialIsotropic) {
+  const int dim = 3;
+  dealii::FE_DGQ<dim> fe(2);
+  dealii::Triangulation<dim> mesh;
+  dealii::GridGenerator::subdivided_hyper_cube(mesh, 20, -1, 1);
+  std::vector<double> cross_sections = {0.5};
+  dealii::DoFHandler<dim> dof_handler(mesh);
+  dof_handler.distribute_dofs(fe);
+  int num_dofs = dof_handler.n_dofs();
+  Scattering<dim> scattering(dof_handler, cross_sections);
+  dealii::BlockVector<double> source(1, num_dofs);
+  dealii::BlockVector<double> scattered(1, num_dofs);
+  scattering.vmult(scattered, source);
+  for (int i = 0; i < num_dofs; ++i) {
+    ASSERT_DOUBLE_EQ(scattered.block(0)[i], 0.5*source.block(0)[i]);
+  }
+}
+
+}
