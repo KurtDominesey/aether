@@ -15,7 +15,7 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
   for (int n = 0; n < num_ordinates; ++n) {
     ordinates.push_back(ordinate<dim>(quadrature.point(n)));
   }
-  octant_directions.resize(std::pow(dim, 2));
+  octant_directions.resize(std::pow(2, dim));
   renumberings.resize(
       octant_directions.size(),
       std::vector<dealii::types::global_dof_index>(dof_handler.n_dofs()));
@@ -105,7 +105,7 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
                                      dealii::update_values |
                                      dealii::update_gradients;
   info_box.add_update_flags(update_flags);
-  info_box.initialize(dof_handler.get_fe(), dealii::MappingQ1<dim>());
+  info_box.initialize(dof_handler.get_fe(), mapping);
 }
 
 template <int dim, int qdim>
