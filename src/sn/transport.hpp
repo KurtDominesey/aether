@@ -88,6 +88,7 @@ class Transport {
 
   std::vector<std::vector<int> > ordinates_in_octant;
   dealii::MeshWorker::IntegrationInfoBox<dim> info_box;
+  dealii::MappingQ1<dim> mapping;
   Sweeper sweeper;
 };
 
