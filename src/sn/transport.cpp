@@ -14,6 +14,7 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
   ordinates.reserve(num_ordinates);
   for (int n = 0; n < num_ordinates; ++n) {
     ordinates.push_back(ordinate<dim>(quadrature.point(n)));
+    std::cout << ordinates.back() << std::endl;
   }
   octant_directions.resize(std::pow(2, dim));
   renumberings.resize(
@@ -113,11 +114,14 @@ void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                  const dealii::BlockVector<double> &src) {
   dealii::MeshWorker::LoopControl loop_control;
   loop_control.cells_first = false;  // loop over faces first
+  loop_control.own_faces = dealii::MeshWorker::LoopControl::both;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
     // dof_handler should first be ordered according to renumberings[0]
     DoFInfo dof_info(dof_handler);
     std::vector<int> &ords = ordinates_in_octant[oct];
+    int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
+    sweeper.initialize(ords, dst, src, dofs_per_cell);
     dealii::MeshWorker::loop<dim, dim, DoFInfo,
                              dealii::MeshWorker::IntegrationInfoBox<dim> >(
       dof_handler.begin_active(),
@@ -146,6 +150,7 @@ void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
 template <int dim, int qdim>
 void Transport<dim, qdim>::integrate_cell_term(
     std::vector<int> &octant_to_global, DoFInfo &dinfo, CellInfo &info) {
+  std::cout << "integrate cell\n";
   const dealii::FEValuesBase<dim> &fe_values = info.fe_values();
   const std::vector<double> &JxW = fe_values.get_JxW_values();
   int material = dinfo.cell->material_id();
@@ -166,12 +171,15 @@ void Transport<dim, qdim>::integrate_cell_term(
         }
       }
     }
+    std::cout << "ordinate " << n << " cell\n";
+    local_matrix.print(std::cout);
   }
 }
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::integrate_boundary_term(
     std::vector<int> &octant_to_global, DoFInfo &dinfo, CellInfo &info) {
+  std::cout << "integrate boundary\n";
   const dealii::FEValuesBase<dim> &fe_face_values = info.fe_values();
   const std::vector<double> &JxW = fe_face_values.get_JxW_values();
   const std::vector<dealii::Tensor<1, dim> > &normals =
@@ -197,7 +205,7 @@ void Transport<dim, qdim>::integrate_boundary_term(
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j) {
             local_vector(i) += -ord_dot_normal
-                               * local_vector_copy(j)
+                               * 1.0 //local_vector_copy(j)
                                * fe_face_values.shape_value(j, q)
                                * fe_face_values.shape_value(i, q)
                                * JxW[q];
@@ -205,6 +213,9 @@ void Transport<dim, qdim>::integrate_boundary_term(
         }
       }
     }
+    // std::cout << "ordinate " << n << " boundary\n";
+    // local_matrix.print(std::cout);
+    // local_vector.print(std::cout);
   }
 }
 
@@ -212,6 +223,7 @@ template <int dim, int qdim>
 void Transport<dim, qdim>::integrate_face_term(
     std::vector<int> &octant_to_global, DoFInfo &dinfo1, DoFInfo &dinfo2,
     CellInfo &info1, CellInfo &info2) {
+  std::cout << "integrate face\n";
   const dealii::FEValuesBase<dim> &fe_face_values = info1.fe_values();
   const int dofs_per_cell = fe_face_values.dofs_per_cell;
   const dealii::FEValuesBase<dim> &fe_face_values_neighbor = info2.fe_values();
@@ -224,48 +236,35 @@ void Transport<dim, qdim>::integrate_face_term(
   AssertDimension(octant_to_global.size(), dinfo2.n_matrices());
   AssertDimension(octant_to_global.size(), dinfo2.n_vectors());
   for (int n = 0; n < octant_to_global.size(); ++n) {
-    dealii::FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0, false).matrix;
-    dealii::FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0, true).matrix;
-    dealii::FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0, true).matrix;
-    dealii::FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0, false).matrix;
+    dealii::FullMatrix<double> &outflow_matrix = dinfo1.matrix(n).matrix;
+    dealii::Vector<double> &inflow_vector = dinfo1.vector(n).block(0);
+    const dealii::Vector<double> &neighbor_vector = dinfo2.vector(n).block(0);
     for (int q = 0; q < fe_face_values.n_quadrature_points; ++q) {
       double ord_dot_normal = ordinates[octant_to_global[n]] * normals[q];
       if (ord_dot_normal > 0) {  // outflow
         for (int i = 0; i < dofs_per_cell; ++i) {
           for (int j = 0; j < dofs_per_cell; ++j) {
-            u1_v1_matrix(i, j) += ord_dot_normal
+            outflow_matrix(i, j) += ord_dot_normal
                                   * fe_face_values.shape_value(j, q)
                                   * fe_face_values.shape_value(i, q)
-                                  * JxW[q];
-          }
-        }
-        for (int k = 0; k < dofs_per_cell_neighbor; ++k) {
-          for (int j = 0; j < dofs_per_cell; ++j) {
-            u1_v2_matrix(k, j) += -ord_dot_normal
-                                  * fe_face_values.shape_value(j, q)
-                                  * fe_face_values_neighbor.shape_value(k, q)
                                   * JxW[q];
           }
         }
       } else {  // inflow
         for (int i = 0; i < dofs_per_cell; ++i) {
           for (int l = 0; l < dofs_per_cell_neighbor; ++l) {
-            u2_v1_matrix(i, l) += ord_dot_normal
-                                  * fe_face_values_neighbor.shape_value(l, q)
-                                  * fe_face_values.shape_value(i, q)
-                                  * JxW[q];
-          }
-        }
-        for (int k = 0; k < dofs_per_cell_neighbor; ++k) {
-          for (int l = 0; l < dofs_per_cell_neighbor; ++l) {
-            u2_v2_matrix(k, l) += -ord_dot_normal
-                                  * fe_face_values_neighbor.shape_value(l, q)
-                                  * fe_face_values_neighbor.shape_value(k, q)
-                                  * JxW[q];
+            inflow_vector(i) += -ord_dot_normal
+                                * 1.0 //neighbor_vector(l)
+                                * fe_face_values_neighbor.shape_value(l, q)
+                                * fe_face_values.shape_value(i, q)
+                                * JxW[q];
           }
         }
       }
     }
+    // std::cout << "ordinate " << n << " face\n";
+    // outflow_matrix.print(std::cout);
+    // inflow_vector.print(std::cout);
   }
 }
 
