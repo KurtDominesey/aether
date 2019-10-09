@@ -43,19 +43,20 @@ class Transport {
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
    * 
+   * @param oct The index of the octant.
    * @param dst Destination vector (one octant).
    * @param src Source vector (\f$q\f$).
    */
-  void sweep_octant(dealii::BlockVector<double> &dst,
-                    dealii::BlockVector<double> &src);
+  void vmult_octant(int oct, dealii::BlockVector<double> &dst,
+                    const dealii::BlockVector<double> &src);
                     
   dealii::DoFHandler<dim> &dof_handler;
   const dealii::Quadrature<qdim> &quadrature;
   const std::vector<double> &cross_sections;
   std::vector<Ordinate> ordinates;
   std::vector<Ordinate> octant_directions;
-  std::vector<dealii::types::global_dof_index> numbering;
-  std::vector<std::vector<dealii::types::global_dof_index > > renumberings;
+  std::vector<std::vector<dealii::types::global_dof_index>> renumberings;
+  std::vector<std::vector<dealii::types::global_dof_index>> unrenumberings;
 
  protected:
   using DoFInfo = dealii::MeshWorker::DoFInfo<dim>;

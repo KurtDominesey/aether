@@ -20,13 +20,19 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
   renumberings.resize(
       octant_directions.size(),
       std::vector<dealii::types::global_dof_index>(dof_handler.n_dofs()));
+  unrenumberings.resize(renumberings.size(), renumberings[0]);
   ordinates_in_octant.resize(octant_directions.size());
   if (dim == 1) {
     octant_directions[0] = dealii::Point<dim>(+1);
     octant_directions[1] = dealii::Point<dim>(-1);
-    dealii::DoFRenumbering::compute_downstream(renumberings[0], renumberings[1],
+    dealii::DoFRenumbering::compute_downstream(renumberings[0], 
+                                               unrenumberings[0],
                                                dof_handler,
                                                octant_directions[0], false);
+    renumberings[1] = renumberings[0];
+    std::reverse(renumberings[1].begin(), renumberings[1].end());
+    unrenumberings[1] = unrenumberings[0];
+    std::reverse(unrenumberings[1].begin(), unrenumberings[1].end());
     // setup ordinates_in_octant
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -40,12 +46,20 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     octant_directions[1] = dealii::Point<dim>(-1, +1);
     octant_directions[2] = dealii::Point<dim>(-1, -1);
     octant_directions[3] = dealii::Point<dim>(+1, -1);
-    dealii::DoFRenumbering::compute_downstream(renumberings[0], renumberings[2],
-                                               dof_handler,
-                                               octant_directions[0], false);
-    dealii::DoFRenumbering::compute_downstream(renumberings[1], renumberings[3],
-                                               dof_handler,
-                                               octant_directions[1], false);
+    std::vector<int> opposites = {2, 3};
+    for (int oct = 0; oct < 2; ++oct) {
+      dealii::DoFRenumbering::compute_downstream(renumberings[oct], 
+                                                 unrenumberings[oct],
+                                                 dof_handler,
+                                                 octant_directions[oct], false);
+      int opposite = opposites[oct];
+      renumberings[opposite] = renumberings[oct];
+      std::reverse(renumberings[opposite].begin(), 
+                   renumberings[opposite].end());
+      unrenumberings[opposite] = unrenumberings[oct];
+      std::reverse(unrenumberings[opposite].begin(), 
+                   unrenumberings[opposite].end());
+    }
     // setup ordinates_in_octant
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -67,18 +81,20 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     octant_directions[5] = dealii::Point<dim>(-1, +1, -1);
     octant_directions[6] = dealii::Point<dim>(-1, -1, -1);
     octant_directions[7] = dealii::Point<dim>(+1, -1, -1);
-    dealii::DoFRenumbering::compute_downstream(renumberings[0], renumberings[6],
-                                               dof_handler,
-                                               octant_directions[0], false);
-    dealii::DoFRenumbering::compute_downstream(renumberings[1], renumberings[7],
-                                               dof_handler,
-                                               octant_directions[1], false);
-    dealii::DoFRenumbering::compute_downstream(renumberings[2], renumberings[4],
-                                                dof_handler,
-                                               octant_directions[2], false);
-    dealii::DoFRenumbering::compute_downstream(renumberings[3], renumberings[5],
-                                               dof_handler,
-                                               octant_directions[3], false);
+    std::vector<int> opposites = {6, 7, 4, 5};
+    for (int oct = 0; oct < 4; ++oct) {
+      dealii::DoFRenumbering::compute_downstream(renumberings[oct], 
+                                                 unrenumberings[oct],
+                                                 dof_handler,
+                                                 octant_directions[oct], false);
+      int opposite = opposites[oct];
+      renumberings[opposite] = renumberings[oct];
+      std::reverse(renumberings[opposite].begin(), 
+                   renumberings[opposite].end());
+      unrenumberings[opposite] = unrenumberings[oct];
+      std::reverse(unrenumberings[opposite].begin(), 
+                   unrenumberings[opposite].end());
+    }
     // setup ordinates_in_octant
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -97,54 +113,90 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
       ordinates_in_octant[octant].push_back(n);
     }
   }
-  dof_handler.renumber_dofs(renumberings[0]);
-  // setup info_box
-  int num_points = dof_handler.get_fe().degree + 1;
-  info_box.initialize_gauss_quadrature(num_points, num_points, num_points);
-  info_box.initialize_update_flags();
-  dealii::UpdateFlags update_flags = dealii::update_quadrature_points |
-                                     dealii::update_values |
-                                     dealii::update_gradients;
-  info_box.add_update_flags(update_flags);
-  info_box.initialize(dof_handler.get_fe(), mapping);
 }
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                  const dealii::BlockVector<double> &src) {
-  dealii::MeshWorker::LoopControl loop_control;
-  loop_control.cells_first = false;  // loop over faces first
-  loop_control.own_faces = dealii::MeshWorker::LoopControl::both;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
-    // dof_handler should first be ordered according to renumberings[0]
-    DoFInfo dof_info(dof_handler);
-    std::vector<int> &ords = ordinates_in_octant[oct];
-    int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-    sweeper.initialize(ords, dst, src, dofs_per_cell);
-    dealii::MeshWorker::loop<dim, dim, DoFInfo,
-                             dealii::MeshWorker::IntegrationInfoBox<dim> >(
-      dof_handler.begin_active(),
-      dof_handler.end(), 
-      dof_info, 
-      info_box,
-      std::bind(&Transport<dim>::integrate_cell_term, this, ords,
-                std::placeholders::_1, 
-                std::placeholders::_2),
-      std::bind(&Transport<dim>::integrate_boundary_term, this, ords, 
-                std::placeholders::_1, 
-                std::placeholders::_2),
-      std::bind(&Transport<dim>::integrate_face_term, this, ords, 
-                std::placeholders::_1, 
-                std::placeholders::_2, 
-                std::placeholders::_3, 
-                std::placeholders::_4),
-      sweeper,
-      loop_control
-    );
-    int oct_next = (oct + 1 == num_octants) ? 0 : oct + 1;
-    dof_handler.renumber_dofs(renumberings[oct_next]);
+    vmult_octant(oct, dst, src);
   }
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::vmult_octant(int oct, 
+                                        dealii::BlockVector<double> &dst,
+                                        const dealii::BlockVector<double> &src) {
+  dof_handler.renumber_dofs(renumberings[oct]);
+  // setup finite elements
+  dealii::FiniteElement<dim> fe = dof_handler.get_fe();
+  dealii::QGauss<dim> quadrature(fe.degree+1);
+  dealii::QGauss<dim-1> quadrature_face(fe.degree+1);
+  const dealii::UpdateFlags update_flags = 
+      dealii::update_values
+      | dealii::update_gradients
+      | dealii::update_quadrature_points
+      | update_JxW_values;
+  const dealii::UpdateFlags update_flags_face =
+      dealii::update_values 
+      | dealii::update_normal_vectors
+      | dealii::update_quadrature_points
+      | dealii::update_JxW_values;
+  dealii::FEValues<dim> fe_values(fe, quadrature, update_flags);
+  dealii::FEFaceValues<dim> fe_face_values(fe, quadrature_face,
+                                           update_flags_face);
+  dealii::FEFaceValues<dim> fe_face_values_neighbor(fe, quadrature_face,
+                                                    update_flags_face);
+  dealii::FESubfaceValues<dim> fe_subface_values(fe, quadrature_face, 
+                                                 update_flags_face);
+  std::vector<dealii::types::global_dof_index> dof_indices(fe.dofs_per_cell);
+  // setup local storage
+  dealii::FullMatrix<double> matrix(fe.dofs_per_cell);
+  dealii::Vector<double> vector(fe.dofs_per_cell);
+  typename dealii::DoFHandler<dim>::active_cell_iterator
+      cell = dof_handler.begin_active(),
+      endc = dof_handler.end();
+  for (; cell != endc; cell++) {
+    if (!cell->is_locally_owned()) continue;
+    matrix = 0;
+    vector = 0;
+    fe_values.reinit(cell);
+    // assemble_cell_terms
+    cell->get_dof_indices(dof_indices);  // dof_indices are downwind
+    for (int i = 0; i < dof_indices.size(); ++i)
+      dof_indices[i] = unrenumberings[oct][dof_indices[i]];
+    for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; f++) {
+      typename dealii::DoFHandler<dim>::face_iterator face = cell->face(f);
+      if (face->at_boundary()) {
+        // assemble boundary terms
+      } else {
+        Assert(cell->neighbor(f).state() == dealii::IteratorState::valid,
+               dealii::ExcInvalidState());
+        typename DofHandler<dim>::cell_iterator neighbor = cell->neighbor(f);
+        if (face->has_children()) {
+          const int f_neighbor = cell->neighbor_of_neighbor(f);
+          for (int f_child = 0; f_child < face->number_of_children();
+               ++f_child) {
+            typename DoFHandler<dim>::cell_iterator neighbor_child = 
+                cell->neighbor_child_on_subface(f, f_child);
+            Assert(!neighbor_child->has_children(), dealii::ExcInvalidState());
+            fe_subface_values.reinit(cell, f, f_child);
+            fe_face_values_neighbor.reinit(neighbor_child, f_neighbor);
+            // assemble face terms
+          }
+        } else { // face has no children
+          const int f_neighbor = cell->neighbor_of_neighbor(f);
+          fe_face_values.reinit(cell, f);
+          fe_face_values_neighbor.reinit(neighbor, f_neighbor);
+          // assemble face terms
+        }
+      }
+    }
+    // invert matrix
+    // vmult vector
+  }
+  dof_handler.renumber_dofs(unrenumberings[oct]);
 }
 
 template <int dim, int qdim>
