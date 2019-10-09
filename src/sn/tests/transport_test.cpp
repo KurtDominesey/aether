@@ -26,12 +26,12 @@ TEST(TransportTest, Void) {
   dealii::BlockVector<double> source(num_ords, num_dofs);
   dealii::BlockVector<double> flux(num_ords, num_dofs);
   for (int n = 0; n < num_ords; ++n) {
-    flux.block(n) = n;
+    flux.block(n) = 1;
   }
   transport.vmult(flux, source);
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {
-      ASSERT_DOUBLE_EQ(flux.block(0)[i], n);
+      ASSERT_DOUBLE_EQ(flux.block(n)[i], 1);
     }
   }
 }
