@@ -67,30 +67,35 @@ class Transport {
    * @param dinfo DoF info.
    * @param info Cell integration info.
    */
-  void integrate_cell_term(std::vector<int> &octant_to_global, 
-                           DoFInfo &dinfo, CellInfo &info);
+  void integrate_cell_term(const std::vector<Ordinate> &ordinates_in_sweep,
+                           const dealii::FEValues<dim> &fe_values,
+                           double cross_section,
+                           std::vector<dealii::FullMatrix<double>> &matrices);
   /**
    * Assemble the boundary contributions of the local matrix.
    * 
    * @param dinfo DoF info.
    * @param info Cell integration info.
    */
-  void integrate_boundary_term(std::vector<int> &octant_to_global, 
-                               DoFInfo &dinfo, CellInfo &info);
+  void integrate_boundary_term(const std::vector<Ordinate> &ordinates_in_sweep,
+                               const dealii::FEFaceValues<dim> &fe_face_values,
+                               std::vector<dealii::FullMatrix<double>> &matrices,
+                               dealii::BlockVector<double> &src_cell);
   /**
    * Assemble the face contributions of the local matrix.
    * 
    * @param dinfo DoF info.
    * @param info Cell integration info.
    */
-  void integrate_face_term(std::vector<int> &octant_to_global, 
-                           DoFInfo &dinfo1, DoFInfo &dinfo2,
-                           CellInfo &info1, CellInfo &info2);
+  void integrate_face_term(
+      const std::vector<Ordinate> &ordinates_in_sweep,
+      const dealii::FEFaceValuesBase<dim> &fe_face_values,
+      const dealii::FEFaceValuesBase<dim> &fe_face_values_neighbor,
+      const dealii::BlockVector<double> &dst_neighbor,
+      std::vector<dealii::FullMatrix<double>> &matrices,
+      dealii::BlockVector<double> &src_cell);
 
-  std::vector<std::vector<int> > ordinates_in_octant;
-  dealii::MeshWorker::IntegrationInfoBox<dim> info_box;
-  dealii::MappingQ1<dim> mapping;
-  Sweeper sweeper;
+  std::vector<std::vector<int>> octants_to_global;
 };
 
 #endif  // AETHER_SN_TRANSPORT_H_
