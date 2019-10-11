@@ -28,11 +28,20 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     dealii::DoFRenumbering::compute_downstream(renumberings[0], 
                                                unrenumberings[0],
                                                dof_handler,
-                                               octant_directions[0], false);
-    renumberings[1] = renumberings[0];
-    std::reverse(renumberings[1].begin(), renumberings[1].end());
-    unrenumberings[1] = unrenumberings[0];
-    std::reverse(unrenumberings[1].begin(), unrenumberings[1].end());
+                                               octant_directions[0], true);
+    dealii::DoFRenumbering::compute_downstream(renumberings[1], 
+                                               unrenumberings[1],
+                                               dof_handler,
+                                               octant_directions[1], true);
+    for (int n = 0; n < octant_directions.size(); ++n) {
+      for (int i = 0; i < renumberings[n].size(); ++i) {
+        unrenumberings[n][renumberings[n][i]] = i;
+      }
+    }
+    // renumberings[1] = renumberings[0];
+    // std::reverse(renumberings[1].begin(), renumberings[1].end());
+    // unrenumberings[1] = unrenumberings[0];
+    // std::reverse(unrenumberings[1].begin(), unrenumberings[1].end());
     // setup ordinates_in_octant
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -169,9 +178,25 @@ void Transport<dim, qdim>::vmult_octant(int oct,
   // get ordinates
   const int num_ords = octant_to_global.size();  // only ords in oct
   std::vector<Ordinate> ordinates_in_octant;
-  ordinates_in_octant.reserve(num_ords);
+  // ordinates_in_octant.reserve(num_ords);
   for (int n = 0; n < num_ords; ++n)
     ordinates_in_octant.push_back(ordinates[octant_to_global[n]]);
+  // assert each ordinate belongs to this octant
+  double norm_a = octant_directions[oct].norm();
+  std::cout << octant_directions[oct] << std::endl;
+  for (int n = 0; n < ordinates_in_octant.size(); ++n) {
+    Ordinate &ordinate = ordinates_in_octant[n];
+    double cos_angle =
+        (octant_directions[oct] * ordinate) / (norm_a * ordinate.norm());
+    Assert(std::acos(cos_angle) <= dealii::numbers::PI_4,
+           dealii::ExcMessage(std::to_string(cos_angle)));
+    std::cout << ordinate << " " << octant_to_global[n] << std::endl;
+  }
+  for (dealii::types::global_dof_index dof_index : renumbering)
+    std::cout << dof_index << " ";
+  std::cout << std::endl;
+  for (dealii::types::global_dof_index dof_index : unrenumbering)
+    std::cout << dof_index << " ";
   // setup local storage
   std::vector<dealii::FullMatrix<double>> matrices(
       num_ords, dealii::FullMatrix<double>(fe.dofs_per_cell));
@@ -185,6 +210,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
        cell++) {
     if (!cell->is_locally_owned()) continue;
     cell->get_dof_indices(dof_indices);  // dof_indices are downwind
+    std::cout << dof_indices[0] << std::endl;
     for (int i = 0; i < dof_indices.size(); ++i)
       dof_indices[i] = unrenumbering[dof_indices[i]];
     for (int n = 0; n < num_ords; ++n) {
@@ -208,6 +234,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
                dealii::ExcInvalidState());
         Cell neighbor = cell->neighbor(f);
         if (face->has_children()) {
+          Assert(false, dealii::ExcNotImplemented());
           const int f_neighbor = cell->neighbor_of_neighbor(f);
           for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
             Cell neighbor_child = cell->neighbor_child_on_subface(f, f_sub);
@@ -250,7 +277,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
       matrix.gauss_jordan();  // directly invert
       matrix.vmult(dst_cell.block(n), src_cell.block(n));
       dst.block(octant_to_global[n]).add(dof_indices, dst_cell.block(n));
-      // dst_cell.print(std::cout);
+      dst_cell.block(n).print(std::cout);
       // std::cout << std::endl;
     }
   }
@@ -335,6 +362,8 @@ void Transport<dim, qdim>::integrate_face_term(
     for (int q = 0; q < fe_face_values.n_quadrature_points; ++q) {
       double ord_dot_normal = ordinate * normals[q];
       if (ord_dot_normal > 0) {  // outflow
+        for (int k = 0; k < fe_face_values_neighbor.dofs_per_cell; ++k)
+          Assert(dst_neighbor.block(n)(k) == 0.0, dealii::ExcInvalidState());
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j) {
             matrix(i, j) += ord_dot_normal
@@ -346,7 +375,6 @@ void Transport<dim, qdim>::integrate_face_term(
       } else {  // inflow
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int k = 0; k < fe_face_values_neighbor.dofs_per_cell; ++k) {
-            std::cout << dst_neighbor.block(n)(k) << std::endl;
             src_cell.block(n)(i) += -ord_dot_normal
                                     * dst_neighbor.block(n)(k)
                                     * fe_face_values_neighbor.shape_value(k, q)
