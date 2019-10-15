@@ -30,9 +30,11 @@ class Transport {
    * @param quadrature Angular quadrature.
    * @param cross_sections Total material cross-sections.
    */
-  Transport(dealii::DoFHandler<dim> &dof_handler,
-            const dealii::Quadrature<qdim> &quadrature,
-            const std::vector<double> &cross_sections);
+  Transport(
+      dealii::DoFHandler<dim> &dof_handler,
+      const dealii::Quadrature<qdim> &quadrature,
+      const std::vector<double> &cross_sections,
+      const std::vector<dealii::BlockVector<double>> &boundary_conditions);
   /**
    * Compute \f$L^{-1}q\f$.
    * 
@@ -54,6 +56,7 @@ class Transport {
   dealii::DoFHandler<dim> &dof_handler;
   const dealii::Quadrature<qdim> &quadrature;
   const std::vector<double> &cross_sections;
+  const std::vector<dealii::BlockVector<double>> &boundary_conditions;
   std::vector<Ordinate> ordinates;
   std::vector<Ordinate> octant_directions;
   std::vector<std::vector<ActiveCell>> cells_downstream;
@@ -79,6 +82,7 @@ class Transport {
    */
   void integrate_boundary_term(const std::vector<Ordinate> &ordinates_in_sweep,
                                const dealii::FEFaceValues<dim> &fe_face_values,
+                               const dealii::BlockVector<double> &dst_boundary,
                                std::vector<dealii::FullMatrix<double>> &matrices,
                                dealii::BlockVector<double> &src_cell);
   /**

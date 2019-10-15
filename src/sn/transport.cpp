@@ -4,12 +4,20 @@
 #include <deal.II/dofs/dof_renumbering.h>
 
 template <int dim, int qdim>
-Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
-                                const dealii::Quadrature<qdim> &quadrature,
-                                const std::vector<double> &cross_sections)
+Transport<dim, qdim>::Transport(
+    dealii::DoFHandler<dim> &dof_handler,
+    const dealii::Quadrature<qdim> &quadrature,
+    const std::vector<double> &cross_sections,
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions)
     : dof_handler(dof_handler),
       quadrature(quadrature),
-      cross_sections(cross_sections) {
+      cross_sections(cross_sections),
+      boundary_conditions(boundary_conditions) {
+  const std::vector<dealii::types::boundary_id> &boundaries =
+      dof_handler.get_triangulation().get_boundary_ids();
+  for (const dealii::types::boundary_id &boundary : boundaries)
+    AssertIndexRange(boundary, boundaries.size());
+  AssertDimension(boundaries.size(), boundary_conditions.size());
   const int num_ordinates = quadrature.get_points().size();
   ordinates.reserve(num_ordinates);
   for (int n = 0; n < num_ordinates; ++n) {
@@ -152,6 +160,13 @@ void Transport<dim, qdim>::vmult_octant(int oct,
   dealii::BlockVector<double> src_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_neighbor(num_ords, fe.dofs_per_cell);
+  std::vector<dealii::BlockVector<double>> boundary_conditions_incident(
+      boundary_conditions.size(), 
+      dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
+  for (int b = 0; b < boundary_conditions.size(); ++b)
+    for (int n = 0; n < num_ords; ++n)
+      boundary_conditions_incident[b].block(n) =
+          boundary_conditions[b].block(octant_to_global[n]);
   using Cell = typename dealii::DoFHandler<dim>::cell_iterator;
   using Face = typename dealii::DoFHandler<dim>::face_iterator;
   for (ActiveCell &cell : cells_downstream[oct]) {
@@ -172,8 +187,10 @@ void Transport<dim, qdim>::vmult_octant(int oct,
       Face face = cell->face(f);
       if (face->at_boundary()) {
         fe_face_values.reinit(cell, f);
-        integrate_boundary_term(ordinates_in_octant, fe_face_values, matrices,
-                                src_cell);
+        dealii::BlockVector<double> &dst_boundary =
+            boundary_conditions_incident[face->boundary_id()];
+        integrate_boundary_term(ordinates_in_octant, fe_face_values, 
+                                dst_boundary, matrices, src_cell);
       } else {
         Assert(cell->neighbor(f).state() == dealii::IteratorState::valid,
                dealii::ExcInvalidState());
@@ -248,6 +265,7 @@ template <int dim, int qdim>
 void Transport<dim, qdim>::integrate_boundary_term(
     const std::vector<Ordinate> &ordinates_in_sweep,
     const dealii::FEFaceValues<dim> &fe_face_values,
+    const dealii::BlockVector<double> &dst_boundary,
     std::vector<dealii::FullMatrix<double>> &matrices,
     dealii::BlockVector<double> &src_cell) {
   const std::vector<double> &JxW = fe_face_values.get_JxW_values();
@@ -271,7 +289,7 @@ void Transport<dim, qdim>::integrate_boundary_term(
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j) {
             src_cell.block(n)(i) += -ord_dot_normal
-                                    * 1.0 //local_vector_copy(j)
+                                    * dst_boundary.block(n)(j)
                                     * fe_face_values.shape_value(j, q)
                                     * fe_face_values.shape_value(i, q)
                                     * JxW[q];
