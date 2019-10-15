@@ -22,7 +22,6 @@ Transport<dim, qdim>::Transport(
   ordinates.reserve(num_ordinates);
   for (int n = 0; n < num_ordinates; ++n) {
     ordinates.push_back(ordinate<dim>(quadrature.point(n)));
-    std::cout << ordinates.back() << std::endl;
   }
   const int num_octants = std::pow(2, dim);
   octant_directions.resize(num_octants);
@@ -145,14 +144,12 @@ void Transport<dim, qdim>::vmult_octant(int oct,
     ordinates_in_octant.push_back(ordinates[octant_to_global[n]]);
   // assert each ordinate belongs to this octant
   double norm_a = octant_directions[oct].norm();
-  std::cout << octant_directions[oct] << std::endl;
   for (int n = 0; n < ordinates_in_octant.size(); ++n) {
     Ordinate &ordinate = ordinates_in_octant[n];
     double cos_angle =
         (octant_directions[oct] * ordinate) / (norm_a * ordinate.norm());
     Assert(std::acos(cos_angle) <= dealii::numbers::PI_4,
            dealii::ExcMessage(std::to_string(cos_angle)));
-    std::cout << ordinate << " " << octant_to_global[n] << std::endl;
   }
   // setup local storage
   std::vector<dealii::FullMatrix<double>> matrices(
@@ -233,7 +230,6 @@ void Transport<dim, qdim>::vmult_octant(int oct,
       matrix.gauss_jordan();  // directly invert
       matrix.vmult(dst_cell.block(n), src_cell.block(n));
       dst.block(octant_to_global[n]).add(dof_indices, dst_cell.block(n));
-      dst_cell.block(n).print(std::cout);
     }
   }
 }
