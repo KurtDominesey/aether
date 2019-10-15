@@ -33,7 +33,7 @@ TEST(TransportTest, Void) {
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {
       // std::cout << flux.block(n)[i];
-      // ASSERT_DOUBLE_EQ(1, flux.block(n)[i]);
+      ASSERT_DOUBLE_EQ(1, flux.block(n)[i]);
     }
   }
 }

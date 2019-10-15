@@ -20,6 +20,7 @@
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class Transport {
   using Ordinate = dealii::Tensor<1, dim>;
+  using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
 
  public:
   /**
@@ -55,8 +56,7 @@ class Transport {
   const std::vector<double> &cross_sections;
   std::vector<Ordinate> ordinates;
   std::vector<Ordinate> octant_directions;
-  std::vector<std::vector<dealii::types::global_dof_index>> renumberings;
-  std::vector<std::vector<dealii::types::global_dof_index>> unrenumberings;
+  std::vector<std::vector<ActiveCell>> cells_downstream;
 
  protected:
   using DoFInfo = dealii::MeshWorker::DoFInfo<dim>;

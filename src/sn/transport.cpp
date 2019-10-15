@@ -16,32 +16,19 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     ordinates.push_back(ordinate<dim>(quadrature.point(n)));
     std::cout << ordinates.back() << std::endl;
   }
-  octant_directions.resize(std::pow(2, dim));
-  renumberings.resize(
-      octant_directions.size(),
-      std::vector<dealii::types::global_dof_index>(dof_handler.n_dofs()));
-  unrenumberings.resize(renumberings.size(), renumberings[0]);
-  octants_to_global.resize(octant_directions.size());
+  const int num_octants = std::pow(2, dim);
+  octant_directions.resize(num_octants);
+  octants_to_global.resize(num_octants);
+  // populate downstream cell vectors with unordered (z-ordered) cells
+  cells_downstream.resize(1);
+  cells_downstream[0].reserve(dof_handler.get_triangulation().n_active_cells());
+  for (ActiveCell cell = dof_handler.begin_active(); cell != dof_handler.end();
+       ++cell)
+    cells_downstream[0].push_back(cell);
+  cells_downstream.resize(num_octants, cells_downstream[0]);
   if (dim == 1) {
     octant_directions[0] = dealii::Point<dim>(+1);
     octant_directions[1] = dealii::Point<dim>(-1);
-    dealii::DoFRenumbering::compute_downstream(renumberings[0], 
-                                               unrenumberings[0],
-                                               dof_handler,
-                                               octant_directions[0], true);
-    dealii::DoFRenumbering::compute_downstream(renumberings[1], 
-                                               unrenumberings[1],
-                                               dof_handler,
-                                               octant_directions[1], true);
-    for (int n = 0; n < octant_directions.size(); ++n) {
-      for (int i = 0; i < renumberings[n].size(); ++i) {
-        unrenumberings[n][renumberings[n][i]] = i;
-      }
-    }
-    // renumberings[1] = renumberings[0];
-    // std::reverse(renumberings[1].begin(), renumberings[1].end());
-    // unrenumberings[1] = unrenumberings[0];
-    // std::reverse(unrenumberings[1].begin(), unrenumberings[1].end());
     // setup ordinates_in_octant
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -55,20 +42,7 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     octant_directions[1] = dealii::Point<dim>(-1, +1);
     octant_directions[2] = dealii::Point<dim>(-1, -1);
     octant_directions[3] = dealii::Point<dim>(+1, -1);
-    std::vector<int> opposites = {2, 3};
-    for (int oct = 0; oct < 2; ++oct) {
-      dealii::DoFRenumbering::compute_downstream(renumberings[oct], 
-                                                 unrenumberings[oct],
-                                                 dof_handler,
-                                                 octant_directions[oct], false);
-      int opposite = opposites[oct];
-      renumberings[opposite] = renumberings[oct];
-      std::reverse(renumberings[opposite].begin(), 
-                   renumberings[opposite].end());
-      unrenumberings[opposite] = unrenumberings[oct];
-      std::reverse(unrenumberings[opposite].begin(), 
-                   unrenumberings[opposite].end());
-    }
+    // std::vector<int> opposites = {2, 3};
     // setup ordinates_in_octants
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -90,20 +64,7 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     octant_directions[5] = dealii::Point<dim>(-1, +1, -1);
     octant_directions[6] = dealii::Point<dim>(-1, -1, -1);
     octant_directions[7] = dealii::Point<dim>(+1, -1, -1);
-    std::vector<int> opposites = {6, 7, 4, 5};
-    for (int oct = 0; oct < 4; ++oct) {
-      dealii::DoFRenumbering::compute_downstream(renumberings[oct], 
-                                                 unrenumberings[oct],
-                                                 dof_handler,
-                                                 octant_directions[oct], false);
-      int opposite = opposites[oct];
-      renumberings[opposite] = renumberings[oct];
-      std::reverse(renumberings[opposite].begin(), 
-                   renumberings[opposite].end());
-      unrenumberings[opposite] = unrenumberings[oct];
-      std::reverse(unrenumberings[opposite].begin(), 
-                   unrenumberings[opposite].end());
-    }
+    // std::vector<int> opposites = {6, 7, 4, 5};
     // setup ordinates_in_octants
     for (int n = 0; n < num_ordinates; ++n) {
       const dealii::Point<qdim> &point = quadrature.point(n);
@@ -123,13 +84,10 @@ Transport<dim, qdim>::Transport(dealii::DoFHandler<dim> &dof_handler,
     }
   }
   for (int octant = 0; octant < octant_directions.size(); ++octant) {
-    for (dealii::types::global_dof_index i = 0; i < renumberings[octant].size();
-         ++i) {
-      // std::cout << i << " " 
-      //           << renumberings[octant][i] << " "
-      //           << unrenumberings[octant][renumberings[octant][i]] << std::endl;
-      AssertDimension(unrenumberings[octant][renumberings[octant][i]], i);
-    }
+    const dealii::DoFRenumbering::CompareDownstream<ActiveCell, dim>
+        comparator(octant_directions[octant]);
+    std::sort(cells_downstream[octant].begin(), cells_downstream[octant].end(),
+              comparator);
   }
 }
 
@@ -146,11 +104,7 @@ template <int dim, int qdim>
 void Transport<dim, qdim>::vmult_octant(int oct, 
                                         dealii::BlockVector<double> &dst,
                                         const dealii::BlockVector<double> &src) {
-  std::vector<dealii::types::global_dof_index> &renumbering = renumberings[oct];
-  std::vector<dealii::types::global_dof_index> &unrenumbering = 
-      unrenumberings[oct];
   std::vector<int> &octant_to_global = octants_to_global[oct];
-  dof_handler.renumber_dofs(renumbering);
   // setup finite elements
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
   dealii::QGauss<dim> quadrature(fe.degree+1);
@@ -192,27 +146,18 @@ void Transport<dim, qdim>::vmult_octant(int oct,
            dealii::ExcMessage(std::to_string(cos_angle)));
     std::cout << ordinate << " " << octant_to_global[n] << std::endl;
   }
-  for (dealii::types::global_dof_index dof_index : renumbering)
-    std::cout << dof_index << " ";
-  std::cout << std::endl;
-  for (dealii::types::global_dof_index dof_index : unrenumbering)
-    std::cout << dof_index << " ";
   // setup local storage
   std::vector<dealii::FullMatrix<double>> matrices(
       num_ords, dealii::FullMatrix<double>(fe.dofs_per_cell));
   dealii::BlockVector<double> src_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_neighbor(num_ords, fe.dofs_per_cell);
-  using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
   using Cell = typename dealii::DoFHandler<dim>::cell_iterator;
   using Face = typename dealii::DoFHandler<dim>::face_iterator;
-  for (ActiveCell cell = dof_handler.begin_active(); cell != dof_handler.end();
-       cell++) {
-    if (!cell->is_locally_owned()) continue;
-    cell->get_dof_indices(dof_indices);  // dof_indices are downwind
-    std::cout << dof_indices[0] << std::endl;
-    for (int i = 0; i < dof_indices.size(); ++i)
-      dof_indices[i] = unrenumbering[dof_indices[i]];
+  for (ActiveCell &cell : cells_downstream[oct]) {
+    if (!cell->is_locally_owned()) 
+      continue;
+    cell->get_dof_indices(dof_indices);
     for (int n = 0; n < num_ords; ++n) {
       matrices[n] = 0;
       for (dealii::types::global_dof_index dof_index : dof_indices)
@@ -238,9 +183,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
           const int f_neighbor = cell->neighbor_of_neighbor(f);
           for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
             Cell neighbor_child = cell->neighbor_child_on_subface(f, f_sub);
-            neighbor_child->get_dof_indices(dof_indices_neighbor);  // downwind
-            for (int i = 0; i < dof_indices_neighbor.size(); ++i)
-              dof_indices_neighbor[i] = unrenumbering[dof_indices_neighbor[i]];
+            neighbor_child->get_dof_indices(dof_indices_neighbor);
             for (int n = 0; n < num_ords; ++n)
               for (dealii::types::global_dof_index dof_index :
                    dof_indices_neighbor)
@@ -254,9 +197,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
                                 src_cell);
           }
         } else { // !face->has_children()
-          neighbor->get_dof_indices(dof_indices_neighbor);  // downwind
-          for (int i = 0; i < dof_indices_neighbor.size(); ++i)
-            dof_indices_neighbor[i] = unrenumbering[dof_indices_neighbor[i]];
+          neighbor->get_dof_indices(dof_indices_neighbor);
           for (int n = 0; n < num_ords; ++n)
             for (dealii::types::global_dof_index dof_index :
                  dof_indices_neighbor)
@@ -272,16 +213,12 @@ void Transport<dim, qdim>::vmult_octant(int oct,
     }
     for (int n = 0; n < num_ords; ++n) {
       dealii::FullMatrix<double> &matrix = matrices[n];
-      // matrix.print(std::cout);
-      // std::cout << std::endl;
       matrix.gauss_jordan();  // directly invert
       matrix.vmult(dst_cell.block(n), src_cell.block(n));
       dst.block(octant_to_global[n]).add(dof_indices, dst_cell.block(n));
       dst_cell.block(n).print(std::cout);
-      // std::cout << std::endl;
     }
   }
-  dof_handler.renumber_dofs(unrenumbering);
 }
 
 template <int dim, int qdim>
