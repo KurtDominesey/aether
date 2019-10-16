@@ -1,7 +1,4 @@
 #include "transport.hpp"
-#include "quadrature.hpp"
-
-#include <deal.II/dofs/dof_renumbering.h>
 
 template <int dim, int qdim>
 Transport<dim, qdim>::Transport(

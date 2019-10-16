@@ -6,11 +6,13 @@
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/fe/fe_update_flags.h>
 #include <deal.II/fe/mapping_q1.h>
+#include <deal.II/dofs/dof_renumbering.h>
 
 #include <deal.II/meshworker/dof_info.h>
 #include <deal.II/meshworker/integration_info.h>
 #include <deal.II/meshworker/loop.h>
 
+#include "quadrature.hpp"
 #include "sweeper.hpp"
 
 /**
