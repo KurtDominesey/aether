@@ -199,10 +199,9 @@ void Transport<dim, qdim>::vmult_octant(int oct,
             Cell neighbor_child = cell->neighbor_child_on_subface(f, f_sub);
             neighbor_child->get_dof_indices(dof_indices_neighbor);
             for (int n = 0; n < num_ords; ++n)
-              for (dealii::types::global_dof_index dof_index :
-                   dof_indices_neighbor)
-                dst_neighbor.block(n) =
-                    dst.block(octant_to_global[n])[dof_index];
+              for (int i = 0; i < fe.dofs_per_cell; ++i)
+                dst_neighbor.block(n)[i] =
+                    dst.block(octant_to_global[n])[dof_indices_neighbor[i]];
             Assert(!neighbor_child->has_children(), dealii::ExcInvalidState());
             fe_subface_values.reinit(cell, f, f_sub);
             fe_face_values_neighbor.reinit(neighbor_child, f_neighbor);
@@ -213,9 +212,9 @@ void Transport<dim, qdim>::vmult_octant(int oct,
         } else { // !face->has_children()
           neighbor->get_dof_indices(dof_indices_neighbor);
           for (int n = 0; n < num_ords; ++n)
-            for (dealii::types::global_dof_index dof_index :
-                 dof_indices_neighbor)
-              dst_neighbor.block(n) = dst.block(octant_to_global[n])[dof_index];
+            for (int i = 0; i < fe.dofs_per_cell; ++i)
+              dst_neighbor.block(n)[i] =
+                  dst.block(octant_to_global[n])[dof_indices_neighbor[i]];
           const int f_neighbor = cell->neighbor_of_neighbor(f);
           fe_face_values.reinit(cell, f);
           fe_face_values_neighbor.reinit(neighbor, f_neighbor);
