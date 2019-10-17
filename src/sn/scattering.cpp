@@ -12,7 +12,7 @@ void Scattering<dim>::vmult(dealii::BlockVector<double> &dst,
   const int num_ell = 1;
   const int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
   std::vector<dealii::types::global_dof_index> dof_indices(dofs_per_cell);
-  for (const auto &cell : dof_handler.cell_iterators()) {
+  for (const auto &cell : dof_handler.active_cell_iterators()) {
     int material = cell->material_id();
     cell->get_dof_indices(dof_indices);
     for (int ell = 0, lm = 0; ell < num_ell; ++ell) {
