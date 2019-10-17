@@ -33,8 +33,8 @@ class Scattering {
               const dealii::BlockVector<double> &src) const;
 
  protected:
-  std::vector<double> &cross_sections;
   dealii::DoFHandler<dim> &dof_handler;
+  std::vector<double> &cross_sections;
 };
 
 #endif  // AETHER_SN_SCATTERING_H_
