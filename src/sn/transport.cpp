@@ -111,7 +111,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
   std::vector<int> &octant_to_global = octants_to_global[oct];
   // setup finite elements
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
-  dealii::QGauss<dim> quadrature(fe.degree+1);
+  dealii::QGauss<dim> quadrature_fe(fe.degree+1);
   dealii::QGauss<dim-1> quadrature_face(fe.degree+1);
   const dealii::UpdateFlags update_flags = 
       dealii::update_values
@@ -123,7 +123,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
       | dealii::update_normal_vectors
       | dealii::update_quadrature_points
       | dealii::update_JxW_values;
-  dealii::FEValues<dim> fe_values(fe, quadrature, update_flags);
+  dealii::FEValues<dim> fe_values(fe, quadrature_fe, update_flags);
   dealii::FEFaceValues<dim> fe_face_values(fe, quadrature_face,
                                            update_flags_face);
   dealii::FEFaceValues<dim> fe_face_values_neighbor(fe, quadrature_face,
