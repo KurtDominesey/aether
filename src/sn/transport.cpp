@@ -97,7 +97,7 @@ Transport<dim, qdim>::Transport(
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
-                                 const dealii::BlockVector<double> &src) {
+                                 const dealii::BlockVector<double> &src) const {
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
     vmult_octant(oct, dst, src);
@@ -107,8 +107,9 @@ void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult_octant(int oct, 
                                         dealii::BlockVector<double> &dst,
-                                        const dealii::BlockVector<double> &src) {
-  std::vector<int> &octant_to_global = octants_to_global[oct];
+                                        const dealii::BlockVector<double> &src) 
+                                        const {
+  const std::vector<int> &octant_to_global = octants_to_global[oct];
   // setup finite elements
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
   dealii::QGauss<dim> quadrature_fe(fe.degree+1);
@@ -163,7 +164,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
           boundary_conditions[b].block(octant_to_global[n]);
   using Cell = typename dealii::DoFHandler<dim>::cell_iterator;
   using Face = typename dealii::DoFHandler<dim>::face_iterator;
-  for (ActiveCell &cell : cells_downstream[oct]) {
+  for (const ActiveCell &cell : cells_downstream[oct]) {
     if (!cell->is_locally_owned()) 
       continue;
     cell->get_dof_indices(dof_indices);
@@ -178,7 +179,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
     integrate_cell_term(ordinates_in_octant, fe_values, cross_section,
                         matrices);
     for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; f++) {
-      Face face = cell->face(f);
+      const Face &face = cell->face(f);
       if (face->at_boundary()) {
         fe_face_values.reinit(cell, f);
         dealii::BlockVector<double> &dst_boundary =
@@ -188,12 +189,13 @@ void Transport<dim, qdim>::vmult_octant(int oct,
       } else {
         Assert(cell->neighbor(f).state() == dealii::IteratorState::valid,
                dealii::ExcInvalidState());
-        Cell neighbor = cell->neighbor(f);
+        const Cell &neighbor = cell->neighbor(f);
         if (face->has_children()) {
           Assert(false, dealii::ExcNotImplemented());
           const int f_neighbor = cell->neighbor_of_neighbor(f);
           for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
-            Cell neighbor_child = cell->neighbor_child_on_subface(f, f_sub);
+            const Cell &neighbor_child = 
+                cell->neighbor_child_on_subface(f, f_sub);
             neighbor_child->get_dof_indices(dof_indices_neighbor);
             for (int n = 0; n < num_ords; ++n)
               for (int i = 0; i < fe.dofs_per_cell; ++i)
@@ -234,7 +236,7 @@ template <int dim, int qdim>
 void Transport<dim, qdim>::integrate_cell_term(
     const std::vector<Ordinate> &ordinates_in_sweep,
     const dealii::FEValues<dim> &fe_values, double cross_section,
-    std::vector<dealii::FullMatrix<double>> &matrices) {
+    std::vector<dealii::FullMatrix<double>> &matrices) const {
   const std::vector<double> &JxW = fe_values.get_JxW_values();
   for (int n = 0; n < ordinates_in_sweep.size(); ++n) {
     const Ordinate &ordinate = ordinates_in_sweep[n];
@@ -259,7 +261,7 @@ void Transport<dim, qdim>::integrate_boundary_term(
     const dealii::FEFaceValues<dim> &fe_face_values,
     const dealii::BlockVector<double> &dst_boundary,
     std::vector<dealii::FullMatrix<double>> &matrices,
-    dealii::BlockVector<double> &src_cell) {
+    dealii::BlockVector<double> &src_cell) const {
   const std::vector<double> &JxW = fe_face_values.get_JxW_values();
   const std::vector<dealii::Tensor<1, dim>> &normals =
       fe_face_values.get_normal_vectors();
@@ -299,7 +301,7 @@ void Transport<dim, qdim>::integrate_face_term(
     const dealii::FEFaceValuesBase<dim> &fe_face_values_neighbor,
     const dealii::BlockVector<double> &dst_neighbor,
     std::vector<dealii::FullMatrix<double>> &matrices,
-    dealii::BlockVector<double> &src_cell) {
+    dealii::BlockVector<double> &src_cell) const {
   const std::vector<double> &JxW = fe_face_values.get_JxW_values();
   const std::vector<dealii::Tensor<1, dim> > &normals =
       fe_face_values.get_normal_vectors();

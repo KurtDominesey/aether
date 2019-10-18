@@ -44,7 +44,7 @@ class Transport {
    * @param src Source vector (\f$q\f$).
    */
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src);
+             const dealii::BlockVector<double> &src) const;
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
    * 
@@ -53,7 +53,7 @@ class Transport {
    * @param src Source vector (\f$q\f$).
    */
   void vmult_octant(int oct, dealii::BlockVector<double> &dst,
-                    const dealii::BlockVector<double> &src);
+                    const dealii::BlockVector<double> &src) const;
                     
   dealii::DoFHandler<dim> &dof_handler;
   const dealii::Quadrature<qdim> &quadrature;
@@ -75,7 +75,8 @@ class Transport {
   void integrate_cell_term(const std::vector<Ordinate> &ordinates_in_sweep,
                            const dealii::FEValues<dim> &fe_values,
                            double cross_section,
-                           std::vector<dealii::FullMatrix<double>> &matrices);
+                           std::vector<dealii::FullMatrix<double>> &matrices)
+                           const;
   /**
    * Assemble the boundary contributions of the local matrix.
    * 
@@ -86,7 +87,8 @@ class Transport {
                                const dealii::FEFaceValues<dim> &fe_face_values,
                                const dealii::BlockVector<double> &dst_boundary,
                                std::vector<dealii::FullMatrix<double>> &matrices,
-                               dealii::BlockVector<double> &src_cell);
+                               dealii::BlockVector<double> &src_cell)
+                               const;
   /**
    * Assemble the face contributions of the local matrix.
    * 
@@ -99,7 +101,8 @@ class Transport {
       const dealii::FEFaceValuesBase<dim> &fe_face_values_neighbor,
       const dealii::BlockVector<double> &dst_neighbor,
       std::vector<dealii::FullMatrix<double>> &matrices,
-      dealii::BlockVector<double> &src_cell);
+      dealii::BlockVector<double> &src_cell)
+      const;
 
   std::vector<std::vector<int>> octants_to_global;
 };
