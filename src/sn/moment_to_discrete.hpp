@@ -12,6 +12,10 @@ class MomentToDiscrete {
              const dealii::BlockVector<double> &src) const;
   void Tvmult(dealii::BlockVector<double> &dst,
               const dealii::BlockVector<double> &src) const;
+  void vmult_add(dealii::BlockVector<double> &dst, 
+                 const dealii::BlockVector<double> &src) const;
+  void Tvmult_add(dealii::BlockVector<double> &dst,
+                  const dealii::BlockVector<double> &src) const;
 
  protected:
   const dealii::Quadrature<qdim> &quadrature;

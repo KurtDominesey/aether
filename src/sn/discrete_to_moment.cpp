@@ -10,6 +10,13 @@ void DiscreteToMoment<qdim>::vmult(dealii::BlockVector<double> &dst,
                                    const dealii::BlockVector<double> &src) 
                                    const {
   dst = 0;
+  vmult_add(dst, src);
+}
+
+template <int qdim>
+void DiscreteToMoment<qdim>::vmult_add(dealii::BlockVector<double> &dst,
+                                       const dealii::BlockVector<double> &src) 
+                                       const {
   int num_moments = dst.n_blocks();
   int num_ordinates = src.n_blocks();
   Assert(num_moments == 1, dealii::ExcNotImplemented());
@@ -30,6 +37,11 @@ template <int qdim>
 void DiscreteToMoment<qdim>::Tvmult(dealii::BlockVector<double> &dst,
                                    const dealii::BlockVector<double> &src) 
                                    const {} // not implemented
+
+template <int qdim>
+void DiscreteToMoment<qdim>::Tvmult_add(dealii::BlockVector<double> &dst,
+                                        const dealii::BlockVector<double> &src) 
+                                        const {} // not implemented
 
 template class DiscreteToMoment<1>;
 template class DiscreteToMoment<2>;
