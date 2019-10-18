@@ -5,6 +5,7 @@
 #include <deal.II/base/convergence_table.h>
 
 #include "../transport.hpp"
+#include "../../functions/attenuated.hpp"
 #include "gtest/gtest.h"
 
 namespace {
@@ -27,6 +28,8 @@ class Transport1DTest : public ::testing::TestWithParam<int> {
         2, dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
   }
 
+  const double x0 = -1;
+  const double x1 = 1;
   dealii::Triangulation<1> mesh;
   dealii::Quadrature<1> quadrature;
   dealii::DoFHandler<1> dof_handler;
@@ -52,24 +55,6 @@ TEST_P(Transport1DTest, Void) {
   }
 }
 
-class Attenuated : public dealii::Function<1> {
- public:
-  Attenuated(double cos_angle, double cross_section, double incident)
-      : dealii::Function<1>(),
-        cos_angle(cos_angle),
-        cross_section(cross_section),
-        incident(incident){};
-  double value(const dealii::Point<1> &p,
-               const unsigned int /*component*/) const {
-    double x0 = cos_angle > 0 ? -1 : +1;
-    double path = (p(0) - x0) / cos_angle;
-    return incident * std::exp(-cross_section * path);
-  };
-  double cos_angle;
-  double cross_section;
-  double incident;
-};
-
 TEST_P(Transport1DTest, Attenuation) {
   int num_ords = quadrature.size();
   double incident = 1;
@@ -78,7 +63,7 @@ TEST_P(Transport1DTest, Attenuation) {
   solutions.reserve(num_ords);
   for (int n = 0; n < num_ords; ++n)
     solutions.emplace_back(ordinate<1>(quadrature.point(n))[0],
-                           cross_sections[0], incident);
+                           cross_sections[0], incident, x0 , x1);
   dealii::ConvergenceTable convergence_table;
   int num_cycles = 2;
   std::vector<std::vector<double>> l2_errors(num_cycles,
