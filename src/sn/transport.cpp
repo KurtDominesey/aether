@@ -170,8 +170,8 @@ void Transport<dim, qdim>::vmult_octant(int oct,
     cell->get_dof_indices(dof_indices);
     for (int n = 0; n < num_ords; ++n) {
       matrices[n] = 0;
-      for (dealii::types::global_dof_index dof_index : dof_indices)
-        src_cell.block(n) = src.block(octant_to_global[n])[dof_index];
+      for (int i = 0; i < fe.dofs_per_cell; ++i)
+        src_cell.block(n)[i] = src.block(octant_to_global[n])[dof_indices[i]];
     }
     fe_values.reinit(cell);
     int material = cell->material_id();
