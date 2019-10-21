@@ -8,6 +8,8 @@
 #include "../types/matrix_type.hpp"
 #include "cache.hpp"
 
+namespace pgd {
+
 class FixedOperator : public MatrixType {
   template <typename T>
   using Separated = std::map<char, std::vector<T> >;
@@ -26,5 +28,6 @@ class FixedOperator : public MatrixType {
   Cache cache;
 };
 
+}
 
 #endif // AETHER_PGD_FIXED_OPERATOR_H_

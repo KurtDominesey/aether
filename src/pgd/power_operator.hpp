@@ -7,6 +7,8 @@
 
 #include "../types/matrix_type.hpp"
 
+namespace pgd {
+
 class PowerOperator : public MatrixType {
  template <typename T>
  using Separated = std::map<std::string, std::vector<T> >;
@@ -32,6 +34,8 @@ void PowerOperator::vmult(dealii::BlockVector<double>& dst,
     operators[i].vmult(dst.block(i), src.block(i));
     coefficients.update(operators[i]);
   }
+}
+
 }
 
 #endif  // AETHER_PGD_POWER_OPERATOR_H_

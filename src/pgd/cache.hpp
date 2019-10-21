@@ -3,6 +3,8 @@
 
 #include <deal.II/lac/block_vector.h>
 
+namespace pgd {
+
 struct Cache {
   template <typename T>
   using Separated = std::map<std::string, std::vector<T> >;
@@ -11,5 +13,7 @@ struct Cache {
   std::vector<Separated<dealii::BlockVector<double> > > operated_modes;
   bool modes_updated = false;
 };
+
+}  // namespace Pgd
 
 #endif // AETHER_PGD_CACHE_H_
