@@ -98,6 +98,7 @@ Transport<dim, qdim>::Transport(
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                  const dealii::BlockVector<double> &src) const {
+  dst = 0;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
     vmult_octant(oct, dst, src);
