@@ -16,8 +16,46 @@
 #include "sweeper.hpp"
 
 /**
- * A matrix-free expression of the linear operator
- * \f$L\psi=\right(\Omega\cdot\nabla+\Sigma_t\right)\psi\f$.
+ * A matrix-free expression of the linear operator \f$L^{-1}\f$ where
+ * \f$L\psi=\left(\Omega\cdot\nabla+\Sigma_t\right)\psi\f$.
+ *
+ * Specifically, discretizing \f$\Omega\f$ to discrete ordinates 
+ * \f$\Omega_1,\ldots\Omega_N\f$ we have 
+ * \f[
+ *   \left(\Omega_n\cdot\nabla+\Sigma_t(r)\right)\psi_n(r)=q(r)\quad
+ *   \forall r\in\mathcal{V},\ n\in[0,N]
+ * \f]
+ * with boundary conditions
+ * \f[
+ *   \psi_n(r)=\psi_{inc}\quad \forall r\in\Gamma_-
+ * \f]
+ * where \f$\Gamma_-\f$ is the inflow boundary,
+ * \f[
+ *   \Gamma_-:=\{r\in\partial\mathcal{V},\ \Omega_n\cdot n(r)<0\}.
+ * \f]
+ * We achieve a variational form by multiplying by test function \f$\psi^*\f$
+ * and integrating over the problem domain \f$\mathcal{V}\f$. Subsequently, we
+ * integrate by parts. Inspecting a single element \f$K\f$ (and suppressing
+ * subscript \f$n\f$),
+ * \f[
+ *   \left(\psi,-\Omega\cdot\nabla\psi^*\right)_K
+ *   + \left\langle\hat{\psi},\Omega\cdot n\psi^*_-\right\rangle_{\partial K_+}
+ *   - \left\langle\hat{\psi},\Omega\cdot n\psi^*_+\right\rangle_{\partial K_-}
+ *   + \left(\Sigma_t\psi,\psi^*\right)_K
+ *   = \left(q,\psi^*\right)_K
+ * \f]
+ * where \f$\psi\f$ and \f$\psi^*\f$ can be discontinuous across faces. As such,
+ * we use subscripts to denote the upwind and downwind values, respectively
+ * \f[
+ *   \psi^*_+=\lim_{s\rightarrow 0^+} \psi^*(r+s\Omega) \\
+ *   \psi^*_-=\lim_{s\rightarrow 0^-} \psi^*(r+s\Omega).
+ * \f]
+ * We achieve closure by applying the upwind conditions on the numerical flux,
+ * \f[
+ *  \hat{\psi}=\psi^-\in\partial K\setminus\Gamma_- \\
+ *  \hat{\psi}=\psi_{inc} \in\Gamma_-
+ * \f]
+ * TODO: finish documentation
  */
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class Transport {
