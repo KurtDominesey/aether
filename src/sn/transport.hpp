@@ -112,8 +112,10 @@ class Transport {
    */
   void integrate_cell_term(const std::vector<Ordinate> &ordinates_in_sweep,
                            const dealii::FEValues<dim> &fe_values,
+                           const dealii::BlockVector<double> &rhs_cell,
                            double cross_section,
-                           std::vector<dealii::FullMatrix<double>> &matrices)
+                           std::vector<dealii::FullMatrix<double>> &matrices,
+                           dealii::BlockVector<double> &src_cell)
                            const;
   /**
    * Assemble the boundary contributions of the local matrix.

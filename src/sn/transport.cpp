@@ -153,6 +153,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
   // setup local storage
   std::vector<dealii::FullMatrix<double>> matrices(
       num_ords, dealii::FullMatrix<double>(fe.dofs_per_cell));
+  dealii::BlockVector<double> rhs_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> src_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_neighbor(num_ords, fe.dofs_per_cell);
@@ -171,14 +172,15 @@ void Transport<dim, qdim>::vmult_octant(int oct,
     cell->get_dof_indices(dof_indices);
     for (int n = 0; n < num_ords; ++n) {
       matrices[n] = 0;
+      src_cell.block(n) = 0;
       for (int i = 0; i < fe.dofs_per_cell; ++i)
-        src_cell.block(n)[i] = src.block(octant_to_global[n])[dof_indices[i]];
+        rhs_cell.block(n)[i] = src.block(octant_to_global[n])[dof_indices[i]];
     }
     fe_values.reinit(cell);
     int material = cell->material_id();
     double cross_section = cross_sections[material];
-    integrate_cell_term(ordinates_in_octant, fe_values, cross_section,
-                        matrices);
+    integrate_cell_term(ordinates_in_octant, fe_values, rhs_cell, cross_section,
+                        matrices, src_cell);
     for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; f++) {
       const Face &face = cell->face(f);
       if (face->at_boundary()) {
@@ -236,8 +238,10 @@ void Transport<dim, qdim>::vmult_octant(int oct,
 template <int dim, int qdim>
 void Transport<dim, qdim>::integrate_cell_term(
     const std::vector<Ordinate> &ordinates_in_sweep,
-    const dealii::FEValues<dim> &fe_values, double cross_section,
-    std::vector<dealii::FullMatrix<double>> &matrices) const {
+    const dealii::FEValues<dim> &fe_values,
+    const dealii::BlockVector<double> &rhs_cell, double cross_section,
+    std::vector<dealii::FullMatrix<double>> &matrices,
+    dealii::BlockVector<double> &src_cell) const {
   const std::vector<double> &JxW = fe_values.get_JxW_values();
   for (int n = 0; n < ordinates_in_sweep.size(); ++n) {
     const Ordinate &ordinate = ordinates_in_sweep[n];
@@ -250,6 +254,10 @@ void Transport<dim, qdim>::integrate_cell_term(
           double collision = cross_section * fe_values.shape_value(i, q) *
                              fe_values.shape_value(j, q);
           matrix(i, j) += (-streaming + collision) * JxW[q];
+          src_cell.block(n)(i) += rhs_cell.block(n)[i] 
+                                  * fe_values.shape_value(i, q)
+                                  * fe_values.shape_value(j, q) 
+                                  * JxW[q];
         }
       }
     }
