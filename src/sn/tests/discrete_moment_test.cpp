@@ -4,8 +4,6 @@
 
 namespace {
 
-// class DiscreteMomentTest : public ::testing::Test {};
-
 TEST(DiscreteMomentTest, IsotropicD2M) {
   const int qdim = 2;
   int num_ords_qdim = 4;
@@ -39,8 +37,3 @@ TEST(DiscreteMomentTest, IsotropicM2D) {
 }
 
 }  // namespace
-
-// int main (int argc, char **argv) {
-//   ::testing::InitGoogleTest(&argc, argv);
-//   return RUN_ALL_TESTS();
-// }

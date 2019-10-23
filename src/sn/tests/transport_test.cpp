@@ -179,8 +179,6 @@ TEST_P(Transport1DTest, ManufacturedCosine) {
     }
     // dealii::Vector<double> solution_h(num_dofs);
     // dealii::VectorTools::interpolate(dof_handler, solution, solution_h);
-    // std::cout << "EXACT\n";
-    // solution_h.print(std::cout);
     Transport<1> transport(dof_handler, quadrature, cross_sections,
                            boundary_conditions);
     transport.vmult(flux, source);
@@ -198,9 +196,6 @@ TEST_P(Transport1DTest, ManufacturedCosine) {
             std::log(2.);
         EXPECT_NEAR(l2_conv, GetParam()+1, 2e-2);
       }
-      // std::cout << "NUMERICAL " << n << std::endl;
-      // flux.block(n).print(std::cout);
-      // std::cout << "SOURCE\n" << source.block(n);
       std::string key = "L2 " + std::to_string(n);
       convergence_table.add_value(key, l2_error);
       if (cycle == num_cycles - 1)
@@ -215,4 +210,4 @@ TEST_P(Transport1DTest, ManufacturedCosine) {
 
 INSTANTIATE_TEST_CASE_P(FEDegree, Transport1DTest, ::testing::Range(0, 4));
 
-}
+}  // namespace

@@ -26,4 +26,4 @@ TEST(ScatteringTest, OneMaterialIsotropic) {
   }
 }
 
-}
+}  // namespace

@@ -92,4 +92,4 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
   }
 }
 
-}
+}  // namespace
