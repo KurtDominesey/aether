@@ -3,6 +3,8 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_richardson.h>
+#include <deal.II/lac/solver_gmres.h>
+#include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
 
 #include "../within_group.cpp"
@@ -11,6 +13,7 @@
 
 namespace {
 
+template <class SolverType>
 class WithinGroupTest : public ::testing::Test {
  protected:
   static const int dim = 1;
@@ -20,12 +23,12 @@ class WithinGroupTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
-    dealii::GridGenerator::subdivided_hyper_cube(mesh, 5, -1, 1);
+    dealii::GridGenerator::subdivided_hyper_cube(mesh, 128, -1, 1);
     dealii::FE_DGQ<dim> fe(1);
     dof_handler.initialize(mesh, fe);
-    int num_ords_qdim = 2;
+    int num_ords_qdim = 8;
     int num_ords = std::pow(num_ords_qdim, qdim);
-    quadrature = dealii::QGauss<dim>(num_ords_qdim);
+    quadrature = dealii::QGauss<qdim>(num_ords_qdim);
     int num_dofs = dof_handler.n_dofs();
     source.reinit(num_ords, num_dofs);
     uncollided.reinit(num_ords, num_dofs);
@@ -34,47 +37,57 @@ class WithinGroupTest : public ::testing::Test {
         2, dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
   }
 
-  dealii::DoFHandler<1> dof_handler;
-  dealii::Quadrature<1> quadrature;
+  dealii::DoFHandler<dim> dof_handler;
+  dealii::Quadrature<qdim> quadrature;
   std::vector<dealii::BlockVector<double>> boundary_conditions;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> uncollided;
   dealii::BlockVector<double> flux;
 };
 
-TEST_F(WithinGroupTest, Void) {
-  const int num_ords = quadrature.size();
-  const int num_dofs = dof_handler.n_dofs();
+using SolverTypes =
+    ::testing::Types< dealii::SolverRichardson<dealii::BlockVector<double>>,
+                      dealii::SolverGMRES<dealii::BlockVector<double>>,
+                      dealii::SolverFGMRES<dealii::BlockVector<double>>,
+                      dealii::SolverBicgstab<dealii::BlockVector<double>> >;
+TYPED_TEST_CASE(WithinGroupTest, SolverTypes);
+
+TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
+  const int dim = this->dim;
+  const int qdim = this->qdim;
+  const int num_ords = this->quadrature.size();
+  const int num_dofs = this->dof_handler.n_dofs();
   for (int n = 0; n < num_ords; ++n)
-    for (dealii::BlockVector<double> &boundary_condition : boundary_conditions)
-      boundary_condition.block(n) = 1;
+    for (dealii::BlockVector<double> &boundary_condition : 
+         this->boundary_conditions)
+      boundary_condition.block(n) = 1.0;
   std::vector<double> cross_sections_total = {1.0};
-  std::vector<double> cross_sections_scattering = {0.0};
-  Transport<dim, qdim> transport(dof_handler, quadrature, cross_sections_total,
-                                 boundary_conditions);
-  Scattering<dim> scattering(dof_handler, cross_sections_scattering);
-  MomentToDiscrete<qdim> m2d(quadrature);
-  DiscreteToMoment<qdim> d2m(quadrature);
+  std::vector<double> cross_sections_scattering = {1.0};
+  Transport<dim, qdim> transport(this->dof_handler, 
+                            this->quadrature, 
+                            cross_sections_total,
+                            this->boundary_conditions);
+  Scattering<dim> scattering(this->dof_handler, cross_sections_scattering);
+  MomentToDiscrete<qdim> m2d(this->quadrature);
+  DiscreteToMoment<qdim> d2m(this->quadrature);
   WithinGroup<dim, qdim> within_group(transport, m2d, scattering, d2m);
-  transport.vmult(uncollided, source);
-  // for (int n = 0; n < num_ords; ++n) {
-  //   for (int i = 0; i < num_dofs; ++i) {
-  //     // ASSERT_NEAR(n + 1, flux.block(n)[i], 1e-10);
-  //   }
-  // }
-  std::cout << "UNCOLLIDED\n";
-  uncollided.print(std::cout);
-  flux = 0;
-  dealii::SolverControl solver_control(100, 1e-10);
-  dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
-  solver.solve(within_group, flux, uncollided, dealii::PreconditionIdentity());
-  std::cout << "FINAL FLUX\n";
-  flux.print(std::cout);
+  this->source = 0;
+  transport.vmult(this->uncollided, this->source);
+  for (dealii::BlockVector<double> &boundary_condition : 
+       this->boundary_conditions)
+    for (int n = 0; n < num_ords; ++n)
+      boundary_condition.block(n) = 0;
+  this->flux = 0;
+  dealii::SolverControl solver_control(200, 1e-10);
+  TypeParam solver(solver_control);
+  solver.solve(within_group, this->flux, this->uncollided, 
+               dealii::PreconditionIdentity());
+  // std::cout << "iterations required " 
+  //           << solver_control.last_step() 
+  //           << std::endl;
   for (int n = 0; n < num_ords; ++n) {
-    // uncollided.block(n).print(std::cout);
-    // flux.block(n).print(std::cout);
     for (int i = 0; i < num_dofs; ++i) {
-      // ASSERT_NEAR(1, flux.block(n)[i], 1e-10);
+      ASSERT_NEAR(1, this->flux.block(n)[i], 1e-10);
     }
   }
 }
