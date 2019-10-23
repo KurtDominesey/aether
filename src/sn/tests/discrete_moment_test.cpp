@@ -15,7 +15,7 @@ TEST(DiscreteMomentTest, IsotropicD2M) {
   int num_dofs = 16;
   dealii::BlockVector<double> discrete(num_ords, num_dofs);
   dealii::BlockVector<double> zeroth(1, num_dofs);
-  discrete = 2;
+  discrete = dealii::numbers::PI;
   d2m.vmult(zeroth, discrete);
   for (int ord = 0; ord < num_ords; ++ord) {
     for (int i = 0; i < num_dofs; ++i)
@@ -32,7 +32,7 @@ TEST(DiscreteMomentTest, IsotropicM2D) {
   int num_dofs = 16;
   dealii::BlockVector<double> zeroth(1, num_dofs);
   dealii::BlockVector<double> discrete(num_ords, num_dofs);
-  zeroth = 2;
+  zeroth = dealii::numbers::PI;
   m2d.vmult(discrete, zeroth);
   for (int ord = 0; ord < num_ords; ++ord)
     ASSERT_EQ(discrete.block(ord), zeroth.block(0));
