@@ -44,7 +44,7 @@ PROJECT(${TARGET})
 DEAL_II_INVOKE_AUTOPILOT()
 
 # Make GTest executable
-find_package(GTest REQUIRED)
+find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
 FILE(GLOB_RECURSE TEST_SRC  "src/[!main]*.cpp")
