@@ -16,7 +16,7 @@ class Transport1DTest : public ::testing::TestWithParam<int> {
   void SetUp() override {
     const int dim = 1;
     const int qdim = 1;
-    dealii::GridGenerator::subdivided_hyper_cube(mesh, 128, -1, 1);
+    dealii::GridGenerator::subdivided_hyper_cube(mesh, 128, x0, x1);
     dealii::FE_DGQ<dim> fe(TestWithParam::GetParam());
     dof_handler.initialize(mesh, fe);
     int num_ords_qdim = 8;
