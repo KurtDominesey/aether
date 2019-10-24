@@ -19,8 +19,9 @@ class WithinGroup {
              const dealii::BlockVector<double> &src) const;
   void Tvmult(dealii::BlockVector<double> &dst,
               const dealii::BlockVector<double> &src) const;
- protected:
   const Transport<dim, qdim> &transport;
+
+ protected:
   const MomentToDiscrete<qdim> &m2d;
   const Scattering<dim> &scattering;
   const DiscreteToMoment<qdim> &d2m;
