@@ -13,7 +13,6 @@
 #include <deal.II/meshworker/loop.h>
 
 #include "quadrature.hpp"
-#include "sweeper.hpp"
 
 /**
  * A matrix-free expression of the linear operator \f$L^{-1}\f$ where
@@ -105,8 +104,6 @@ class Transport {
   std::vector<std::vector<ActiveCell>> cells_downstream;
 
  protected:
-  using DoFInfo = dealii::MeshWorker::DoFInfo<dim>;
-  using CellInfo = dealii::MeshWorker::IntegrationInfo<dim>;
   /**
    * Assemble the cell contributions of the local matrix.
    * 
