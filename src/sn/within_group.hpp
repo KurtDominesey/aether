@@ -24,25 +24,6 @@ class WithinGroup {
   MomentToDiscrete<qdim> &m2d;
   Scattering<dim> &scattering;
   DiscreteToMoment<qdim> &d2m;
-
- private:
-  // dealii::BlockVector<double> flux_m;
-  // dealii::BlockVector<double> scattered;
-  // dealii::BlockVector<double> src_total;
 };
-
-// template <//typename Range = dealii::BlockVector<double>, typename Domain = Range,
-//           // typename BlockPayload = dealii::internal::BlockLinearOperatorImplementation::EmptyBlockPayload<>,
-//           int dim, int qdim>
-// void within_group(
-//     Transport<dim, qdim> transport, MomentToDiscrete<qdim> moment_to_discrete,
-//     Scattering<dim> scattering, DiscreteToMoment<qdim> discrete_to_moment) {
-//   // auto Linv = dealii::linear_operator(transport);
-//   // auto M2D = dealii::linear_operator(moment_to_discrete);
-//   dealii::LinearOperator<dealii::BlockVector<double>> S 
-//       = dealii::linear_operator(scattering);
-//   // auto D2M = dealii::linear_operator(discrete_to_moment);
-//   // auto wg = Linv * D2M * S * M2D;
-// }
 
 #endif  // AETHER_SN_WITHIN_GROUP_H_
