@@ -59,10 +59,11 @@
  */
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class Transport {
+ public:
   using Ordinate = dealii::Tensor<1, dim>;
   using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
-
- public:
+  using Cell = typename dealii::DoFHandler<dim>::cell_iterator;
+  using Face = typename dealii::DoFHandler<dim>::face_iterator;
   /**
    * Constructor.
    * 

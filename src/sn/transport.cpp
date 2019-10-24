@@ -164,8 +164,6 @@ void Transport<dim, qdim>::vmult_octant(int oct,
     for (int n = 0; n < num_ords; ++n)
       boundary_conditions_incident[b].block(n) =
           boundary_conditions[b].block(octant_to_global[n]);
-  using Cell = typename dealii::DoFHandler<dim>::cell_iterator;
-  using Face = typename dealii::DoFHandler<dim>::face_iterator;
   for (const ActiveCell &cell : cells_downstream[oct]) {
     if (!cell->is_locally_owned()) 
       continue;
