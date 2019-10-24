@@ -72,7 +72,7 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
   DiscreteToMoment<qdim> d2m(this->quadrature);
   WithinGroup<dim, qdim> within_group(transport, m2d, scattering, d2m);
   this->source = 0;
-  transport.vmult(this->uncollided, this->source);
+  transport.vmult(this->uncollided, this->source, false);
   for (dealii::BlockVector<double> &boundary_condition : 
        this->boundary_conditions)
     for (int n = 0; n < num_ords; ++n)

@@ -48,7 +48,7 @@ TEST_P(Transport1DTest, Void) {
       boundary_condition.block(n) = n + 1;
   Transport<1> transport(dof_handler, quadrature, cross_sections,
                          boundary_conditions);
-  transport.vmult(flux, source);
+  transport.vmult(flux, source, false);
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {
       ASSERT_NEAR(n + 1, flux.block(n)[i], 1e-10);
@@ -86,7 +86,7 @@ TEST_P(Transport1DTest, Attenuation) {
       }
     Transport<1> transport(dof_handler, quadrature, cross_sections,
                            boundary_conditions);
-    transport.vmult(flux, source);
+    transport.vmult(flux, source, false);
     for (int n = 0; n < num_ords; ++n) {
       dealii::Vector<double> difference_per_cell(mesh.n_active_cells());
       dealii::VectorTools::integrate_difference(
@@ -181,7 +181,7 @@ TEST_P(Transport1DTest, ManufacturedCosine) {
     // dealii::VectorTools::interpolate(dof_handler, solution, solution_h);
     Transport<1> transport(dof_handler, quadrature, cross_sections,
                            boundary_conditions);
-    transport.vmult(flux, source);
+    transport.vmult(flux, source, false);
     for (int n = 0; n < num_ords; ++n) {
       dealii::Vector<double> difference_per_cell(mesh.n_active_cells());
       dealii::VectorTools::integrate_difference(

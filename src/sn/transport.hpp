@@ -83,7 +83,8 @@ class Transport {
    * @param src Source vector (\f$q\f$).
    */
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src,
+             const bool homogeneous = true) const;
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
    * 
@@ -92,8 +93,9 @@ class Transport {
    * @param src Source vector (\f$q\f$).
    */
   void vmult_octant(int oct, dealii::BlockVector<double> &dst,
-                    const dealii::BlockVector<double> &src) const;
-                    
+                    const dealii::BlockVector<double> &src,
+                    const bool homogeneous) const;
+
   dealii::DoFHandler<dim> &dof_handler;
   const dealii::Quadrature<qdim> &quadrature;
   const std::vector<double> &cross_sections;
@@ -128,7 +130,8 @@ class Transport {
                                const dealii::FEFaceValues<dim> &fe_face_values,
                                const dealii::BlockVector<double> &dst_boundary,
                                std::vector<dealii::FullMatrix<double>> &matrices,
-                               dealii::BlockVector<double> &src_cell)
+                               dealii::BlockVector<double> &src_cell,
+                               const bool homogeneous)
                                const;
   /**
    * Assemble the face contributions of the local matrix.

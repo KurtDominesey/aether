@@ -97,18 +97,20 @@ Transport<dim, qdim>::Transport(
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
-                                 const dealii::BlockVector<double> &src) const {
+                                 const dealii::BlockVector<double> &src,
+                                 const bool homogeneous) const {
   dst = 0;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
-    vmult_octant(oct, dst, src);
+    vmult_octant(oct, dst, src, homogeneous);
   }
 }
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult_octant(int oct, 
                                         dealii::BlockVector<double> &dst,
-                                        const dealii::BlockVector<double> &src) 
+                                        const dealii::BlockVector<double> &src,
+                                        const bool homogeneous) 
                                         const {
   const std::vector<int> &octant_to_global = octants_to_global[oct];
   // setup finite elements
@@ -186,7 +188,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
         dealii::BlockVector<double> &dst_boundary =
             boundary_conditions_incident[face->boundary_id()];
         integrate_boundary_term(ordinates_in_octant, fe_face_values, 
-                                dst_boundary, matrices, src_cell);
+                                dst_boundary, matrices, src_cell, homogeneous);
       } else {
         Assert(cell->neighbor(f).state() == dealii::IteratorState::valid,
                dealii::ExcInvalidState());
@@ -268,7 +270,8 @@ void Transport<dim, qdim>::integrate_boundary_term(
     const dealii::FEFaceValues<dim> &fe_face_values,
     const dealii::BlockVector<double> &dst_boundary,
     std::vector<dealii::FullMatrix<double>> &matrices,
-    dealii::BlockVector<double> &src_cell) const {
+    dealii::BlockVector<double> &src_cell,
+    const bool homogeneous) const {
   const std::vector<double> &JxW = fe_face_values.get_JxW_values();
   const std::vector<dealii::Tensor<1, dim>> &normals =
       fe_face_values.get_normal_vectors();
@@ -286,7 +289,7 @@ void Transport<dim, qdim>::integrate_boundary_term(
                             * JxW[q];
           }
         }
-      } else {  // inflow
+      } else if (!homogeneous) {  // inflow
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j) {
             src_cell.block(n)(i) += -ord_dot_normal
