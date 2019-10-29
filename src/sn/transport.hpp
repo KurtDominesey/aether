@@ -81,6 +81,15 @@ class Transport {
    * @param dst Destination vector.
    * @param src Source vector (\f$q\f$).
    */
+  void vmult(dealii::Vector<double> &dst,
+             const dealii::Vector<double> &src,
+             const bool homogeneous = true) const;
+  /**
+   * Compute \f$L^{-1}q\f$.
+   * 
+   * @param dst Destination vector.
+   * @param src Source vector (\f$q\f$).
+   */
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
              const bool homogeneous = true) const;

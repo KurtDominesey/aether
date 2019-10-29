@@ -21,6 +21,14 @@ class Scattering {
    * @param dst Destination vector.
    * @param src Source vector.
    */
+  void vmult(dealii::Vector<double> &dst,
+             const dealii::Vector<double> &src) const;
+  /**
+   * Apply the linear operator.
+   * 
+   * @param dst Destination vector.
+   * @param src Source vector.
+   */
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   /**
@@ -31,6 +39,22 @@ class Scattering {
    */
   void Tvmult(dealii::BlockVector<double> &dst,
               const dealii::BlockVector<double> &src) const;
+  /**
+   * Add the linear operator.
+   * 
+   * @param dst Destination vector.
+   * @param src Source vector.
+   */
+  void vmult_add(dealii::Vector<double> &dst,
+                 const dealii::Vector<double> &src) const;
+  /**
+   * Add the linear operator.
+   * 
+   * @param dst Destination vector.
+   * @param src Source vector.
+   */
+  void vmult_add(dealii::BlockVector<double> &dst,
+                 const dealii::BlockVector<double> &src) const;
 
  protected:
   dealii::DoFHandler<dim> &dof_handler;

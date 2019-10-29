@@ -6,11 +6,37 @@ DiscreteToMoment<qdim>::DiscreteToMoment(
     : quadrature(quadrature) {}
 
 template <int qdim>
+void DiscreteToMoment<qdim>::vmult(dealii::Vector<double> &dst,
+                                   const dealii::Vector<double> &src) const {
+  const int num_ords = quadrature.size();
+  const int num_dofs = src.size() / num_ords;
+  dealii::BlockVector<double> dst_b(1, num_dofs);
+  dealii::BlockVector<double> src_b(num_ords, num_dofs);
+  src_b = src;
+  vmult(dst_b, src_b);
+  dst = dst_b;
+}
+
+template <int qdim>
 void DiscreteToMoment<qdim>::vmult(dealii::BlockVector<double> &dst,
                                    const dealii::BlockVector<double> &src) 
                                    const {
   dst = 0;
   vmult_add(dst, src);
+}
+
+template <int qdim>
+void DiscreteToMoment<qdim>::vmult_add(dealii::Vector<double> &dst,
+                                       const dealii::Vector<double> &src) 
+                                       const {
+  const int num_ords = quadrature.size();
+  const int num_dofs = src.size() / num_ords;
+  dealii::BlockVector<double> dst_b(1, num_dofs);
+  dealii::BlockVector<double> src_b(num_ords, num_dofs);
+  dst_b = dst;
+  src_b = src;
+  vmult_add(dst_b, src_b);
+  dst = dst_b;
 }
 
 template <int qdim>

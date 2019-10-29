@@ -15,6 +15,8 @@ class WithinGroup {
               MomentToDiscrete<qdim> &m2d,
               Scattering<dim> &scattering,
               DiscreteToMoment<qdim> &d2m);
+  void vmult(dealii::Vector<double> &dst,
+             const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   void Tvmult(dealii::BlockVector<double> &dst,
@@ -24,7 +26,6 @@ class WithinGroup {
 
  protected:
   const MomentToDiscrete<qdim> &m2d;
-  const Scattering<dim> &scattering;
   const DiscreteToMoment<qdim> &d2m;
 };
 

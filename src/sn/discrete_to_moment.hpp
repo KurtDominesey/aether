@@ -8,10 +8,14 @@ template <int qdim>
 class DiscreteToMoment {
  public:
   DiscreteToMoment(const dealii::Quadrature<qdim> &quadrature);
+  void vmult(dealii::Vector<double> &dst,
+             const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst, 
              const dealii::BlockVector<double> &src) const;
   void Tvmult(dealii::BlockVector<double> &dst,
               const dealii::BlockVector<double> &src) const;
+  void vmult_add(dealii::Vector<double> &dst,
+                 const dealii::Vector<double> &src) const;
   void vmult_add(dealii::BlockVector<double> &dst, 
                  const dealii::BlockVector<double> &src) const;
   void Tvmult_add(dealii::BlockVector<double> &dst,

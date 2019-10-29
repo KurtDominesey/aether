@@ -96,6 +96,17 @@ Transport<dim, qdim>::Transport(
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
+                                 const dealii::Vector<double> &src,
+                                 const bool homogeneous) const {
+  dealii::BlockVector<double> dst_b(quadrature.size(), dof_handler.n_dofs());
+  dealii::BlockVector<double> src_b(quadrature.size(), dof_handler.n_dofs());
+  src_b = src;
+  vmult(dst_b, src_b, homogeneous);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                  const dealii::BlockVector<double> &src,
                                  const bool homogeneous) const {
