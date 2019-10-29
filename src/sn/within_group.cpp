@@ -5,7 +5,8 @@ WithinGroup<dim, qdim>::WithinGroup(Transport<dim, qdim> &transport,
                                     MomentToDiscrete<qdim> &m2d,
                                     Scattering<dim> &scattering,
                                     DiscreteToMoment<qdim> &d2m)
-    : transport(transport), m2d(m2d), scattering(scattering), d2m(d2m) {
+    : transport(std::move(transport)), m2d(m2d), 
+      scattering(std::move(scattering)), d2m(d2m) {}
   
 }
 
