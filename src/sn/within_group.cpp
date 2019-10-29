@@ -7,7 +7,7 @@ WithinGroup<dim, qdim>::WithinGroup(Transport<dim, qdim> &transport,
                                     DiscreteToMoment<qdim> &d2m)
     : transport(std::move(transport)), m2d(m2d), 
       scattering(std::move(scattering)), d2m(d2m) {}
-  
+
 
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(dealii::Vector<double> &flux,
@@ -42,3 +42,7 @@ void WithinGroup<dim, qdim>::vmult(
   flux = src;  // I x
   flux -= transported;  // (I - L^-1 S) x
 }
+
+template class WithinGroup<1>;
+template class WithinGroup<2>;
+template class WithinGroup<3>;
