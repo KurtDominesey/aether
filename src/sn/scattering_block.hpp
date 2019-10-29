@@ -43,4 +43,18 @@ class ScatteringBlock {
   const std::vector<double> &cross_sections;
 };
 
+template <int dim>
+template <typename VectorType>
+void ScatteringBlock<dim>::vmult(VectorType &dst, const VectorType &src) 
+    const {
+  scattering.vmult(dst, src, cross_sections);
+}
+
+template <int dim>
+template <typename VectorType>
+void ScatteringBlock<dim>::vmult_add(VectorType &dst, 
+                                            const VectorType &src) const {
+  scattering.vmult_add(dst, src, cross_sections);
+}
+
 #endif  // AETHER_SN_SCATTERING_BLOCK_H_

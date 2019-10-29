@@ -1,41 +1,47 @@
 #include "scattering.hpp"
 
 template <int dim>
-Scattering<dim>::Scattering(dealii::DoFHandler<dim> &dof_handler,
-                            std::vector<double> &cross_sections)
-    : dof_handler(dof_handler), cross_sections(cross_sections) {}
+Scattering<dim>::Scattering(dealii::DoFHandler<dim> &dof_handler)
+    : dof_handler(dof_handler) {}
 
 template <int dim>
 void Scattering<dim>::vmult(dealii::Vector<double> &dst,
-                            const dealii::Vector<double> &src) const {
+                            const dealii::Vector<double> &src,
+                            const std::vector<double> &cross_sections) const {
   dealii::BlockVector<double> dst_b(1, dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(1, dof_handler.n_dofs());
   src_b = src;
-  vmult(dst_b, src_b);
+  vmult(dst_b, src_b, cross_sections);
   dst = dst_b;
 }
 
 template <int dim>
-void Scattering<dim>::vmult_add(dealii::Vector<double> &dst,
-                                const dealii::Vector<double> &src) const {
+void Scattering<dim>::vmult_add(
+    dealii::Vector<double> &dst, 
+    const dealii::Vector<double> &src,
+    const std::vector<double> &cross_sections) const {
   dealii::BlockVector<double> dst_b(1, dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(1, dof_handler.n_dofs());
   dst_b = dst;
   src_b = src;
-  vmult_add(dst_b, src_b);
+  vmult_add(dst_b, src_b, cross_sections);
   dst = dst_b;
 }
 
 template <int dim>
-void Scattering<dim>::vmult(dealii::BlockVector<double> &dst,
-                  const dealii::BlockVector<double> &src) const {
+void Scattering<dim>::vmult(
+    dealii::BlockVector<double> &dst,
+    const dealii::BlockVector<double> &src,
+    const std::vector<double> &cross_sections) const {
   dst = 0;
-  vmult_add(dst, src);
+  vmult_add(dst, src, cross_sections);
 }
 
 template <int dim>
-void Scattering<dim>::vmult_add(dealii::BlockVector<double> &dst,
-                  const dealii::BlockVector<double> &src) const {
+void Scattering<dim>::vmult_add(
+    dealii::BlockVector<double> &dst,
+    const dealii::BlockVector<double> &src,
+    const std::vector<double> &cross_sections) const {
   const int num_ell = 1;
   const int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
   std::vector<dealii::types::global_dof_index> dof_indices(dofs_per_cell);

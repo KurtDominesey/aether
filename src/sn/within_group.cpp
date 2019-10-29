@@ -3,7 +3,7 @@
 template <int dim, int qdim>
 WithinGroup<dim, qdim>::WithinGroup(Transport<dim, qdim> &transport,
                                     MomentToDiscrete<qdim> &m2d,
-                                    Scattering<dim> &scattering,
+                                    ScatteringBlock<dim> &scattering,
                                     DiscreteToMoment<qdim> &d2m)
     : transport(std::move(transport)), m2d(m2d), 
       scattering(std::move(scattering)), d2m(d2m) {}

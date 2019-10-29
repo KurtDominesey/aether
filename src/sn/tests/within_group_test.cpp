@@ -67,10 +67,11 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
                             this->quadrature, 
                             cross_sections_total,
                             this->boundary_conditions);
-  Scattering<dim> scattering(this->dof_handler, cross_sections_scattering);
+  Scattering<dim> scattering(this->dof_handler);
+  ScatteringBlock<dim> scattering_block(scattering, cross_sections_scattering);
   MomentToDiscrete<qdim> m2d(this->quadrature);
   DiscreteToMoment<qdim> d2m(this->quadrature);
-  WithinGroup<dim, qdim> within_group(transport, m2d, scattering, d2m);
+  WithinGroup<dim, qdim> within_group(transport, m2d, scattering_block, d2m);
   this->source = 0;
   within_group.transport.vmult(this->uncollided, this->source, false);
   for (dealii::BlockVector<double> &boundary_condition : 

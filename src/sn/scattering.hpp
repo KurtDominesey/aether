@@ -13,8 +13,7 @@ class Scattering {
    * 
    * @param Scattering material cross-sections.
    */
-  Scattering(dealii::DoFHandler<dim> &dof_handler,
-             std::vector<double> &cross_sections);
+  Scattering(dealii::DoFHandler<dim> &dof_handler);
   /**
    * Apply the linear operator.
    * 
@@ -22,7 +21,8 @@ class Scattering {
    * @param src Source vector.
    */
   void vmult(dealii::Vector<double> &dst,
-             const dealii::Vector<double> &src) const;
+             const dealii::Vector<double> &src,
+             const std::vector<double> &cross_sections) const;
   /**
    * Apply the linear operator.
    * 
@@ -30,7 +30,8 @@ class Scattering {
    * @param src Source vector.
    */
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src,
+             const std::vector<double> &cross_sections) const;
   /**
    * Apply the transpose of the linear operator (not implemented)
    * 
@@ -46,7 +47,8 @@ class Scattering {
    * @param src Source vector.
    */
   void vmult_add(dealii::Vector<double> &dst,
-                 const dealii::Vector<double> &src) const;
+                 const dealii::Vector<double> &src,
+                 const std::vector<double> &cross_sections) const;
   /**
    * Add the linear operator.
    * 
@@ -54,11 +56,11 @@ class Scattering {
    * @param src Source vector.
    */
   void vmult_add(dealii::BlockVector<double> &dst,
-                 const dealii::BlockVector<double> &src) const;
+                 const dealii::BlockVector<double> &src,
+                 const std::vector<double> &cross_sections) const;
 
  protected:
   dealii::DoFHandler<dim> &dof_handler;
-  std::vector<double> &cross_sections;
 };
 
 #endif  // AETHER_SN_SCATTERING_H_

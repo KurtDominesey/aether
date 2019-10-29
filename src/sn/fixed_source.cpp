@@ -7,8 +7,8 @@
 template <int dim, int qdim>
 FixedSource<dim, qdim>::FixedSource(
     std::vector<WithinGroup<dim, qdim>> &within_groups,
-    std::vector<std::vector<Scattering<dim>>> &downscattering,
-    std::vector<std::vector<Scattering<dim>>> &upscattering,
+    std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
+    std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
     MomentToDiscrete<qdim> &m2d, 
     DiscreteToMoment<qdim> &d2m)
     : within_groups(within_groups),

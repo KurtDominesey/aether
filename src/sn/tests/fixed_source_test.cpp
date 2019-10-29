@@ -49,8 +49,8 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   MomentToDiscrete<qdim> m2d(this->quadrature);
   DiscreteToMoment<qdim> d2m(this->quadrature);
   std::vector<WithinGroup<dim, qdim>> within_groups;
-  std::vector<std::vector<Scattering<dim>>> downscattering(num_groups);
-  std::vector<std::vector<Scattering<dim>>> upscattering(num_groups);
+  std::vector<std::vector<ScatteringBlock<dim>>> downscattering(num_groups);
+  std::vector<std::vector<ScatteringBlock<dim>>> upscattering(num_groups);
   std::vector<std::vector<double>> xs_total = {{1.0}, {1.0}};
   std::vector<std::vector<std::vector<double>>> xs_scatter = {
        {{0.0}, {1.0}},
@@ -65,17 +65,18 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   boundary_conditions[0][1] = 1;
   boundary_conditions[1][0] = 1;
   boundary_conditions[1][1] = 1;
+  Scattering<dim> scattering(this->dof_handler);
   for (int g = 0; g < num_groups; ++g) {
     Transport<dim, qdim> transport(
         this->dof_handler, this->quadrature, xs_total[g], 
         boundary_conditions[g]);
-    Scattering<dim> scattering(this->dof_handler, xs_scatter[g][g]);
+    ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
     // WithinGroup<dim, qdim> within_group(transport, m2d, scattering, d2m);
-    within_groups.emplace_back(transport, m2d, scattering, d2m);
+    within_groups.emplace_back(transport, m2d, scattering_wg, d2m);
     for (int up = g - 1; up >= 0; --up)
-      downscattering[g].emplace_back(this->dof_handler, xs_scatter[g][up]);
+      downscattering[g].emplace_back(scattering, xs_scatter[g][up]);
     for (int down = g + 1; down < num_groups; ++down)
-      upscattering[g].emplace_back(this->dof_handler, xs_scatter[g][down]);
+      upscattering[g].emplace_back(scattering, xs_scatter[g][down]);
   }
   FixedSource<dim, qdim> fixed_source(
       within_groups, downscattering, upscattering, m2d, d2m);
