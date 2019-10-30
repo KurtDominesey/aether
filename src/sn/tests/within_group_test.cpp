@@ -63,15 +63,15 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
       boundary_condition.block(n) = 1.0;
   std::vector<double> cross_sections_total = {1.0};
   std::vector<double> cross_sections_scattering = {1.0};
-  Transport<dim, qdim> transport(this->dof_handler, 
-                            this->quadrature, 
-                            cross_sections_total,
-                            this->boundary_conditions);
+  Transport<dim, qdim> transport(this->dof_handler, this->quadrature);
+  TransportBlock<dim, qdim> transport_block(transport, cross_sections_total,
+                                            this->boundary_conditions);
   Scattering<dim> scattering(this->dof_handler);
   ScatteringBlock<dim> scattering_block(scattering, cross_sections_scattering);
   MomentToDiscrete<qdim> m2d(this->quadrature);
   DiscreteToMoment<qdim> d2m(this->quadrature);
-  WithinGroup<dim, qdim> within_group(transport, m2d, scattering_block, d2m);
+  WithinGroup<dim, qdim> within_group(
+      transport_block, m2d, scattering_block, d2m);
   this->source = 0;
   within_group.transport.vmult(this->uncollided, this->source, false);
   for (dealii::BlockVector<double> &boundary_condition : 

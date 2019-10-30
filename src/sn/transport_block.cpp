@@ -1,8 +1,8 @@
 #include "transport_block.hpp"
 
-template <int dim>
-TransportBlock<dim>::TransportBlock(
-    const Transport<dim> &transport, 
+template <int dim, int qdim>
+TransportBlock<dim, qdim>::TransportBlock(
+    const Transport<dim, qdim> &transport, 
     const std::vector<double> &cross_sections,
     const std::vector<dealii::BlockVector<double>> &boundary_conditions)
     : transport(transport),
@@ -12,3 +12,17 @@ TransportBlock<dim>::TransportBlock(
   for (int b = 0; b < boundary_conditions.size(); ++b)
     boundary_conditions_zero[b].reinit(boundary_conditions[b]);
 }
+
+template <int dim, int qdim>
+int TransportBlock<dim, qdim>::n_block_cols() const {
+  return transport.n_block_cols();
+}
+
+template <int dim, int qdim>
+int TransportBlock<dim, qdim>::n_block_rows() const {
+  return transport.n_block_rows();
+}
+
+template class TransportBlock<1>;
+template class TransportBlock<2>;
+template class TransportBlock<3>;

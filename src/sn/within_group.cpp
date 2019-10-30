@@ -1,7 +1,7 @@
 #include "within_group.hpp"
 
 template <int dim, int qdim>
-WithinGroup<dim, qdim>::WithinGroup(Transport<dim, qdim> &transport,
+WithinGroup<dim, qdim>::WithinGroup(TransportBlock<dim, qdim> &transport,
                                     MomentToDiscrete<qdim> &m2d,
                                     ScatteringBlock<dim> &scattering,
                                     DiscreteToMoment<qdim> &d2m)

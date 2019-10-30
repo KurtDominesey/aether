@@ -68,31 +68,45 @@ class Transport {
    * 
    * @param dof_handler DoF handler for finite elements.
    * @param quadrature Angular quadrature.
-   * @param cross_sections Total material cross-sections.
    */
-  Transport(
-      dealii::DoFHandler<dim> &dof_handler,
-      const dealii::Quadrature<qdim> &quadrature,
-      const std::vector<double> &cross_sections,
-      const std::vector<dealii::BlockVector<double>> &boundary_conditions);
+  Transport(dealii::DoFHandler<dim> &dof_handler,
+            const dealii::Quadrature<qdim> &quadrature);
   /**
    * Compute \f$L^{-1}q\f$.
    * 
    * @param dst Destination vector.
    * @param src Source vector (\f$q\f$).
+   * @param cross_sections Total material cross_sections.
+   * @param boundary_conditions Values of \f$\psi_\text{inc}\f$ by boundary id.
    */
-  void vmult(dealii::Vector<double> &dst,
+  void vmult(dealii::Vector<double> &dst, 
              const dealii::Vector<double> &src,
-             const bool homogeneous = true) const;
+             const std::vector<double> &cross_sections,
+             const std::vector<dealii::BlockVector<double>>
+                 &boundary_conditions) const;
   /**
    * Compute \f$L^{-1}q\f$.
    * 
    * @param dst Destination vector.
    * @param src Source vector (\f$q\f$).
+   * @param cross_sections Total material cross_sections.
+   * @param boundary_conditions Values of \f$\psi_\text{inc}\f$ by boundary id.
    */
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
-             const bool homogeneous = true) const;
+             const std::vector<double> &cross_sections,
+             const std::vector<dealii::BlockVector<double>> 
+                 &boundary_conditions) const;
+  
+  /**
+   * Return the number of blocks in a column.
+   */
+  int n_block_cols() const;
+
+  /**
+   * Return the number of blocks in a row.
+   */ 
+  int n_block_rows() const;
 
   dealii::DoFHandler<dim> &dof_handler;
   const dealii::Quadrature<qdim> &quadrature;
@@ -105,10 +119,14 @@ class Transport {
    * @param oct The index of the octant.
    * @param dst Destination vector (one octant).
    * @param src Source vector (\f$q\f$).
+   * @param cross_sections Total material cross_sections.
+   * @param boundary_conditions Values of \f$\psi_\text{inc}\f$ by boundary id.
    */
   void vmult_octant(int oct, dealii::BlockVector<double> &dst,
                     const dealii::BlockVector<double> &src,
-                    const bool homogeneous) const;
+                    const std::vector<double> &cross_sections,
+                    const std::vector<dealii::BlockVector<double>>
+                        &boundary_conditions) const;
   /**
    * Assemble the cell contributions of the local matrix.
    * 
@@ -132,8 +150,7 @@ class Transport {
                                const dealii::FEFaceValues<dim> &fe_face_values,
                                const dealii::BlockVector<double> &dst_boundary,
                                std::vector<dealii::FullMatrix<double>> &matrices,
-                               dealii::BlockVector<double> &src_cell,
-                               const bool homogeneous)
+                               dealii::BlockVector<double> &src_cell)
                                const;
   /**
    * Assemble the face contributions of the local matrix.
@@ -150,8 +167,6 @@ class Transport {
       dealii::BlockVector<double> &src_cell)
       const;
 
-  const std::vector<double> &cross_sections;
-  const std::vector<dealii::BlockVector<double>> &boundary_conditions;
   std::vector<Ordinate> octant_directions;
   std::vector<std::vector<ActiveCell>> cells_downstream;
   std::vector<std::vector<int>> octants_to_global;

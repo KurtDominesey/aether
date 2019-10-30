@@ -3,7 +3,7 @@
 
 #include <deal.II/lac/block_linear_operator.h>
 
-#include "transport.hpp"
+#include "transport_block.hpp"
 #include "scattering_block.hpp"
 #include "moment_to_discrete.hpp"
 #include "discrete_to_moment.hpp"
@@ -11,7 +11,7 @@
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class WithinGroup {
  public:
-  WithinGroup(Transport<dim, qdim> &transport,
+  WithinGroup(TransportBlock<dim, qdim> &transport,
               MomentToDiscrete<qdim> &m2d,
               ScatteringBlock<dim> &scattering,
               DiscreteToMoment<qdim> &d2m);
@@ -19,7 +19,7 @@ class WithinGroup {
              const dealii::BlockVector<double> &src) const;
   void Tvmult(dealii::BlockVector<double> &dst,
               const dealii::BlockVector<double> &src) const;
-  const Transport<dim, qdim> transport;
+  const TransportBlock<dim, qdim> transport;
   const ScatteringBlock<dim> scattering;
 
  protected:

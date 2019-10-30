@@ -22,7 +22,7 @@ void FixedSource<dim, qdim>::vmult(
     dealii::BlockVector<double> &dst,
     const dealii::BlockVector<double> &src) const {
   const int num_groups = within_groups.size();
-  const int num_ords = within_groups[0].transport.ordinates.size();
+  const int num_ords = within_groups[0].transport.n_block_cols();
   const int num_dofs = dst.block(0).size() / num_ords;
   AssertDimension(num_groups, dst.n_blocks());
   AssertDimension(num_groups, src.n_blocks());

@@ -65,14 +65,14 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   boundary_conditions[0][1] = 1;
   boundary_conditions[1][0] = 1;
   boundary_conditions[1][1] = 1;
+  Transport<dim, qdim> transport(this->dof_handler, this->quadrature);
   Scattering<dim> scattering(this->dof_handler);
   for (int g = 0; g < num_groups; ++g) {
-    Transport<dim, qdim> transport(
-        this->dof_handler, this->quadrature, xs_total[g], 
-        boundary_conditions[g]);
+    TransportBlock<dim, qdim> transport_wg(transport, xs_total[g], 
+                                           boundary_conditions[g]);
     ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
     // WithinGroup<dim, qdim> within_group(transport, m2d, scattering, d2m);
-    within_groups.emplace_back(transport, m2d, scattering_wg, d2m);
+    within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
     for (int up = g - 1; up >= 0; --up)
       downscattering[g].emplace_back(scattering, xs_scatter[g][up]);
     for (int down = g + 1; down < num_groups; ++down)

@@ -7,7 +7,7 @@
  * A group-specific transport operator \f$L^{-1}_g\f$ with boundary conditions
  * given by \f$\psi_\text{inc}\f$.
  */
-template <int dim>
+template <int dim, int qdim = dim == 1 ? 1 : 2>
 class TransportBlock {
  public:
   /**
@@ -19,7 +19,7 @@ class TransportBlock {
    *                            boundary id.
    */
   TransportBlock(
-      const Transport<dim> &transport,
+      const Transport<dim, qdim> &transport,
       const std::vector<double> &cross_sections,
       const std::vector<dealii::BlockVector<double>> &boundary_conditions);
 
@@ -32,7 +32,17 @@ class TransportBlock {
    */
   template <typename VectorType>
   void vmult(VectorType &dst, const VectorType &src,
-             const bool homogeneous) const;
+             const bool homogeneous = true) const;
+
+  /**
+   * Return the number of blocks in a column.
+   */
+  int n_block_cols() const;
+
+  /**
+   * Return the number of blocks in a row.
+   */
+  int n_block_rows() const;
 
  protected:
   //! The transport operator.
@@ -45,10 +55,10 @@ class TransportBlock {
   std::vector<dealii::BlockVector<double>> boundary_conditions_zero;
 };
 
-template <int dim>
+template <int dim, int qdim>
 template <typename VectorType>
-void TransportBlock<dim>::vmult(VectorType &dst, const VectorType &src,
-                                const bool homogeneous) const {
+void TransportBlock<dim, qdim>::vmult(VectorType &dst, const VectorType &src,
+                                      const bool homogeneous) const {
   if (homogeneous)
     transport.vmult(dst, src, cross_sections, boundary_conditions_zero);
   else

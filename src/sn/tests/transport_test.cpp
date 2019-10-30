@@ -6,6 +6,7 @@
 #include <deal.II/base/function_lib.h>
 
 #include "../transport.hpp"
+#include "../transport_block.hpp"
 #include "../../functions/attenuated.hpp"
 #include "gtest/gtest.h"
 
@@ -46,9 +47,10 @@ TEST_P(Transport1DTest, Void) {
   for (int n = 0; n < num_ords; ++n)
     for (dealii::BlockVector<double> &boundary_condition : boundary_conditions)
       boundary_condition.block(n) = n + 1;
-  Transport<1> transport(dof_handler, quadrature, cross_sections,
-                         boundary_conditions);
-  transport.vmult(flux, source, false);
+  Transport<1> transport(dof_handler, quadrature);
+  TransportBlock<1> transport_block(transport, cross_sections,
+                                    boundary_conditions);
+  transport_block.vmult(flux, source, false);
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {
       ASSERT_NEAR(n + 1, flux.block(n)[i], 1e-10);
@@ -84,9 +86,10 @@ TEST_P(Transport1DTest, Attenuation) {
         boundary_condition.block(n).reinit(num_dofs);
         boundary_condition.block(n) = incident;
       }
-    Transport<1> transport(dof_handler, quadrature, cross_sections,
-                           boundary_conditions);
-    transport.vmult(flux, source, false);
+    Transport<1> transport(dof_handler, quadrature);
+    TransportBlock<1> transport_block(transport, cross_sections, 
+                                      boundary_conditions);
+    transport_block.vmult(flux, source, false);
     for (int n = 0; n < num_ords; ++n) {
       dealii::Vector<double> difference_per_cell(mesh.n_active_cells());
       dealii::VectorTools::integrate_difference(
@@ -179,9 +182,10 @@ TEST_P(Transport1DTest, ManufacturedCosine) {
     }
     // dealii::Vector<double> solution_h(num_dofs);
     // dealii::VectorTools::interpolate(dof_handler, solution, solution_h);
-    Transport<1> transport(dof_handler, quadrature, cross_sections,
-                           boundary_conditions);
-    transport.vmult(flux, source, false);
+    Transport<1> transport(dof_handler, quadrature);
+    TransportBlock<1> transport_block(transport, cross_sections,
+                                      boundary_conditions);
+    transport_block.vmult(flux, source, false);
     for (int n = 0; n < num_ords; ++n) {
       dealii::Vector<double> difference_per_cell(mesh.n_active_cells());
       dealii::VectorTools::integrate_difference(

@@ -3,18 +3,9 @@
 template <int dim, int qdim>
 Transport<dim, qdim>::Transport(
     dealii::DoFHandler<dim> &dof_handler,
-    const dealii::Quadrature<qdim> &quadrature,
-    const std::vector<double> &cross_sections,
-    const std::vector<dealii::BlockVector<double>> &boundary_conditions)
+    const dealii::Quadrature<qdim> &quadrature)
     : dof_handler(dof_handler),
-      quadrature(quadrature),
-      cross_sections(cross_sections),
-      boundary_conditions(boundary_conditions) {
-  const std::vector<dealii::types::boundary_id> &boundaries =
-      dof_handler.get_triangulation().get_boundary_ids();
-  for (const dealii::types::boundary_id &boundary : boundaries)
-    AssertIndexRange(boundary, boundaries.size());
-  AssertDimension(boundaries.size(), boundary_conditions.size());
+      quadrature(quadrature) {
   const int num_ordinates = quadrature.get_points().size();
   ordinates.reserve(num_ordinates);
   for (int n = 0; n < num_ordinates; ++n) {
@@ -98,31 +89,40 @@ Transport<dim, qdim>::Transport(
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
                                  const dealii::Vector<double> &src,
-                                 const bool homogeneous) const {
+                                 const std::vector<double> &cross_sections,
+                                 const std::vector<dealii::BlockVector<double>>
+                                     &boundary_conditions) const {
   dealii::BlockVector<double> dst_b(quadrature.size(), dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(quadrature.size(), dof_handler.n_dofs());
   src_b = src;
-  vmult(dst_b, src_b, homogeneous);
+  vmult(dst_b, src_b, cross_sections, boundary_conditions);
   dst = dst_b;
 }
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                  const dealii::BlockVector<double> &src,
-                                 const bool homogeneous) const {
+                                 const std::vector<double> &cross_sections,
+                                 const std::vector<dealii::BlockVector<double>>
+                                     &boundary_conditions) const {
+  const std::vector<dealii::types::boundary_id> &boundaries =
+      dof_handler.get_triangulation().get_boundary_ids();
+  for (const dealii::types::boundary_id &boundary : boundaries)
+    AssertIndexRange(boundary, boundaries.size());
+  AssertDimension(boundaries.size(), boundary_conditions.size());
   dst = 0;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
-    vmult_octant(oct, dst, src, homogeneous);
+    vmult_octant(oct, dst, src, cross_sections, boundary_conditions);
   }
 }
 
 template <int dim, int qdim>
-void Transport<dim, qdim>::vmult_octant(int oct, 
-                                        dealii::BlockVector<double> &dst,
-                                        const dealii::BlockVector<double> &src,
-                                        const bool homogeneous) 
-                                        const {
+void Transport<dim, qdim>::vmult_octant(
+    int oct, dealii::BlockVector<double> &dst,
+    const dealii::BlockVector<double> &src,
+    const std::vector<double> &cross_sections,
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
   const std::vector<int> &octant_to_global = octants_to_global[oct];
   // setup finite elements
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
@@ -199,7 +199,7 @@ void Transport<dim, qdim>::vmult_octant(int oct,
         dealii::BlockVector<double> &dst_boundary =
             boundary_conditions_incident[face->boundary_id()];
         integrate_boundary_term(ordinates_in_octant, fe_face_values, 
-                                dst_boundary, matrices, src_cell, homogeneous);
+                                dst_boundary, matrices, src_cell);
       } else {
         Assert(cell->neighbor(f).state() == dealii::IteratorState::valid,
                dealii::ExcInvalidState());
@@ -281,8 +281,7 @@ void Transport<dim, qdim>::integrate_boundary_term(
     const dealii::FEFaceValues<dim> &fe_face_values,
     const dealii::BlockVector<double> &dst_boundary,
     std::vector<dealii::FullMatrix<double>> &matrices,
-    dealii::BlockVector<double> &src_cell,
-    const bool homogeneous) const {
+    dealii::BlockVector<double> &src_cell) const {
   const std::vector<double> &JxW = fe_face_values.get_JxW_values();
   const std::vector<dealii::Tensor<1, dim>> &normals =
       fe_face_values.get_normal_vectors();
@@ -300,7 +299,7 @@ void Transport<dim, qdim>::integrate_boundary_term(
                             * JxW[q];
           }
         }
-      } else if (!homogeneous) {  // inflow
+      } else {  // inflow
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j) {
             src_cell.block(n)(i) += -ord_dot_normal
@@ -355,6 +354,16 @@ void Transport<dim, qdim>::integrate_face_term(
       }
     }
   }
+}
+
+template <int dim, int qdim>
+int Transport<dim, qdim>::n_block_rows() const {
+  return ordinates.size();
+}
+
+template <int dim, int qdim>
+int Transport<dim, qdim>::n_block_cols() const {
+  return ordinates.size();
 }
 
 template class Transport<1>;
