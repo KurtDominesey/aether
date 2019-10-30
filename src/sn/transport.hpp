@@ -93,6 +93,12 @@ class Transport {
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
              const bool homogeneous = true) const;
+
+  dealii::DoFHandler<dim> &dof_handler;
+  const dealii::Quadrature<qdim> &quadrature;
+  std::vector<Ordinate> ordinates;
+
+ protected:
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
    * 
@@ -103,16 +109,6 @@ class Transport {
   void vmult_octant(int oct, dealii::BlockVector<double> &dst,
                     const dealii::BlockVector<double> &src,
                     const bool homogeneous) const;
-
-  dealii::DoFHandler<dim> &dof_handler;
-  const dealii::Quadrature<qdim> &quadrature;
-  const std::vector<double> &cross_sections;
-  const std::vector<dealii::BlockVector<double>> &boundary_conditions;
-  std::vector<Ordinate> ordinates;
-  std::vector<Ordinate> octant_directions;
-  std::vector<std::vector<ActiveCell>> cells_downstream;
-
- protected:
   /**
    * Assemble the cell contributions of the local matrix.
    * 
@@ -154,6 +150,10 @@ class Transport {
       dealii::BlockVector<double> &src_cell)
       const;
 
+  const std::vector<double> &cross_sections;
+  const std::vector<dealii::BlockVector<double>> &boundary_conditions;
+  std::vector<Ordinate> octant_directions;
+  std::vector<std::vector<ActiveCell>> cells_downstream;
   std::vector<std::vector<int>> octants_to_global;
 };
 
