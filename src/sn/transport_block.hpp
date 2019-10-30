@@ -41,6 +41,18 @@ class TransportBlock {
   const std::vector<double> &cross_sections;
   //! The values of \f$\psi_\text{inc}\f$ by boundary id.
   const std::vector<dealii::BlockVector<double>> &boundary_conditions;
+  //! Zero values of \f$\psi_\text{inc}\f$ by boundary id. 
+  std::vector<dealii::BlockVector<double>> boundary_conditions_zero;
 };
+
+template <int dim>
+template <typename VectorType>
+void TransportBlock<dim>::vmult(VectorType &dst, const VectorType &src,
+                                const bool homogeneous) const {
+  if (homogeneous)
+    transport.vmult(dst, src, cross_sections, boundary_conditions_zero);
+  else
+    transport.vmult(dst, src, cross_sections, boundary_conditions);
+}
 
 #endif // AETHER_SN_TRANSPORT_BLOCK_H_
