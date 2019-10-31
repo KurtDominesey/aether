@@ -1,9 +1,5 @@
 #include "fixed_source.hpp"
 
-#include <deal.II/lac/solver_gmres.h>
-#include <deal.II/lac/solver_control.h>
-#include <deal.II/lac/precondition.h>
-
 template <int dim, int qdim>
 FixedSource<dim, qdim>::FixedSource(
     std::vector<WithinGroup<dim, qdim>> &within_groups,

@@ -1,7 +1,7 @@
 #ifndef AETHER_SN_MOMENT_TO_DISCRETE_H_
 #define AETHER_SN_MOMENT_TO_DISCRETE_H_
 
-#include <deal.II/base/quadrature_lib.h>
+#include <deal.II/base/quadrature.h>
 #include <deal.II/lac/block_vector.h>
 
 template <int qdim>

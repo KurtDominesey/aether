@@ -2,15 +2,11 @@
 #define AETHER_SN_TRANSPORT_H_
 
 #include <deal.II/dofs/dof_handler.h>
-#include <deal.II/base/iterator_range.h>
+#include <deal.II/dofs/dof_renumbering.h>
+#include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/fe/fe_update_flags.h>
-#include <deal.II/fe/mapping_q1.h>
-#include <deal.II/dofs/dof_renumbering.h>
-
-#include <deal.II/meshworker/dof_info.h>
-#include <deal.II/meshworker/integration_info.h>
-#include <deal.II/meshworker/loop.h>
+#include <deal.II/fe/fe_values.h>
 
 #include "quadrature.hpp"
 

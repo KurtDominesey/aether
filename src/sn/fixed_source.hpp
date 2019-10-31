@@ -3,6 +3,8 @@
 
 #include "within_group.hpp"
 #include "scattering_block.hpp"
+#include "discrete_to_moment.hpp"
+#include "moment_to_discrete.hpp"
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSource {

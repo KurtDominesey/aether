@@ -1,8 +1,6 @@
 #ifndef AETHER_SN_WITHIN_GROUP_H_
 #define AETHER_SN_WITHIN_GROUP_H_
 
-#include <deal.II/lac/block_linear_operator.h>
-
 #include "transport_block.hpp"
 #include "scattering_block.hpp"
 #include "moment_to_discrete.hpp"
