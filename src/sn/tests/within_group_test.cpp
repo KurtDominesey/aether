@@ -7,7 +7,7 @@
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
 
-#include "../within_group.cpp"
+#include "../within_group.hpp"
 #include "../../functions/attenuated.hpp"
 #include "gtest/gtest.h"
 
