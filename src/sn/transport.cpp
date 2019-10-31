@@ -2,7 +2,7 @@
 
 template <int dim, int qdim>
 Transport<dim, qdim>::Transport(
-    dealii::DoFHandler<dim> &dof_handler,
+    const dealii::DoFHandler<dim> &dof_handler,
     const dealii::Quadrature<qdim> &quadrature)
     : dof_handler(dof_handler),
       quadrature(quadrature) {

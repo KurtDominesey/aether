@@ -69,7 +69,7 @@ class Transport {
    * @param dof_handler DoF handler for finite elements.
    * @param quadrature Angular quadrature.
    */
-  Transport(dealii::DoFHandler<dim> &dof_handler,
+  Transport(const dealii::DoFHandler<dim> &dof_handler,
             const dealii::Quadrature<qdim> &quadrature);
   /**
    * Compute \f$L^{-1}q\f$.
@@ -163,7 +163,7 @@ class Transport {
       dealii::BlockVector<double> &src_cell)
       const;
 
-  dealii::DoFHandler<dim> &dof_handler;
+  const dealii::DoFHandler<dim> &dof_handler;
   const dealii::Quadrature<qdim> &quadrature;
   std::vector<Ordinate> ordinates;
   std::vector<Ordinate> octant_directions;
