@@ -63,6 +63,7 @@ class Transport {
   using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
   using Cell = typename dealii::DoFHandler<dim>::cell_iterator;
   using Face = typename dealii::DoFHandler<dim>::face_iterator;
+
   /**
    * Constructor.
    * 
@@ -71,6 +72,7 @@ class Transport {
    */
   Transport(const dealii::DoFHandler<dim> &dof_handler,
             const dealii::Quadrature<qdim> &quadrature);
+
   /**
    * Compute \f$L^{-1}q\f$.
    * 
@@ -84,6 +86,7 @@ class Transport {
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>>
                  &boundary_conditions) const;
+
   /**
    * Compute \f$L^{-1}q\f$.
    * 
@@ -123,36 +126,48 @@ class Transport {
                     const std::vector<double> &cross_sections,
                     const std::vector<dealii::BlockVector<double>>
                         &boundary_conditions) const;
+
   /**
    * Assemble the cell contributions of the local matrix.
    * 
-   * @param dinfo DoF info.
-   * @param info Cell integration info.
+   * @param ordinates_in_sweep Ordinates in the current sweep.
+   * @param fe_values Cell finite element values.
+   * @param rhs_cell The right-hand-side vectors by ordinate (block).
+   * @param cross_section The total material cross-section of the cell.
+   * @param matrices The local (cell) matrices by ordinate.
+   * @param src_cell The source vectors by ordinate (block).
    */
   void integrate_cell_term(const std::vector<Ordinate> &ordinates_in_sweep,
                            const dealii::FEValues<dim> &fe_values,
                            const dealii::BlockVector<double> &rhs_cell,
                            double cross_section,
                            std::vector<dealii::FullMatrix<double>> &matrices,
-                           dealii::BlockVector<double> &src_cell)
-                           const;
+                           dealii::BlockVector<double> &src_cell) const;
+
   /**
    * Assemble the boundary contributions of the local matrix.
    * 
-   * @param dinfo DoF info.
-   * @param info Cell integration info.
+   * @param ordinates_in_sweep Ordinates in the current sweep.
+   * @param fe_face_values Face finite element values.
+   * @param dst_boundary The values of \f$\psi_\text{inc}\f$ on the face.
+   * @param matrices The local (cell) matrices by ordinate.
+   * @param src_cell The source vectors by ordinate (block).
    */
   void integrate_boundary_term(const std::vector<Ordinate> &ordinates_in_sweep,
                                const dealii::FEFaceValues<dim> &fe_face_values,
                                const dealii::BlockVector<double> &dst_boundary,
                                std::vector<dealii::FullMatrix<double>> &matrices,
-                               dealii::BlockVector<double> &src_cell)
-                               const;
+                               dealii::BlockVector<double> &src_cell) const;
+
   /**
    * Assemble the face contributions of the local matrix.
    * 
-   * @param dinfo DoF info.
-   * @param info Cell integration info.
+   * @param ordinates_in_sweep Ordinates in the current sweep.
+   * @param fe_face_values Face finite element values.
+   * @param fe_face_values_neighbor Face finite element values of neighbor.
+   * @param dst_boundary The values of \f$\psi\f$ in the neighboring cell.
+   * @param matrices The local (cell) matrices by ordinate.
+   * @param src_cell The source vectors by ordinate (block).
    */
   void integrate_face_term(
       const std::vector<Ordinate> &ordinates_in_sweep,
@@ -160,14 +175,19 @@ class Transport {
       const dealii::FEFaceValuesBase<dim> &fe_face_values_neighbor,
       const dealii::BlockVector<double> &dst_neighbor,
       std::vector<dealii::FullMatrix<double>> &matrices,
-      dealii::BlockVector<double> &src_cell)
-      const;
+      dealii::BlockVector<double> &src_cell) const;
 
+  //! DoF handler for the finite elelments.
   const dealii::DoFHandler<dim> &dof_handler;
+  //! Angular quadrature.
   const dealii::Quadrature<qdim> &quadrature;
+  //! Discrete ordinates (sweep directions).
   std::vector<Ordinate> ordinates;
+  //! Representative direction per unique octant of unit sphere.
   std::vector<Ordinate> octant_directions;
+  //! Downstream ordering of cells, by unique octant of unit sphere.
   std::vector<std::vector<ActiveCell>> cells_downstream;
+  //! Map of octant ordinate indices to global ordinate indices.
   std::vector<std::vector<int>> octants_to_global;
 };
 
