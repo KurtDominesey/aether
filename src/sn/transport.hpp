@@ -108,10 +108,6 @@ class Transport {
    */ 
   int n_block_rows() const;
 
-  dealii::DoFHandler<dim> &dof_handler;
-  const dealii::Quadrature<qdim> &quadrature;
-  std::vector<Ordinate> ordinates;
-
  protected:
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
@@ -167,6 +163,9 @@ class Transport {
       dealii::BlockVector<double> &src_cell)
       const;
 
+  dealii::DoFHandler<dim> &dof_handler;
+  const dealii::Quadrature<qdim> &quadrature;
+  std::vector<Ordinate> ordinates;
   std::vector<Ordinate> octant_directions;
   std::vector<std::vector<ActiveCell>> cells_downstream;
   std::vector<std::vector<int>> octants_to_global;
