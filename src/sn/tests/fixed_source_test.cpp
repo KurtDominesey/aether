@@ -7,7 +7,7 @@
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
 
-#include "../fixed_source.hpp"
+#include "sn/fixed_source.hpp"
 #include "gtest/gtest.h"
 
 namespace {

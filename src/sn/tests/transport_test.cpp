@@ -5,9 +5,9 @@
 #include <deal.II/base/convergence_table.h>
 #include <deal.II/base/function_lib.h>
 
-#include "../transport.hpp"
-#include "../transport_block.hpp"
-#include "../../functions/attenuated.hpp"
+#include "sn/transport.hpp"
+#include "sn/transport_block.hpp"
+#include "functions/attenuated.hpp"
 #include "gtest/gtest.h"
 
 namespace {

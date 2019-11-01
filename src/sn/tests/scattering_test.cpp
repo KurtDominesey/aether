@@ -2,8 +2,8 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
 
-#include "../scattering.hpp"
-#include "../scattering_block.hpp"
+#include "sn/scattering.hpp"
+#include "sn/scattering_block.hpp"
 #include "gtest/gtest.h"
 
 namespace {
