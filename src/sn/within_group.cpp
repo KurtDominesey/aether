@@ -8,6 +8,19 @@ WithinGroup<dim, qdim>::WithinGroup(TransportBlock<dim, qdim> &transport,
     : transport(std::move(transport)), m2d(m2d), 
       scattering(std::move(scattering)), d2m(d2m) {}
 
+
+template <int dim, int qdim>
+void WithinGroup<dim, qdim>::vmult(dealii::Vector<double> &flux,
+                                   const dealii::Vector<double> &src) const {
+  const int num_ords = transport.quadrature.size();
+  const int num_dofs = transport.dof_handler.n_dofs();
+  dealii::BlockVector<double> flux_b(num_ords, num_dofs);
+  dealii::BlockVector<double> src_b(num_ords, num_dofs);
+  src_b = src;
+  vmult(flux_b, src_b);
+  flux = flux_b;
+}
+
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(
     dealii::BlockVector<double> &flux,
