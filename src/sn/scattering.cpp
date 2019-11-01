@@ -1,7 +1,7 @@
 #include "scattering.hpp"
 
 template <int dim>
-Scattering<dim>::Scattering(dealii::DoFHandler<dim> &dof_handler)
+Scattering<dim>::Scattering(const dealii::DoFHandler<dim> &dof_handler)
     : dof_handler(dof_handler) {}
 
 template <int dim>

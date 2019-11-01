@@ -14,7 +14,7 @@ class Scattering {
    * 
    * @param Scattering material cross-sections.
    */
-  Scattering(dealii::DoFHandler<dim> &dof_handler);
+  Scattering(const dealii::DoFHandler<dim> &dof_handler);
 
   /**
    * Apply the linear operator.
@@ -67,7 +67,7 @@ class Scattering {
 
  protected:
   //! DoF handler for the finite elements.
-  dealii::DoFHandler<dim> &dof_handler;
+  const dealii::DoFHandler<dim> &dof_handler;
 };
 
 #endif  // AETHER_SN_SCATTERING_H_
