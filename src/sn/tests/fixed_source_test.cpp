@@ -8,6 +8,7 @@
 #include <deal.II/lac/precondition.h>
 
 #include "sn/fixed_source.hpp"
+#include "sn/fixed_source_gs.cpp"
 #include "gtest/gtest.h"
 
 namespace {
@@ -80,6 +81,8 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   }
   FixedSource<dim, qdim> fixed_source(
       within_groups, downscattering, upscattering, m2d, d2m);
+  FixedSourceGS<dim, qdim> fixed_source_gs(
+      within_groups, downscattering, upscattering, m2d, d2m);
   dealii::BlockVector<double> source(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> uncollided(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> flux(num_groups, num_ords*num_dofs);
@@ -89,7 +92,7 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   for (int g = 0; g < within_groups.size(); ++g)
     within_groups[g].transport.vmult(uncollided.block(g), source.block(g),
                                      false);
-  solver.solve(fixed_source, flux, uncollided, dealii::PreconditionIdentity());
+  solver.solve(fixed_source, flux, uncollided, fixed_source_gs);
   // flux.print(std::cout);
   std::cout << "iterations required " 
             << solver_control.last_step() 
