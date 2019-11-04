@@ -12,8 +12,8 @@ WithinGroup<dim, qdim>::WithinGroup(TransportBlock<dim, qdim> &transport,
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(dealii::Vector<double> &flux,
                                    const dealii::Vector<double> &src) const {
-  const int num_ords = transport.quadrature.size();
-  const int num_dofs = transport.dof_handler.n_dofs();
+  const int num_ords = transport.n_block_cols();
+  const int num_dofs = flux.size() / num_ords;
   dealii::BlockVector<double> flux_b(num_ords, num_dofs);
   dealii::BlockVector<double> src_b(num_ords, num_dofs);
   src_b = src;
