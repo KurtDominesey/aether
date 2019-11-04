@@ -5,6 +5,7 @@
 #include <deal.II/lac/solver_richardson.h>
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/solver_bicgstab.h>
+#include <deal.II/lac/solver_relaxation.h>
 #include <deal.II/lac/precondition.h>
 
 #include "sn/fixed_source.hpp"
@@ -17,7 +18,7 @@ template <class SolverType>
 class FixedSourceTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    dealii::GridGenerator::subdivided_hyper_cube(mesh, 8, -1, 1);
+    dealii::GridGenerator::subdivided_hyper_cube(mesh, 128, -1, 1);
     dealii::FE_DGQ<dim> fe(1);
     dof_handler.initialize(mesh, fe);
     int num_ords_qdim = 4;
@@ -38,7 +39,8 @@ using SolverTypes =
     ::testing::Types< dealii::SolverRichardson<dealii::BlockVector<double>>,
                       dealii::SolverGMRES<dealii::BlockVector<double>>,
                       dealii::SolverFGMRES<dealii::BlockVector<double>>,
-                      dealii::SolverBicgstab<dealii::BlockVector<double>> >;
+                      dealii::SolverBicgstab<dealii::BlockVector<double>>,
+                      dealii::SolverRelaxation<dealii::BlockVector<double>> >;
 TYPED_TEST_CASE(FixedSourceTest, SolverTypes);
 
 TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
@@ -87,7 +89,7 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   dealii::BlockVector<double> uncollided(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> flux(num_groups, num_ords*num_dofs);
   // fixed_source.vmult(flux, source);
-  dealii::SolverControl solver_control(2000, 1e-10);
+  dealii::SolverControl solver_control(200, 1e-10);
   TypeParam solver(solver_control);
   for (int g = 0; g < within_groups.size(); ++g)
     within_groups[g].transport.vmult(uncollided.block(g), source.block(g),

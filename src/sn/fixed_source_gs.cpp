@@ -24,20 +24,53 @@ void FixedSourceGS<dim, qdim>::vmult(
   AssertDimension(num_groups, upscattering.size());
   AssertDimension(num_groups, downscattering.size());
   dealii::BlockVector<double> dst_m(num_groups, num_dofs);
-  dealii::Vector<double> inscattered_m(num_dofs);
-  dealii::Vector<double> inscattered(num_ords*num_dofs);
+  dealii::Vector<double> downscattered_m(num_dofs);
+  dealii::Vector<double> downscattered(num_ords*num_dofs);
+  dealii::Vector<double> transported(num_ords*num_dofs);
   dealii::SolverControl solver_control(1000, 1e-10);
   dealii::SolverGMRES<dealii::Vector<double>> solver(solver_control);
   for (int g = 0; g < num_groups; ++g) {
     Assert(downscattering[g].size() < g + 1, dealii::ExcInvalidState());
-    inscattered_m = 0;
+    downscattered_m = 0;
     for (int up = 0; up < downscattering[g].size(); ++up)
-      downscattering[g][up].vmult_add(inscattered_m, dst_m.block(g-1-up));
-    m2d.vmult(inscattered, inscattered_m);
-    solver.solve(within_groups[g], dst.block(g), inscattered,
+      downscattering[g][up].vmult_add(downscattered_m, dst_m.block(g-1-up));
+    m2d.vmult(downscattered, downscattered_m);
+    within_groups[g].transport.vmult(transported, downscattered);
+    transported += src.block(g);
+    solver.solve(within_groups[g], dst.block(g), transported,
                  dealii::PreconditionIdentity());
     d2m.vmult(dst_m.block(g), dst.block(g));
   }
+}
+
+template <int dim, int qdim>
+void FixedSourceGS<dim, qdim>::step(
+    dealii::BlockVector<double> &flux,
+    const dealii::BlockVector<double> &src) const {
+  const int num_groups = within_groups.size();
+  const int num_ords = within_groups[0].transport.n_block_cols();
+  const int num_dofs = flux.block(0).size() / num_ords;
+  dealii::BlockVector<double> flux_m(num_groups, num_dofs);
+  dealii::BlockVector<double> upscattered_m(num_groups, num_dofs);
+  dealii::BlockVector<double> upscattered(num_groups, num_ords*num_dofs);
+  dealii::BlockVector<double> transported(num_groups, num_ords*num_dofs);
+  for (int g = 0; g < num_groups; ++g) {
+    d2m.vmult(flux_m.block(g), flux.block(g));
+  }
+  for (int g = 0; g < num_groups; ++g) {
+    for (int down = 0; down < upscattering[g].size(); ++down) {
+      upscattering[g][down].vmult(upscattered_m.block(g), 
+                                  flux_m.block(g+1+down));
+    }
+  }
+  for (int g = 0; g < num_groups; ++g) {
+    m2d.vmult(upscattered.block(g), upscattered_m.block(g));
+    within_groups[g].transport.vmult(transported.block(g), 
+                                     upscattered.block(g));
+  }
+  // transported.sadd(-1, 1, src);
+  transported += src;
+  vmult(flux, transported);
 }
 
 template class FixedSourceGS<1>;
