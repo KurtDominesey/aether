@@ -4,6 +4,8 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_reordering.h>
 #include <deal.II/grid/manifold_lib.h>
+#include <deal.II/grid/grid_tools.h>
+#include <deal.II/grid/grid_generator.h>
 
 void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
                           const std::vector<double> radii,
@@ -62,6 +64,26 @@ void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
   for (auto cell = tria.last(); i < 2; ++i, --cell)
     cell->set_manifold_id(2);
   tria.set_manifold(1, dealii::SphericalManifold<2>());
+  dealii::TransfiniteInterpolationManifold<2> trans_manifold;
+  trans_manifold.initialize(tria);
+  tria.set_manifold(2, trans_manifold);
+}
+
+void mesh_pincell(dealii::Triangulation<2> &tria,
+                  const std::vector<double> &radii,
+                  const double &pitch,
+                  const std::vector<int> &materials) {
+  const dealii::Point<2> center(pitch/2, pitch/2);
+  std::vector<dealii::Triangulation<2>> quadrants(4);
+  for (int i = 0; i < 4; ++i) {
+    mesh_quarter_pincell(quadrants[i], radii, pitch, materials);
+    dealii::GridTools::rotate(i*dealii::numbers::PI_2, quadrants[i]);
+    dealii::GridTools::shift(center, quadrants[i]);
+  }
+  dealii::GridGenerator::merge_triangulations(
+      {&quadrants[0], &quadrants[1], &quadrants[2], &quadrants[3]}, 
+      tria, 1e-12, true);
+  tria.set_manifold(1, dealii::SphericalManifold<2>(center));
   dealii::TransfiniteInterpolationManifold<2> trans_manifold;
   trans_manifold.initialize(tria);
   tria.set_manifold(2, trans_manifold);
