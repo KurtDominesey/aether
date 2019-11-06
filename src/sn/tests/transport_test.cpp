@@ -58,6 +58,31 @@ TEST_P(Transport1DTest, Void) {
   }
 }
 
+TEST_P(Transport1DTest, VoidReflected) {
+  std::vector<double> cross_sections = {0};
+  int num_ords = quadrature.size();
+  int num_dofs = dof_handler.n_dofs();
+  boundary_conditions.resize(1);
+  for (int n = num_ords / 2; n < num_ords; ++n)
+    boundary_conditions[0].block(n) = n;
+  using Face = typename dealii::Triangulation<1>::face_iterator;
+  for (int f = 0; f < dealii::GeometryInfo<1>::faces_per_cell; ++f) {
+    Face face = mesh.last_active()->face(f);
+    if (face->at_boundary())
+      face->set_boundary_id(types::reflecting_boundary_id);
+  }
+  Transport<1> transport(dof_handler, quadrature);
+  TransportBlock<1> transport_block(transport, cross_sections,
+                                    boundary_conditions);
+  transport_block.vmult(flux, source, false);
+  for (int n = num_ords / 2; n < num_ords; ++n)
+    for (int i = 0; i < num_dofs; ++i)
+      ASSERT_NEAR(n, flux.block(n)[i], 1e-10);
+  for (int n = 0; n < num_ords / 2; ++n)
+    for (int i = 0; i < num_dofs; ++i)
+      ASSERT_NEAR(num_ords - (n + 1), flux.block(n)[i], 1e-10);
+}
+
 TEST_P(Transport1DTest, Attenuation) {
   int num_ords = quadrature.size();
   double incident = 1;

@@ -107,9 +107,14 @@ void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                      &boundary_conditions) const {
   const std::vector<dealii::types::boundary_id> &boundaries =
       dof_handler.get_triangulation().get_boundary_ids();
+  int num_natural_boundaries = boundaries.size();
   for (const dealii::types::boundary_id &boundary : boundaries)
-    AssertIndexRange(boundary, boundaries.size());
-  AssertDimension(boundaries.size(), boundary_conditions.size());
+    if (boundary == types::reflecting_boundary_id)
+      num_natural_boundaries--;
+  for (const dealii::types::boundary_id &boundary : boundaries)
+    if (boundary != types::reflecting_boundary_id)
+      AssertIndexRange(boundary, num_natural_boundaries);
+  AssertDimension(num_natural_boundaries, boundary_conditions.size());
   dst = 0;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
@@ -170,6 +175,7 @@ void Transport<dim, qdim>::vmult_octant(
   dealii::BlockVector<double> src_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_cell(num_ords, fe.dofs_per_cell);
   dealii::BlockVector<double> dst_neighbor(num_ords, fe.dofs_per_cell);
+  dealii::BlockVector<double> dst_boundary(num_ords, fe.dofs_per_cell);
   std::vector<dealii::BlockVector<double>> boundary_conditions_incident(
       boundary_conditions.size(), 
       dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
@@ -196,8 +202,15 @@ void Transport<dim, qdim>::vmult_octant(
       const Face &face = cell->face(f);
       if (face->at_boundary()) {
         fe_face_values.reinit(cell, f);
-        dealii::BlockVector<double> &dst_boundary =
-            boundary_conditions_incident[face->boundary_id()];
+        if (face->boundary_id() == types::reflecting_boundary_id) {
+          for (int n = 0; n < num_ords; ++n) {
+            int n_refl = quadrature.size() - (octant_to_global[n] + 1);
+            for (int i = 0; i < fe.dofs_per_cell; ++i)
+              dst_boundary.block(n)[i] = dst.block(n_refl)[dof_indices[i]];
+          }
+        } else {
+          dst_boundary = boundary_conditions_incident[face->boundary_id()];
+        }
         integrate_boundary_term(ordinates_in_octant, fe_face_values, 
                                 dst_boundary, matrices, src_cell);
       } else {

@@ -9,6 +9,7 @@
 #include <deal.II/fe/fe_values.h>
 
 #include "quadrature.hpp"
+#include "types/types.hpp"
 
 /**
  * A matrix-free expression of the linear operator \f$L^{-1}\f$ where
