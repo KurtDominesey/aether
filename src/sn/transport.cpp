@@ -94,6 +94,7 @@ void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
                                      &boundary_conditions) const {
   dealii::BlockVector<double> dst_b(quadrature.size(), dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(quadrature.size(), dof_handler.n_dofs());
+  dst_b = dst;
   src_b = src;
   vmult(dst_b, src_b, cross_sections, boundary_conditions);
   dst = dst_b;
@@ -115,7 +116,6 @@ void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
     if (boundary != types::reflecting_boundary_id)
       AssertIndexRange(boundary, num_natural_boundaries);
   AssertDimension(num_natural_boundaries, boundary_conditions.size());
-  dst = 0;
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
     vmult_octant(oct, dst, src, cross_sections, boundary_conditions);
@@ -254,7 +254,8 @@ void Transport<dim, qdim>::vmult_octant(
       dealii::FullMatrix<double> &matrix = matrices[n];
       matrix.gauss_jordan();  // directly invert
       matrix.vmult(dst_cell.block(n), src_cell.block(n));
-      dst.block(octant_to_global[n]).add(dof_indices, dst_cell.block(n));
+      for (int i = 0; i < fe.dofs_per_cell; ++i)
+        dst.block(octant_to_global[n])[dof_indices[i]] = dst_cell.block(n)[i];
     }
   }
 }
@@ -344,8 +345,6 @@ void Transport<dim, qdim>::integrate_face_term(
     for (int q = 0; q < fe_face_values.n_quadrature_points; ++q) {
       double ord_dot_normal = ordinate * normals[q];
       if (ord_dot_normal > 0) {  // outflow
-        for (int k = 0; k < fe_face_values_neighbor.dofs_per_cell; ++k)
-          Assert(dst_neighbor.block(n)(k) == 0.0, dealii::ExcInvalidState());
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i) {
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j) {
             matrix(i, j) += ord_dot_normal

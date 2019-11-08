@@ -38,6 +38,7 @@ void WithinGroup<dim, qdim>::vmult(
   d2m.vmult(src_m, src);
   scattering.vmult(scattered_m, src_m);
   m2d.vmult(scattered, scattered_m);
+  transported = src;
   transport.vmult(transported, scattered);  // L^-1 S x
   flux = src;  // I x
   flux -= transported;  // (I - L^-1 S) x

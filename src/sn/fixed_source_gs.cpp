@@ -31,6 +31,7 @@ void FixedSourceGS<dim, qdim>::vmult(
   dealii::SolverGMRES<dealii::Vector<double>> solver(solver_control);
   for (int g = 0; g < num_groups; ++g) {
     Assert(downscattering[g].size() < g + 1, dealii::ExcInvalidState());
+    transported = 0;
     downscattered_m = 0;
     for (int up = 0; up < downscattering[g].size(); ++up)
       downscattering[g][up].vmult_add(downscattered_m, dst_m.block(g-1-up));

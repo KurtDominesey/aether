@@ -34,6 +34,7 @@ void FixedSource<dim, qdim>::vmult(
   for (int g = 0; g < num_groups; ++g) {
     Assert(upscattering[g].size() < num_groups - g, dealii::ExcInvalidState());
     Assert(downscattering[g].size() < g + 1, dealii::ExcInvalidState());
+    transported = 0;
     inscattered_m = 0;
     for (int down = 0; down < upscattering[g].size(); ++down)
       upscattering[g][down].vmult_add(inscattered_m, src_m.block(g+1+down));
