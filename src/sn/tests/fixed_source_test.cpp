@@ -74,7 +74,6 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
     TransportBlock<dim, qdim> transport_wg(transport, xs_total[g], 
                                            boundary_conditions[g]);
     ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
-    // WithinGroup<dim, qdim> within_group(transport, m2d, scattering, d2m);
     within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
     for (int up = g - 1; up >= 0; --up)
       downscattering[g].emplace_back(scattering, xs_scatter[g][up]);
@@ -88,17 +87,15 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   dealii::BlockVector<double> source(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> uncollided(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> flux(num_groups, num_ords*num_dofs);
-  // fixed_source.vmult(flux, source);
   dealii::SolverControl solver_control(200, 1e-10);
   TypeParam solver(solver_control);
   for (int g = 0; g < within_groups.size(); ++g)
     within_groups[g].transport.vmult(uncollided.block(g), source.block(g),
                                      false);
   solver.solve(fixed_source, flux, uncollided, fixed_source_gs);
-  // flux.print(std::cout);
-  std::cout << "iterations required " 
-            << solver_control.last_step() 
-            << std::endl;
+  // std::cout << "iterations required " 
+  //           << solver_control.last_step() 
+  //           << std::endl;
   for (int g = 0; g < num_groups; ++g)
     for (int i = 0; i < flux.block(g).size(); ++i)
       ASSERT_NEAR(1, flux.block(g)[i], 1e-10);
