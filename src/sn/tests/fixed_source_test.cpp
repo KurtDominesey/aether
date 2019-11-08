@@ -169,4 +169,71 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
       ASSERT_NEAR(1, flux.block(g)[i], 1e-10);
 }
 
+TYPED_TEST(FixedSourceRelaxedTest, IsotropicInfiniteMedium) {
+  const int dim = this->dim;
+  const int qdim = this-> qdim;
+  const int num_groups = 2;
+  const int num_ords = this->quadrature.size();
+  const int num_dofs = this->dof_handler.n_dofs();
+  MomentToDiscrete<qdim> m2d(this->quadrature);
+  DiscreteToMoment<qdim> d2m(this->quadrature);
+  std::vector<WithinGroup<dim, qdim>> within_groups;
+  std::vector<std::vector<ScatteringBlock<dim>>> downscattering(num_groups);
+  std::vector<std::vector<ScatteringBlock<dim>>> upscattering(num_groups);
+  double xs_total_value = 1;
+  double xs_scatter_value = 0.9;
+  std::vector<std::vector<double>> xs_total = {{xs_total_value},
+                                               {xs_total_value}};
+  std::vector<std::vector<std::vector<double>>> xs_scatter = {
+       {{0.0}, {xs_scatter_value}},
+       {{xs_scatter_value}, {0.0}}
+  };
+  const int dofs_per_cell = this->dof_handler.get_fe().dofs_per_cell;
+  std::vector<std::vector<dealii::BlockVector<double>>> boundary_conditions(
+      num_groups);
+  using Cell = typename dealii::Triangulation<dim>::cell_iterator;
+  using Face = typename dealii::Triangulation<dim>::face_iterator;
+  for (Cell cell : {this->mesh.begin_active(), this->mesh.last_active()}) {
+    for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
+      Face face = cell->face(f);
+      if (face->at_boundary())
+        face->set_boundary_id(types::reflecting_boundary_id);
+    }
+  }
+  Transport<dim, qdim> transport(this->dof_handler, this->quadrature);
+  Scattering<dim> scattering(this->dof_handler);
+  for (int g = 0; g < num_groups; ++g) {
+    TransportBlock<dim, qdim> transport_wg(transport, xs_total[g], 
+                                           boundary_conditions[g]);
+    ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
+    within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
+    for (int up = g - 1; up >= 0; --up)
+      downscattering[g].emplace_back(scattering, xs_scatter[g][up]);
+    for (int down = g + 1; down < num_groups; ++down)
+      upscattering[g].emplace_back(scattering, xs_scatter[g][down]);
+  }
+  FixedSource<dim, qdim> fixed_source(
+      within_groups, downscattering, upscattering, m2d, d2m);
+  FixedSourceGS<dim, qdim> fixed_source_gs(
+      within_groups, downscattering, upscattering, m2d, d2m);
+  dealii::BlockVector<double> source(num_groups, num_ords*num_dofs);
+  dealii::BlockVector<double> uncollided(num_groups, num_ords*num_dofs);
+  dealii::BlockVector<double> flux(num_groups, num_ords*num_dofs);
+  double strength = 1;
+  source = strength;
+  dealii::SolverControl solver_control(300, 1e-10);
+  TypeParam solver(solver_control);
+  for (int g = 0; g < within_groups.size(); ++g)
+    within_groups[g].transport.vmult(uncollided.block(g), source.block(g),
+                                     false);
+  solver.solve(fixed_source, flux, uncollided, fixed_source_gs);
+  // std::cout << "iterations required " 
+  //           << solver_control.last_step() 
+  //           << std::endl;
+  double solution = strength / (xs_total_value - xs_scatter_value);
+  for (int g = 0; g < num_groups; ++g)
+    for (int i = 0; i < flux.block(g).size(); ++i)
+      ASSERT_NEAR(solution, flux.block(g)[i], 1e-10);
+}
+
 }  // namespace

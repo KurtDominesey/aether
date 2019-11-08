@@ -42,6 +42,7 @@ void FixedSource<dim, qdim>::vmult(
       downscattering[g][up].vmult_add(inscattered_m, src_m.block(g-1-up));
     within_groups[g].scattering.vmult_add(inscattered_m, src_m.block(g));
     m2d.vmult(inscattered, inscattered_m);  // M S D x
+    transported = src.block(g);
     within_groups[g].transport.vmult(transported, inscattered);  // L^-1 M S D x
     dst.block(g) -= transported;  // (I - L^-1 M S D) x
   }
