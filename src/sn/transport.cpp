@@ -165,8 +165,11 @@ void Transport<dim, qdim>::vmult_octant(
     Ordinate &ordinate = ordinates_in_octant[n];
     double cos_angle =
         (octant_directions[oct] * ordinate) / (norm_a * ordinate.norm());
-    Assert(std::acos(cos_angle) <= dealii::numbers::PI_4,
-           dealii::ExcMessage(std::to_string(cos_angle)));
+    double angle = std::abs(std::acos(cos_angle));
+    Assert(angle <= double{dealii::numbers::PI_4},
+           dealii::ExcMessage("Ordinate not in octant"));
+    Assert(ordinate.norm() - 1.0 < 1e-12, 
+           dealii::ExcMessage("Ordinate not of unit magnitude"));
   }
   // setup local storage
   std::vector<dealii::FullMatrix<double>> matrices(
