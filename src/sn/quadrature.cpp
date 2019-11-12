@@ -7,6 +7,27 @@ dealii::Quadrature<2> gauss_chebyshev(int order) {
   return dealii::Quadrature<2>(polar, azimuthal);
 }
 
+template <int dim, int qdim>
+dealii::Tensor<1, dim> ordinate(const dealii::Point<qdim> coordinate) {
+  dealii::Point<dim> ordinate;
+  double cos_theta = 2 * coordinate(0) - 1;
+  if (qdim == 1) {
+    Assert(dim == 1, dealii::ExcInvalidState());
+    ordinate(0) = cos_theta;
+  }
+  else {
+    Assert(qdim == 2, dealii::ExcInvalidState());
+    Assert(2 <= dim && dim <= 3, dealii::ExcInvalidState());
+    double phi = coordinate(1) * 2 * dealii::numbers::PI;
+    double polar_proj = std::sqrt(1 - std::pow(cos_theta, 2));
+    ordinate(0) = polar_proj * std::cos(phi);
+    ordinate(1) = polar_proj * std::sin(phi);
+    if (dim == 3)
+      ordinate(2) = cos_theta;
+  }
+  return ordinate;
+}
+
 dealii::Quadrature<2> impose_azimuthal_symmetry(
     const dealii::Quadrature<2> &quadrature) {
   const std::vector<dealii::Point<2> > &points = quadrature.get_points();
@@ -24,3 +45,7 @@ dealii::Quadrature<2> impose_azimuthal_symmetry(
   dealii::Quadrature<2> quadrature_sym(points_sym, weights_sym);
   return quadrature_sym;
 }
+
+template dealii::Tensor<1, 1> ordinate(const dealii::Point<1>);
+template dealii::Tensor<1, 2> ordinate(const dealii::Point<2>);
+template dealii::Tensor<1, 3> ordinate(const dealii::Point<2>);
