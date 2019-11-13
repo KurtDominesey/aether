@@ -11,7 +11,7 @@
 /**
  * Block Gauss-Seidel for the multigroup fixed source operator.
  */
-template <int dim, int qdim = dim == 1 ? 1 : 2>
+template <class SolverType, int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSourceGS {
  public:
 
@@ -23,13 +23,15 @@ class FixedSourceGS {
    * @param upscattering Upscattering (upper triangle) operators.
    * @param m2d Moment to discrete operator.
    * @param d2m Discrete to moment operator
+   * @param solver Solver to invert the within group operators.
    */
   FixedSourceGS(
       const std::vector<WithinGroup<dim, qdim>> &within_groups,
       const std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
       const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
       const MomentToDiscrete<qdim> &m2d,
-      const DiscreteToMoment<qdim> &d2m);
+      const DiscreteToMoment<qdim> &d2m,
+      const SolverType &solver);
 
   /**
    * Apply the Gauss-Seidel linear operator.
@@ -60,6 +62,8 @@ class FixedSourceGS {
   const MomentToDiscrete<qdim> &m2d;
   //! Discrete to moment operator.
   const DiscreteToMoment<qdim> &d2m;
+  //! Solver to invert the within group operators.
+  const SolverType &solver;
 };
 
 #endif  // AETHER_FIXED_SOURCE_GS_H_ 

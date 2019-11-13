@@ -94,8 +94,10 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicPureScattering) {
   }
   FixedSource<dim, qdim> fixed_source(
       within_groups, downscattering, upscattering, m2d, d2m);
-  FixedSourceGS<dim, qdim> fixed_source_gs(
-      within_groups, downscattering, upscattering, m2d, d2m);
+  dealii::SolverControl solver_control_wg(300, 1e-10);
+  dealii::SolverGMRES<dealii::Vector<double>> solver_wg(solver_control_wg);
+  FixedSourceGS fixed_source_gs(
+      within_groups, downscattering, upscattering, m2d, d2m, solver_wg);
   dealii::BlockVector<double> source(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> uncollided(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> flux(num_groups, num_ords*num_dofs);
@@ -214,8 +216,10 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicInfiniteMedium) {
   }
   FixedSource<dim, qdim> fixed_source(
       within_groups, downscattering, upscattering, m2d, d2m);
-  FixedSourceGS<dim, qdim> fixed_source_gs(
-      within_groups, downscattering, upscattering, m2d, d2m);
+  dealii::SolverControl solver_control_wg(300, 1e-10);
+  dealii::SolverGMRES<dealii::Vector<double>> solver_wg(solver_control_wg);
+  FixedSourceGS fixed_source_gs(
+      within_groups, downscattering, upscattering, m2d, d2m, solver_wg);
   dealii::BlockVector<double> source(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> uncollided(num_groups, num_ords*num_dofs);
   dealii::BlockVector<double> flux(num_groups, num_ords*num_dofs);

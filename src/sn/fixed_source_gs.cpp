@@ -1,19 +1,22 @@
 #include "fixed_source_gs.hpp"
 
-template <int dim, int qdim>
-FixedSourceGS<dim, qdim>::FixedSourceGS(
+template <class SolverType, int dim, int qdim>
+FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
       const std::vector<WithinGroup<dim, qdim>> &within_groups,
       const std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
       const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
       const MomentToDiscrete<qdim> &m2d,
-      const DiscreteToMoment<qdim> &d2m)
+      const DiscreteToMoment<qdim> &d2m,
+      const SolverType &solver)
       : within_groups(within_groups),
         downscattering(downscattering),
         upscattering(upscattering),
-        m2d(m2d), d2m(d2m) {}
+        m2d(m2d), 
+        d2m(d2m),
+        solver(solver) {}
 
-template <int dim, int qdim>
-void FixedSourceGS<dim, qdim>::vmult(
+template <class SolverType, int dim, int qdim>
+void FixedSourceGS<SolverType, dim, qdim>::vmult(
     dealii::BlockVector<double> &dst, 
     const dealii::BlockVector<double> &src) const {
   const int num_groups = within_groups.size();
@@ -44,8 +47,8 @@ void FixedSourceGS<dim, qdim>::vmult(
   }
 }
 
-template <int dim, int qdim>
-void FixedSourceGS<dim, qdim>::step(
+template <class SolverType, int dim, int qdim>
+void FixedSourceGS<SolverType, dim, qdim>::step(
     dealii::BlockVector<double> &flux,
     const dealii::BlockVector<double> &src) const {
   const int num_groups = within_groups.size();
@@ -74,6 +77,6 @@ void FixedSourceGS<dim, qdim>::step(
   vmult(flux, transported);
 }
 
-template class FixedSourceGS<1>;
-template class FixedSourceGS<2>;
-template class FixedSourceGS<3>;
+template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 1>;
+template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 2>;
+template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 3>;
