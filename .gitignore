@@ -6,3 +6,5 @@ CMakeFiles
 CMakeCache.txt
 .vscode
 *.tcl
+*.svg
+*.vtu
