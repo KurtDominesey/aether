@@ -17,8 +17,6 @@ class WithinGroup {
              const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
-  void Tvmult(dealii::BlockVector<double> &dst,
-              const dealii::BlockVector<double> &src) const;
   const TransportBlock<dim, qdim> transport;
   const ScatteringBlock<dim> scattering;
 

@@ -59,15 +59,5 @@ void MomentToDiscrete<qdim>::vmult_add(dealii::BlockVector<double> &dst,
   }
 }
 
-template <int qdim>
-void MomentToDiscrete<qdim>::Tvmult(dealii::BlockVector<double> &dst,
-                                   const dealii::BlockVector<double> &src) 
-                                   const {} // not implemented
-
-template <int qdim>
-void MomentToDiscrete<qdim>::Tvmult_add(dealii::BlockVector<double> &dst,
-                                        const dealii::BlockVector<double> &src) 
-                                        const {} // not implemented
-
 template class MomentToDiscrete<1>;
 template class MomentToDiscrete<2>;
