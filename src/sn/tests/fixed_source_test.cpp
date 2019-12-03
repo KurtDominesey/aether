@@ -8,6 +8,7 @@
 #include <deal.II/lac/solver_relaxation.h>
 #include <deal.II/lac/precondition.h>
 
+#include "sn/quadrature.hpp"
 #include "sn/fixed_source.hpp"
 #include "sn/fixed_source_gs.cpp"
 #include "gtest/gtest.h"
@@ -23,6 +24,7 @@ class FixedSourceAbstractTest : public ::testing::Test {
     int num_ords_qdim = 4;
     int num_ords = std::pow(num_ords_qdim, qdim);
     quadrature = dealii::QGauss<qdim>(num_ords_qdim);
+    quadrature = reorder(quadrature);
     int num_dofs = dof_handler.n_dofs();
   }
 

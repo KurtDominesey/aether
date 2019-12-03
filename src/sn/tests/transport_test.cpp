@@ -5,6 +5,7 @@
 #include <deal.II/base/convergence_table.h>
 #include <deal.II/base/function_lib.h>
 
+#include "sn/quadrature.hpp"
 #include "sn/transport.hpp"
 #include "sn/transport_block.hpp"
 #include "functions/attenuated.hpp"
@@ -23,6 +24,7 @@ class Transport1DTest : public ::testing::TestWithParam<int> {
     int num_ords_qdim = 8;
     int num_ords = std::pow(num_ords_qdim, qdim);
     quadrature = dealii::QGauss<qdim>(num_ords_qdim);
+    quadrature = reorder(quadrature);
     int num_dofs = dof_handler.n_dofs();
     source.reinit(num_ords, num_dofs);
     flux.reinit(num_ords, num_dofs);
@@ -80,7 +82,7 @@ TEST_P(Transport1DTest, VoidReflected) {
       ASSERT_NEAR(n, flux.block(n)[i], 1e-10);
   for (int n = 0; n < num_ords / 2; ++n)
     for (int i = 0; i < num_dofs; ++i)
-      ASSERT_NEAR(num_ords - (n + 1), flux.block(n)[i], 1e-10);
+      ASSERT_NEAR(n + num_ords / 2, flux.block(n)[i], 1e-10);
 }
 
 TEST_P(Transport1DTest, Attenuation) {

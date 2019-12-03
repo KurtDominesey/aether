@@ -28,16 +28,18 @@ dealii::Tensor<1, dim> ordinate(const dealii::Point<qdim> coordinate) {
   return ordinate;
 }
 
-dealii::Quadrature<2> impose_azimuthal_symmetry(
+dealii::Quadrature<2> impose_polar_symmetry(
     const dealii::Quadrature<2> &quadrature) {
-  const std::vector<dealii::Point<2> > &points = quadrature.get_points();
+  const std::vector<dealii::Point<2>> &points = quadrature.get_points();
   const std::vector<double> &weights = quadrature.get_weights();
-  std::vector<dealii::Point<2> > points_sym;
+  std::vector<dealii::Point<2>> points_sym;
   std::vector<double> weights_sym;
   points_sym.reserve(points.size()/2);
   weights_sym.reserve(weights.size()/2);
   for (int n = 0; n < points.size(); ++n) {
-    if (points[n](1) > 0.5) {
+    bool both_pos = points[n](0) > 0.5 && points[n](1) > 0.5;
+    bool both_neg = points[n](0) < 0.5 && points[n](1) < 0.5;
+    if (both_pos || both_neg) {
       points_sym.push_back(points[n]);
       weights_sym.push_back(weights[n]*2);
     }
@@ -45,6 +47,25 @@ dealii::Quadrature<2> impose_azimuthal_symmetry(
   dealii::Quadrature<2> quadrature_sym(points_sym, weights_sym);
   return quadrature_sym;
 }
+
+template <int dim>
+dealii::Quadrature<dim> reorder(const dealii::Quadrature<dim> &quadrature) {
+  const std::vector<dealii::Point<dim>> &points = quadrature.get_points();
+  const std::vector<double> &weights = quadrature.get_weights();
+  std::vector<int> indices(points.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  std::sort(indices.begin(), indices.end(), CompareQuadraturePoints(points));
+  std::vector<dealii::Point<dim>> points_sorted(points.size());
+  std::vector<double> weights_sorted(weights.size());
+  for (int i = 0; i < points.size(); ++i) {
+    points_sorted[indices[i]] = points[i];
+    weights_sorted[indices[i]] = weights[i];
+  }
+  return dealii::Quadrature<dim>(points_sorted, weights_sorted);
+}
+
+template dealii::Quadrature<1> reorder(const dealii::Quadrature<1>&);
+template dealii::Quadrature<2> reorder(const dealii::Quadrature<2>&);
 
 template dealii::Tensor<1, 1> ordinate(const dealii::Point<1>);
 template dealii::Tensor<1, 2> ordinate(const dealii::Point<2>);

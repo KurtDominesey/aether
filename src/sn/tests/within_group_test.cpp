@@ -7,6 +7,7 @@
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
 
+#include "sn/quadrature.hpp"
 #include "sn/within_group.hpp"
 #include "functions/attenuated.hpp"
 #include "gtest/gtest.h"
@@ -26,6 +27,7 @@ class WithinGroupTest : public ::testing::Test {
     int num_ords_qdim = 8;
     int num_ords = std::pow(num_ords_qdim, qdim);
     quadrature = dealii::QGauss<qdim>(num_ords_qdim);
+    quadrature = reorder(quadrature);
     int num_dofs = dof_handler.n_dofs();
     source.reinit(num_ords, num_dofs);
     uncollided.reinit(num_ords, num_dofs);

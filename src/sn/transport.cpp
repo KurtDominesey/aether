@@ -45,8 +45,11 @@ Transport<dim, qdim>::Transport(
       if (point(1) < 0.25)      octant = 0;
       else if (point(1) < 0.5)  octant = 1;
       else if (point(1) < 0.75) octant = 2;
-      else                      octant = 4;
-      Assert(point(0) > 0.5, dealii::ExcInvalidState());
+      else                      octant = 3;
+      // Assert(point(0) > 0.5, 
+      //        dealii::ExcMessage("2D simulations allow only positive polar "
+      //                           "angles. Impose polar symmetry on "
+      //                           "quadrature."));
       // 2D simulations allow only positive polar angles (symmetry)
       octants_to_global[octant].push_back(n);
     }
@@ -207,7 +210,16 @@ void Transport<dim, qdim>::vmult_octant(
         fe_face_values.reinit(cell, f);
         if (face->boundary_id() == types::reflecting_boundary_id) {
           for (int n = 0; n < num_ords; ++n) {
-            int n_refl = quadrature.size() - (octant_to_global[n] + 1);
+            int n_global = octant_to_global[n];
+            int n_refl = (n_global + (quadrature.size() / 2)) 
+                         % quadrature.size();
+            dealii::Point<qdim> angle = quadrature.point(n_global);
+            dealii::Point<qdim> angle_refl = quadrature.point(n_refl);
+            Assert(std::abs(angle[0] - (1 - angle_refl[0])) < 1e-12,
+                   dealii::ExcMessage("Polar angle not reflecting"));
+            if (qdim == 2)
+              Assert(std::abs(std::abs(angle[1] - angle_refl[1]) - 0.5) < 1e-12,
+                     dealii::ExcMessage("Azimuthal angle not reflecting"));
             for (int i = 0; i < fe.dofs_per_cell; ++i)
               dst_boundary.block(n)[i] = dst.block(n_refl)[dof_indices[i]];
           }
