@@ -28,6 +28,10 @@ dealii::Tensor<1, dim> ordinate(const dealii::Point<qdim> coordinate) {
   return ordinate;
 }
 
+template dealii::Tensor<1, 1> ordinate(const dealii::Point<1>);
+template dealii::Tensor<1, 2> ordinate(const dealii::Point<2>);
+template dealii::Tensor<1, 3> ordinate(const dealii::Point<2>);
+
 dealii::Quadrature<2> impose_polar_symmetry(
     const dealii::Quadrature<2> &quadrature) {
   const std::vector<dealii::Point<2>> &points = quadrature.get_points();
@@ -67,6 +71,36 @@ dealii::Quadrature<dim> reorder(const dealii::Quadrature<dim> &quadrature) {
 template dealii::Quadrature<1> reorder(const dealii::Quadrature<1>&);
 template dealii::Quadrature<2> reorder(const dealii::Quadrature<2>&);
 
-template dealii::Tensor<1, 1> ordinate(const dealii::Point<1>);
-template dealii::Tensor<1, 2> ordinate(const dealii::Point<2>);
-template dealii::Tensor<1, 3> ordinate(const dealii::Point<2>);
+template <int dim>
+CompareQuadraturePoints<dim>::CompareQuadraturePoints(
+    const std::vector<dealii::Point<dim>> &points) : points(points) {}
+
+template <int dim>
+bool CompareQuadraturePoints<dim>::operator() (const int a, 
+                                               const int b) const {
+  const double pol_a = points[a](0);
+  const double pol_b = points[b](0);
+  Assert(pol_a != 0.5 && pol_b != 0.5, dealii::ExcInvalidState());
+  if (dim == 2) {
+    const double azi_a = points[a](1);
+    const double azi_b = points[b](1);
+    Assert(azi_a != 0.5 && azi_b != 0.5, dealii::ExcInvalidState());
+    if (azi_a != azi_b) {
+      return azi_a < azi_b;  // sort by azimuthal
+    } else {
+      if (azi_a < 0.5)
+        return pol_a < pol_b;  // sort equal azimuthal < pi by polar
+      else
+        return pol_a > pol_b;  // sort equal azimuthal > pi by reverse polar
+    }
+  } else if (dim == 1) {
+    if (pol_a > 0.5 && pol_b > 0.5) 
+      return pol_a < pol_b;  // sort by polar
+    else if (pol_a < 0.5 && pol_a < 0.5)
+      return pol_a > pol_b;  // sort by reverse polar
+    else
+      return pol_a < pol_b;  // sort by octant
+  } else {
+    throw dealii::ExcNotImplemented();
+  }
+}
