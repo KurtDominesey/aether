@@ -31,7 +31,7 @@ class FixedSourceGS {
       const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
       const MomentToDiscrete<qdim> &m2d,
       const DiscreteToMoment<qdim> &d2m,
-      const SolverType &solver);
+      SolverType &solver);
 
   /**
    * Apply the Gauss-Seidel linear operator.
@@ -63,7 +63,7 @@ class FixedSourceGS {
   //! Discrete to moment operator.
   const DiscreteToMoment<qdim> &d2m;
   //! Solver to invert the within group operators.
-  const SolverType &solver;
+  SolverType &solver;
 };
 
 #endif  // AETHER_FIXED_SOURCE_GS_H_ 

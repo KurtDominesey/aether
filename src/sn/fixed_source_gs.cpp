@@ -7,7 +7,7 @@ FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
       const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
       const MomentToDiscrete<qdim> &m2d,
       const DiscreteToMoment<qdim> &d2m,
-      const SolverType &solver)
+      SolverType &solver)
       : within_groups(within_groups),
         downscattering(downscattering),
         upscattering(upscattering),
@@ -30,8 +30,6 @@ void FixedSourceGS<SolverType, dim, qdim>::vmult(
   dealii::Vector<double> downscattered_m(num_dofs);
   dealii::Vector<double> downscattered(num_ords*num_dofs);
   dealii::Vector<double> transported(num_ords*num_dofs);
-  dealii::SolverControl solver_control(1000, 1e-10);
-  dealii::SolverGMRES<dealii::Vector<double>> solver(solver_control);
   for (int g = 0; g < num_groups; ++g) {
     Assert(downscattering[g].size() < g + 1, dealii::ExcInvalidState());
     transported = 0;
