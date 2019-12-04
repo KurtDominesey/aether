@@ -242,33 +242,28 @@ TEST_P(Transport1DTest, ManufacturedCosine) {
 INSTANTIATE_TEST_CASE_P(FEDegree, Transport1DTest, ::testing::Range(0, 4));
 
 template <typename T>
-class TransportDimTest : public ::testing::Test {
+class TransportMmsTest : public ::testing::Test {
  protected:
   static const int dim = T::value;
   static const int qdim = dim == 1 ? 1 : 2;
   void SetUp() override {
     dealii::GridGenerator::subdivided_hyper_cube(mesh, 8, -1, 1);
     dealii::FE_DGQ<dim> fe(1);
-    dof_handler.initialize(mesh, fe);
-    int num_ords_qdim = 2;
-    int num_ords = std::pow(num_ords_qdim, qdim) * qdim;
-    dealii::QGauss<1> q_polar(num_ords_qdim);
+    dof_handler.set_fe(fe);
+    int num_polar = 2;
+    dealii::QGauss<1> q_polar(num_polar);
     if (qdim == 1) {
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_polar);
     } else {  // qdim == 2
-      dealii::QIterated<1> q_azimuthal(q_polar, 4);
+      int num_azimuthal = num_polar;
+      dealii::QGauss<1> q_base(num_azimuthal);
+      dealii::QIterated<1> q_azimuthal(q_base, 4);
       dealii::QAnisotropic<2> q_to_cast(q_polar, q_azimuthal);
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_to_cast);
     }
-    // AssertDimension(q_polar.size()*2, q_azimuthal.size());
-    // AssertDimension(num_ords, quadrature.size());
-    int num_dofs = dof_handler.n_dofs();
-    num_ords = quadrature.size();
-    source.reinit(num_ords, num_dofs);
-    flux.reinit(num_ords, num_dofs);
     boundary_conditions.resize(
         dim == 1 ? 2 : 1,
-        dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
+        dealii::BlockVector<double>(quadrature.size(), fe.dofs_per_cell));
   }
 
   dealii::Triangulation<dim> mesh;
@@ -283,9 +278,9 @@ using Dimensions =
     ::testing::Types< std::integral_constant<int, 1>,
                       std::integral_constant<int, 2>,
                       std::integral_constant<int, 3>  >;
-TYPED_TEST_CASE(TransportDimTest, Dimensions);
+TYPED_TEST_CASE(TransportMmsTest, Dimensions);
 
-TYPED_TEST(TransportDimTest, ManufacturedCosine) {
+TYPED_TEST(TransportMmsTest, ManufacturedCosine) {
   static const int dim = this->dim;
   int num_ords = this->quadrature.size();
   double cross_section = 0.5;
