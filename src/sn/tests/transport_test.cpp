@@ -346,4 +346,27 @@ TYPED_TEST(TransportMmsTest, ManufacturedCosine) {
   this->Test(solution);
 }
 
+class TransportMms1DTest
+    : public TransportMmsTest<std::integral_constant<int, 1>>,
+      public ::testing::WithParamInterface<int> {
+ protected:
+  void SetUp() override {
+    TransportMmsTest::SetUp();
+    // parameterize the degree of the finite elements
+    dealii::FE_DGQ<dim> fe(WithParamInterface::GetParam());
+    dof_handler.set_fe(fe);
+    for (dealii::BlockVector<double> &boundary_condition : boundary_conditions)
+      for (int n = 0; n < boundary_condition.n_blocks(); ++n)
+        boundary_condition.block(n).reinit(fe.dofs_per_cell);
+  }
+};
+
+TEST_P(TransportMms1DTest, ManufacturedCosine) {
+  dealii::GridGenerator::subdivided_hyper_cube(mesh, 8, -1, 1);
+  dealii::Functions::CosineFunction<dim> solution;
+  Test(solution);
+}
+
+INSTANTIATE_TEST_CASE_P(FEDegree, TransportMms1DTest, ::testing::Range(0, 4));
+
 }  // namespace
