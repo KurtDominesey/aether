@@ -15,28 +15,24 @@ namespace {
 
 class Transport1DTest : public ::testing::TestWithParam<int> {
  protected:
+  static const int dim = 1;
+  static const int qdim = 1;
   void SetUp() override {
-    const int dim = 1;
-    const int qdim = 1;
-    dealii::GridGenerator::subdivided_hyper_cube(mesh, 64, x0, x1);
+    dealii::GridGenerator::subdivided_hyper_cube(mesh, 64, 0, 1);
     dealii::FE_DGQ<dim> fe(TestWithParam::GetParam());
     dof_handler.initialize(mesh, fe);
-    int num_ords_qdim = 8;
-    int num_ords = std::pow(num_ords_qdim, qdim);
-    quadrature = dealii::QGauss<qdim>(num_ords_qdim);
+    int num_polar = 8;
+    quadrature = dealii::QGauss<qdim>(num_polar);
     quadrature = reorder(quadrature);
-    int num_dofs = dof_handler.n_dofs();
-    source.reinit(num_ords, num_dofs);
-    flux.reinit(num_ords, num_dofs);
+    source.reinit(num_polar, dof_handler.n_dofs());
+    flux.reinit(num_polar, dof_handler.n_dofs());
     boundary_conditions.resize(
-        2, dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
+        2, dealii::BlockVector<double>(num_polar, fe.dofs_per_cell));
   }
 
-  const double x0 = 0;
-  const double x1 = 1;
-  dealii::Triangulation<1> mesh;
-  dealii::Quadrature<1> quadrature;
-  dealii::DoFHandler<1> dof_handler;
+  dealii::Triangulation<dim> mesh;
+  dealii::Quadrature<qdim> quadrature;
+  dealii::DoFHandler<dim> dof_handler;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> flux;
   std::vector<dealii::BlockVector<double>> boundary_conditions;
@@ -90,6 +86,8 @@ TEST_P(Transport1DTest, Attenuation) {
   double incident = 1;
   std::vector<double> cross_sections = {1.0};
   std::vector<Attenuated> solutions;
+  double x0 = mesh.begin()->face(0)->vertex(0)(0);
+  double x1 = mesh.last()->face(1)->vertex(0)(0);
   solutions.reserve(num_ords);
   for (int n = 0; n < num_ords; ++n)
     solutions.emplace_back(ordinate<1>(quadrature.point(n))[0],
@@ -133,17 +131,15 @@ TEST_P(Transport1DTest, Attenuation) {
       }
       std::string key = "L2 " + std::to_string(n);
       convergence_table.add_value(key, l2_error);
-      // dealii::Vector<double> solution_h(num_dofs);
-      // dealii::VectorTools::interpolate(dof_handler, solutions[n], solution_h);
       if (cycle == num_cycles - 1)
         convergence_table.set_scientific(key, true);
     }
-    flux = 0;
   }
   convergence_table.evaluate_all_convergence_rates(
     dealii::ConvergenceTable::RateMode::reduction_rate_log2);
-  // convergence_table.write_text(std::cout);
 }
+
+INSTANTIATE_TEST_CASE_P(FEDegree, Transport1DTest, ::testing::Range(0, 4));
 
 template <int dim>
 class Transported : public dealii::Function<dim> {
@@ -167,8 +163,6 @@ class Transported : public dealii::Function<dim> {
   const DoubleAt solution;
   const TensorAt grad;
 };
-
-INSTANTIATE_TEST_CASE_P(FEDegree, Transport1DTest, ::testing::Range(0, 4));
 
 template <typename T>
 class TransportMmsTest : public ::testing::Test {
