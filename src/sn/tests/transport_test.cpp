@@ -359,10 +359,22 @@ class TransportMms1DTest
       for (int n = 0; n < boundary_condition.n_blocks(); ++n)
         boundary_condition.block(n).reinit(fe.dofs_per_cell);
   }
+  template <typename Solution>
+  void Test(Solution &solution) {
+    dealii::Point<1> &x_first = mesh.begin_active()->face(0)->vertex(0);
+    dealii::Point<1> &x_last = mesh.last_active()->face(1)->vertex(0);
+    Assert(mesh.begin_active()->face(0)->boundary_id() == 0,
+           dealii::ExcInvalidState());
+    Assert(mesh.last_active()->face(1)->boundary_id() == 1,
+           dealii::ExcInvalidState());
+    boundary_conditions[0] = solution.value(x_first);
+    boundary_conditions[1] = solution.value(x_last);
+    TransportMmsTest::Test(solution);
+  }
 };
 
 TEST_P(TransportMms1DTest, ManufacturedCosine) {
-  dealii::GridGenerator::subdivided_hyper_cube(mesh, 8, -1, 1);
+  dealii::GridGenerator::subdivided_hyper_cube(mesh, 64, 0, 1);
   dealii::Functions::CosineFunction<dim> solution;
   Test(solution);
 }
