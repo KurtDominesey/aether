@@ -176,13 +176,15 @@ class TransportMmsTest : public ::testing::Test {
     dealii::QGauss<1> q_polar(num_polar);
     if (qdim == 1) {
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_polar);
-    } else {  // qdim == 2
+    } else {
+      AssertDimension(qdim, 2);
       int num_azimuthal = num_polar;
       dealii::QGauss<1> q_base(num_azimuthal);
       dealii::QIterated<1> q_azimuthal(q_base, 4);
       dealii::QAnisotropic<2> q_to_cast(q_polar, q_azimuthal);
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_to_cast);
     }
+    quadrature = reorder(quadrature);
     boundary_conditions.resize(
         dim == 1 ? 2 : 1,
         dealii::BlockVector<double>(quadrature.size(), fe.dofs_per_cell));
@@ -242,7 +244,6 @@ class TransportMmsTest : public ::testing::Test {
         if (cycle == num_cycles - 1)
           convergence_table.set_scientific(key, true);
       }
-      flux = 0;
     }
     convergence_table.evaluate_all_convergence_rates(
       dealii::ConvergenceTable::RateMode::reduction_rate_log2);
