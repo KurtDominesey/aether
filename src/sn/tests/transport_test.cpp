@@ -247,7 +247,6 @@ class TransportMmsTest : public ::testing::Test {
   static const int dim = T::value;
   static const int qdim = dim == 1 ? 1 : 2;
   void SetUp() override {
-    dealii::GridGenerator::subdivided_hyper_cube(mesh, 8, -1, 1);
     dealii::FE_DGQ<dim> fe(1);
     dof_handler.set_fe(fe);
     int num_polar = 2;
@@ -264,6 +263,66 @@ class TransportMmsTest : public ::testing::Test {
     boundary_conditions.resize(
         dim == 1 ? 2 : 1,
         dealii::BlockVector<double>(quadrature.size(), fe.dofs_per_cell));
+    cross_section = 0.5;
+  }
+  template <typename Solution>
+  void Test(Solution &solution) {
+    int num_ords = quadrature.size();
+    std::vector<double> cross_sections = {cross_section};
+    std::vector<Transported<dim>> sources;
+    sources.reserve(num_ords);
+    for (int n = 0; n < num_ords; ++n)
+      sources.emplace_back(
+          ordinate<dim>(this->quadrature.point(n)), this->cross_section,
+          std::bind(&Solution::value, 
+                    solution,
+                    std::placeholders::_1, 
+                    0),
+          std::bind(&Solution::gradient, 
+                    solution,
+                    std::placeholders::_1,
+                    0));
+    dealii::ConvergenceTable convergence_table;
+    int num_cycles = 2;
+    std::vector<std::vector<double>> l2_errors(num_cycles,
+                                              std::vector<double>(num_ords));
+    for (int cycle = 0; cycle < num_cycles; ++cycle) {
+      if (cycle > 0)
+        mesh.refine_global();
+      dof_handler.initialize(mesh, dof_handler.get_fe());
+      int num_dofs = dof_handler.n_dofs();
+      source.reinit(num_ords, num_dofs);
+      flux.reinit(num_ords, num_dofs);
+      for (int n = 0; n < num_ords; ++n)
+        dealii::VectorTools::interpolate(dof_handler, sources[n], 
+                                         source.block(n));
+      Transport<dim> transport(dof_handler, quadrature);
+      TransportBlock<dim> transport_block(transport, cross_sections,
+                                          boundary_conditions);
+      transport_block.vmult(flux, source, false);
+      for (int n = 0; n < num_ords; ++n) {
+        dealii::Vector<double> difference_per_cell(mesh.n_active_cells());
+        dealii::VectorTools::integrate_difference(
+            dof_handler, flux.block(n), solution, difference_per_cell,
+            dealii::QGauss<dim>(dof_handler.get_fe().degree + 2),
+            dealii::VectorTools::L2_norm);
+        double l2_error = difference_per_cell.l2_norm();
+        l2_errors[cycle][n] = l2_error;
+        if (cycle > 0) {
+          double l2_conv =
+              std::log(std::abs(l2_errors[cycle - 1][n] / l2_errors[cycle][n])) 
+              / std::log(2.);
+          EXPECT_NEAR(l2_conv, this->dof_handler.get_fe().degree+1, 5e-2);
+        }
+        std::string key = "L2 " + std::to_string(n);
+        convergence_table.add_value(key, l2_error);
+        if (cycle == num_cycles - 1)
+          convergence_table.set_scientific(key, true);
+      }
+      flux = 0;
+    }
+    convergence_table.evaluate_all_convergence_rates(
+      dealii::ConvergenceTable::RateMode::reduction_rate_log2);
   }
 
   dealii::Triangulation<dim> mesh;
@@ -272,6 +331,7 @@ class TransportMmsTest : public ::testing::Test {
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> flux;
   std::vector<dealii::BlockVector<double>> boundary_conditions;
+  double cross_section;
 };
 
 using Dimensions =
@@ -281,70 +341,9 @@ using Dimensions =
 TYPED_TEST_CASE(TransportMmsTest, Dimensions);
 
 TYPED_TEST(TransportMmsTest, ManufacturedCosine) {
-  static const int dim = this->dim;
-  int num_ords = this->quadrature.size();
-  double cross_section = 0.5;
-  std::vector<double> cross_sections = {cross_section};
-  using Solution = dealii::Functions::CosineFunction<dim>;
-  Solution solution;
-  std::vector<Transported<dim>> sources;
-  sources.reserve(num_ords);
-  for (int n = 0; n < num_ords; ++n)
-    sources.emplace_back(
-        ordinate<dim>(this->quadrature.point(n)), cross_section,
-        std::bind(&Solution::value, 
-                  solution,
-                  std::placeholders::_1, 
-                  0),
-        std::bind(&Solution::gradient, 
-                  solution,
-                  std::placeholders::_1,
-                  0));
-  dealii::ConvergenceTable convergence_table;
-  int num_cycles = 2;
-  std::vector<std::vector<double>> l2_errors(num_cycles,
-                                             std::vector<double>(num_ords));
-  for (int cycle = 0; cycle < num_cycles; ++cycle) {
-    if (cycle > 0)
-      this->mesh.refine_global();
-    this->dof_handler.initialize(this->mesh, this->dof_handler.get_fe());
-    int num_dofs = this->dof_handler.n_dofs();
-    this->source.reinit(num_ords, num_dofs);
-    this->flux.reinit(num_ords, num_dofs);
-    for (int n = 0; n < num_ords; ++n)
-      dealii::VectorTools::interpolate(this->dof_handler, sources[n],
-                                       this->source.block(n));
-    // dealii::Vector<double> solution_h(num_dofs);
-    // dealii::VectorTools::interpolate(dof_handler, solution, solution_h);
-    Transport<dim> transport(this->dof_handler, this->quadrature);
-    TransportBlock<dim> transport_block(transport, cross_sections,
-                                        this->boundary_conditions);
-    transport_block.vmult(this->flux, this->source, false);
-    for (int n = 0; n < num_ords; ++n) {
-      dealii::Vector<double> difference_per_cell(this->mesh.n_active_cells());
-      dealii::VectorTools::integrate_difference(
-          this->dof_handler, this->flux.block(n), solution, difference_per_cell,
-          dealii::QGauss<dim>(this->dof_handler.get_fe().degree + 2),
-          dealii::VectorTools::L2_norm);
-      double l2_error = difference_per_cell.l2_norm();
-      l2_errors[cycle][n] = l2_error;
-      if (cycle > 0) {
-        double l2_conv =
-            std::log(std::abs(l2_errors[cycle - 1][n] / l2_errors[cycle][n])) /
-            std::log(2.);
-        EXPECT_NEAR(l2_conv, this->dof_handler.get_fe().degree+1, 5e-2);
-      }
-      std::string key = "L2 " + std::to_string(n);
-      convergence_table.add_value(key, l2_error);
-      if (cycle == num_cycles - 1)
-        convergence_table.set_scientific(key, true);
-      // flux.print(std::cout);
-    }
-    this->flux = 0;
-  }
-  convergence_table.evaluate_all_convergence_rates(
-    dealii::ConvergenceTable::RateMode::reduction_rate_log2);
-  // convergence_table.write_text(std::cout);
+  dealii::GridGenerator::subdivided_hyper_cube(this->mesh, 8, -1, 1);
+  dealii::Functions::CosineFunction<this->dim> solution;
+  this->Test(solution);
 }
 
 }  // namespace
