@@ -10,6 +10,7 @@
 #include "sn/transport_block.hpp"
 #include "functions/attenuated.hpp"
 #include "gtest/gtest.h"
+#include "gtest/gtest-spi.h"
 
 namespace {
 
@@ -193,7 +194,7 @@ class TransportMmsTest : public ::testing::Test {
     cross_section = 0.5;
   }
   template <typename Solution>
-  void Test(Solution &solution) {
+  void Test(Solution &solution, int num_sweeps = 1) {
     int num_ords = quadrature.size();
     std::vector<double> cross_sections = {cross_section};
     std::vector<Transported<dim>> sources;
@@ -226,7 +227,8 @@ class TransportMmsTest : public ::testing::Test {
       Transport<dim> transport(dof_handler, quadrature);
       TransportBlock<dim> transport_block(transport, cross_sections,
                                           boundary_conditions);
-      transport_block.vmult(flux, source, false);
+      for (int sweep = 0; sweep < num_sweeps; ++sweep)
+        transport_block.vmult(flux, source, false);
       for (int n = 0; n < num_ords; ++n) {
         dealii::Vector<double> difference_per_cell(mesh.n_active_cells());
         dealii::VectorTools::integrate_difference(
@@ -273,7 +275,7 @@ TYPED_TEST(TransportMmsTest, VacuumCosine) {
   this->Test(solution);
 }
 
-TYPED_TEST(TransportMmsTest, ReflectedCosine) {
+TYPED_TEST(TransportMmsTest, ReflectedInlineCosine) {
   static const int dim = this->dim;
   int num_cells = 18;
   std::vector<unsigned int> num_cells_by_dim(dim, num_cells);
@@ -312,6 +314,64 @@ TYPED_TEST(TransportMmsTest, ReflectedCosine) {
   this->boundary_conditions.resize(1);
   dealii::Functions::CosineFunction<dim> solution;
   this->Test(solution);
+}
+
+TYPED_TEST(TransportMmsTest, ReflectedOnceCosine) {
+  static const int dim = this->dim;
+  int num_cells = 18;
+  std::vector<unsigned int> num_cells_by_dim(dim, num_cells);
+  num_cells_by_dim.back() /= 2;
+  if (dim == 1)
+    dealii::GridGenerator::subdivided_hyper_rectangle(
+        this->mesh, num_cells_by_dim, 
+        dealii::Point<dim>(0), dealii::Point<dim>(1), true);
+  else if (dim == 2)
+    dealii::GridGenerator::subdivided_hyper_rectangle(
+        this->mesh, num_cells_by_dim,
+        dealii::Point<dim>(-1, 0), dealii::Point<dim>(1, 1), true);
+  else if (dim == 3)
+    dealii::GridGenerator::subdivided_hyper_rectangle<dim>(
+        this->mesh, num_cells_by_dim, 
+        dealii::Point<dim>(-1, -1, 0), dealii::Point<dim>(1, 1, 1), true);
+  else
+    throw dealii::ExcInvalidState();
+  int boundary_id_bottom = 2 * dim - 2;
+  using Cell = typename dealii::Triangulation<dim>::cell_iterator;
+  using Face = typename dealii::Triangulation<dim>::face_iterator;
+  for (Cell cell = this->mesh.begin(); cell != this->mesh.end(); cell++) {
+    cell->set_material_id(0);
+    if (!cell->at_boundary())
+      continue;
+    for (int f = 0; f < dealii::GeometryInfo<this->dim>::faces_per_cell; ++f) {
+      Face face = cell->face(f);
+      if (!face->at_boundary())
+        continue;
+      if (face->boundary_id() == boundary_id_bottom)
+        face->set_boundary_id(types::reflecting_boundary_id);
+      else
+        face->set_boundary_id(0);
+    }
+  }
+  this->boundary_conditions.resize(1);
+  dealii::Functions::CosineFunction<dim> solution;
+  dealii::Triangulation<dim> mesh_coarse;
+  mesh_coarse.copy_triangulation(this->mesh);
+  // sweep once: this should fail for half the ordinates
+  int num_failures = this->quadrature.size() / 2;
+  std::string msg_failure =
+      "The difference between l2_conv and this->dof_handler.get_fe().degree+1";
+  if (num_failures == 1)
+    EXPECT_NONFATAL_FAILURE(this->Test(solution, 1), msg_failure);
+  else
+    EXPECT_NONFATAL_FAILURE(
+        // this expectation will fail because we encounter more than one failure
+        EXPECT_NONFATAL_FAILURE(this->Test(solution, 1), msg_failure),
+        "Expected: 1 non-fatal failure\n"
+        "  Actual: "+std::to_string(num_failures)+" failures");
+  // sweep twice (using original mesh)
+  this->mesh = std::move(mesh_coarse);
+  this->dof_handler.initialize(this->mesh, this->dof_handler.get_fe());
+  this->Test(solution, 2);
 }
 
 class TransportMms1DTest
