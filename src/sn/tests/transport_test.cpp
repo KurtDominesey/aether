@@ -181,7 +181,9 @@ class TransportMmsTest : public ::testing::Test {
       int num_azimuthal = num_polar;
       dealii::QGauss<1> q_base(num_azimuthal);
       dealii::QIterated<1> q_azimuthal(q_base, 4);
-      dealii::QAnisotropic<2> q_to_cast(q_polar, q_azimuthal);
+      dealii::Quadrature<2> q_to_cast(q_polar, q_azimuthal);
+      if (dim == 2)
+        q_to_cast = impose_polar_symmetry(q_to_cast);
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_to_cast);
     }
     quadrature = reorder(quadrature);
