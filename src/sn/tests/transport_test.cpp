@@ -249,6 +249,7 @@ class TransportMmsTest : public ::testing::Test {
     }
     convergence_table.evaluate_all_convergence_rates(
       dealii::ConvergenceTable::RateMode::reduction_rate_log2);
+    convergence_table.write_text(std::cout);
   }
 
   dealii::Triangulation<dim> mesh;
@@ -266,9 +267,50 @@ using Dimensions =
                       std::integral_constant<int, 3>  >;
 TYPED_TEST_CASE(TransportMmsTest, Dimensions);
 
-TYPED_TEST(TransportMmsTest, ManufacturedCosine) {
+TYPED_TEST(TransportMmsTest, VacuumCosine) {
   dealii::GridGenerator::subdivided_hyper_cube(this->mesh, 8, -1, 1);
   dealii::Functions::CosineFunction<this->dim> solution;
+  this->Test(solution);
+}
+
+TYPED_TEST(TransportMmsTest, ReflectedCosine) {
+  static const int dim = this->dim;
+  int num_cells = 18;
+  std::vector<unsigned int> num_cells_by_dim(dim, num_cells);
+  num_cells_by_dim.back() /= 2;
+  if (dim == 1)
+    dealii::GridGenerator::subdivided_hyper_rectangle(
+        this->mesh, num_cells_by_dim, 
+        dealii::Point<dim>(-1), dealii::Point<dim>(0), true);
+  else if (dim == 2)
+    dealii::GridGenerator::subdivided_hyper_rectangle(
+        this->mesh, num_cells_by_dim,
+        dealii::Point<dim>(-1, -1), dealii::Point<dim>(1, 0), true);
+  else if (dim == 3)
+    dealii::GridGenerator::subdivided_hyper_rectangle<dim>(
+        this->mesh, num_cells_by_dim, 
+        dealii::Point<dim>(-1, -1, -1), dealii::Point<dim>(1, 1, 0), true);
+  else
+    throw dealii::ExcInvalidState();
+  int boundary_id_top = 2 * dim - 1;
+  using Cell = typename dealii::Triangulation<dim>::cell_iterator;
+  using Face = typename dealii::Triangulation<dim>::face_iterator;
+  for (Cell cell = this->mesh.begin(); cell != this->mesh.end(); cell++) {
+    cell->set_material_id(0);
+    if (!cell->at_boundary())
+      continue;
+    for (int f = 0; f < dealii::GeometryInfo<this->dim>::faces_per_cell; ++f) {
+      Face face = cell->face(f);
+      if (!face->at_boundary())
+        continue;
+      if (face->boundary_id() == boundary_id_top)
+        face->set_boundary_id(types::reflecting_boundary_id);
+      else
+        face->set_boundary_id(0);
+    }
+  }
+  this->boundary_conditions.resize(1);
+  dealii::Functions::CosineFunction<dim> solution;
   this->Test(solution);
 }
 
