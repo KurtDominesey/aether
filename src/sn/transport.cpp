@@ -220,6 +220,11 @@ void Transport<dim, qdim>::vmult_octant(
             if (qdim == 2)
               Assert(std::abs(std::abs(angle[1] - angle_refl[1]) - 0.5) < 1e-12,
                      dealii::ExcMessage("Azimuthal angle not reflecting"));
+            if (dim == 3) {
+              double cos_theta = ordinates[n_global] * ordinates[n_refl];
+              Assert(std::abs(cos_theta + 1) < 1e-12, dealii::ExcMessage(
+                  "Dot product is "+std::to_string(cos_theta)+" not -1"));
+            }
             for (int i = 0; i < fe.dofs_per_cell; ++i)
               dst_boundary.block(n)[i] = dst.block(n_refl)[dof_indices[i]];
           }
