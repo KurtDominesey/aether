@@ -14,13 +14,16 @@ Transport<dim, qdim>::Transport(
   const int num_octants = std::pow(2, dim);
   octant_directions.resize(num_octants);
   octants_to_global.resize(num_octants);
-  // populate downstream cell vectors with unordered (z-ordered) cells
-  cells_downstream.resize(1);
-  cells_downstream[0].reserve(dof_handler.get_triangulation().n_active_cells());
-  for (ActiveCell cell = dof_handler.begin_active(); cell != dof_handler.end();
+  // populate cell vector
+  cells.reserve(dof_handler.get_triangulation().n_active_cells());
+  for (auto cell = dof_handler.begin_active(); cell != dof_handler.end(); 
        ++cell)
-    cells_downstream[0].push_back(cell);
-  cells_downstream.resize(num_octants, cells_downstream[0]);
+    cells.push_back(cell);
+  // populate sweep orders with unordered (z-ordered) indices
+  sweep_orders.resize(1);
+  sweep_orders[0].resize(cells.size());
+  std::iota(sweep_orders[0].begin(), sweep_orders[0].end(), 0);
+  sweep_orders.resize(num_octants, sweep_orders[0]);
   if (dim == 1) {
     octant_directions[0] = dealii::Point<dim>(+1);
     octant_directions[1] = dealii::Point<dim>(-1);
@@ -84,8 +87,11 @@ Transport<dim, qdim>::Transport(
   for (int octant = 0; octant < octant_directions.size(); ++octant) {
     const dealii::DoFRenumbering::CompareDownstream<ActiveCell, dim>
         comparator(octant_directions[octant]);
-    std::sort(cells_downstream[octant].begin(), cells_downstream[octant].end(),
-              comparator);
+    auto compare = [&comparator, this](int a, int b) -> bool {
+      return comparator(this->cells[a], this->cells[b]);
+    };
+    std::sort(sweep_orders[octant].begin(), sweep_orders[octant].end(),
+              compare);
   }
   assemble_cell_matrices();
 }
@@ -286,7 +292,8 @@ void Transport<dim, qdim>::vmult_octant(
     for (int n = 0; n < num_ords; ++n)
       boundary_conditions_incident[b].block(n) =
           boundary_conditions[b].block(octant_to_global[n]);
-  for (const ActiveCell &cell : cells_downstream[oct]) {
+  for (int c : sweep_orders[oct]) {
+    const ActiveCell &cell = cells[c];
     if (!cell->is_locally_owned()) 
       continue;
     cell->get_dof_indices(dof_indices);
