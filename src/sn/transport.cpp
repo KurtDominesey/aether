@@ -87,6 +87,103 @@ Transport<dim, qdim>::Transport(
     std::sort(cells_downstream[octant].begin(), cells_downstream[octant].end(),
               comparator);
   }
+  assemble_cell_matrices();
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::assemble_cell_matrices() {
+  Assert(cell_matrices.empty(), dealii::ExcInvalidState());
+  const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
+  const dealii::Triangulation<dim> &mesh = dof_handler.get_triangulation();
+  // setup finite elements
+  dealii::QGauss<dim> quadrature_fe(fe.degree+1);
+  dealii::QGauss<dim-1> quadrature_face(fe.degree+1);
+  const dealii::UpdateFlags update_flags = 
+      dealii::update_values
+      | dealii::update_gradients
+      | dealii::update_quadrature_points
+      | dealii::update_JxW_values;
+  const dealii::UpdateFlags update_flags_face =
+      dealii::update_values 
+      | dealii::update_normal_vectors
+      | dealii::update_quadrature_points
+      | dealii::update_JxW_values;
+  dealii::FEValues<dim> fe_values(fe, quadrature_fe, update_flags);
+  dealii::FEFaceValues<dim> fe_face_values(fe, quadrature_face,
+                                           update_flags_face);
+  dealii::FEFaceValues<dim> fe_face_values_neighbor(fe, quadrature_face,
+                                                    update_flags_face);
+  dealii::FESubfaceValues<dim> fe_subface_values(fe, quadrature_face, 
+                                                 update_flags_face);
+  for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
+    if (!cell->is_locally_owned())
+      continue;
+    fe_values.reinit(cell);
+    const std::vector<double> &JxW = fe_values.get_JxW_values();
+    cell_matrices.emplace_back(fe_values.dofs_per_cell,
+                               dealii::GeometryInfo<dim>::faces_per_cell);
+    auto &matrices = cell_matrices.back();
+    for (int q = 0; q < fe_values.n_quadrature_points; ++q) {
+      for (int i = 0; i < fe_values.dofs_per_cell; ++i) {
+        for (int j = 0; j < fe_values.dofs_per_cell; ++j) {
+          matrices.mass[i][j] += fe_values.shape_value(i, q) *
+                                 fe_values.shape_value(j, q) *
+                                 JxW[q];
+          matrices.grad[i][j] += fe_values.shape_grad(i, q) *
+                                 fe_values.shape_value(j, q) *
+                                 JxW[q];
+        }
+      }
+    }
+    for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
+      auto face = cell->face(f);
+      fe_face_values.reinit(cell, f);
+      const std::vector<dealii::Tensor<1, dim>> &normals =
+          fe_face_values.get_normal_vectors();
+      for (int q = 0; q < fe_face_values.n_quadrature_points; ++q)
+        for (int i = 0; i < fe_face_values.dofs_per_cell; ++i)
+          for (int j = 0; j < fe_face_values.dofs_per_cell; ++j)
+            matrices.outflow[f][i][j] += normals[q] *
+                                         fe_face_values.shape_value(i, q) *
+                                         fe_face_values.shape_value(j, q) *
+                                         JxW[q];
+      if (face->at_boundary())
+        continue;
+      const auto neighbor = cell->neighbor(f);
+      const int f_neighbor = cell->neighbor_of_neighbor(f);
+      if (!face->has_children()) {
+        fe_face_values_neighbor.reinit(neighbor, f_neighbor);
+        matrices.inflow[f].emplace_back(fe_face_values.dofs_per_cell,
+                                        fe_face_values_neighbor.dofs_per_cell);
+        for (int q = 0; q < fe_face_values.n_quadrature_points; ++q)
+          for (int i = 0; i < fe_face_values.dofs_per_cell; ++i)
+            for (int j = 0; j < fe_face_values_neighbor.dofs_per_cell; ++j)
+              matrices.inflow[f][0][i][j] +=
+                  normals[q] *
+                  fe_face_values.shape_value(i, q) *
+                  fe_face_values_neighbor.shape_value(j, q) *
+                  JxW[q];
+      } else {
+        for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
+          const auto neighbor_child = cell->neighbor_child_on_subface(f, f_sub);
+          fe_subface_values.reinit(cell, f, f_sub);
+          fe_face_values_neighbor.reinit(neighbor_child, f_neighbor);
+          const std::vector<dealii::Tensor<1, dim>> &subnormals =
+              fe_subface_values.get_normal_vectors();
+          matrices.inflow[f].emplace_back(fe_subface_values.dofs_per_cell,
+                                          fe_face_values_neighbor.dofs_per_cell);
+          for (int q = 0; q < fe_subface_values.n_quadrature_points; ++q)
+            for (int i = 0; i < fe_subface_values.dofs_per_cell; ++i)
+              for (int j = 0; j < fe_face_values_neighbor.dofs_per_cell; ++j)
+                matrices.inflow[f][f_sub][i][j] +=
+                    subnormals[q] *
+                    fe_subface_values.shape_value(i, q) *
+                    fe_face_values_neighbor.shape_value(j, q) *
+                    JxW[q];
+        }
+      }
+    }
+  }
 }
 
 template <int dim, int qdim>
@@ -401,3 +498,7 @@ int Transport<dim, qdim>::n_block_cols() const {
 template class Transport<1>;
 template class Transport<2>;
 template class Transport<3>;
+
+template struct CellMatrices<1>;
+template struct CellMatrices<2>;
+template struct CellMatrices<3>;

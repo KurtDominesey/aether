@@ -11,6 +11,19 @@
 #include "quadrature.hpp"
 #include "types/types.hpp"
 
+template <int dim>
+struct CellMatrices {
+  CellMatrices(int num_dofs, int num_faces)
+      : mass(num_dofs),
+        grad(num_dofs, num_dofs),
+        outflow(num_faces, num_dofs, num_dofs),
+        inflow(num_faces) {};
+  dealii::FullMatrix<double> mass;
+  dealii::Table<2, dealii::Tensor<1, dim>> grad;
+  dealii::Table<3, dealii::Tensor<1, dim>> outflow;
+  std::vector<std::vector<dealii::Table<2, dealii::Tensor<1, dim>>>> inflow;
+};
+
 /**
  * A matrix-free expression of the linear operator \f$L^{-1}\f$ where
  * \f$L\psi=\left(\Omega\cdot\nabla+\Sigma_t\right)\psi\f$.
@@ -109,6 +122,7 @@ class Transport {
   int n_block_rows() const;
 
  protected:
+  void assemble_cell_matrices();
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
    * 
@@ -186,6 +200,8 @@ class Transport {
   std::vector<std::vector<ActiveCell>> cells_downstream;
   //! Map of octant ordinate indices to global ordinate indices.
   std::vector<std::vector<int>> octants_to_global;
+  //! Cached cell matrices
+  std::vector<CellMatrices<dim>> cell_matrices;
 };
 
 #endif  // AETHER_SN_TRANSPORT_H_
