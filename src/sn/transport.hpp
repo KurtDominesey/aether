@@ -142,56 +142,6 @@ class Transport {
                     const std::vector<dealii::BlockVector<double>>
                         &boundary_conditions) const;
 
-  /**
-   * Assemble the cell contributions of the local matrix.
-   * 
-   * @param ordinates_in_sweep Ordinates in the current sweep.
-   * @param fe_values Cell finite element values.
-   * @param rhs_cell The right-hand-side vectors by ordinate (block).
-   * @param cross_section The total material cross-section of the cell.
-   * @param matrices The local (cell) matrices by ordinate.
-   * @param src_cell The source vectors by ordinate (block).
-   */
-  void integrate_cell_term(const std::vector<Ordinate> &ordinates_in_sweep,
-                           const dealii::FEValues<dim> &fe_values,
-                           const dealii::BlockVector<double> &rhs_cell,
-                           double cross_section,
-                           std::vector<dealii::FullMatrix<double>> &matrices,
-                           dealii::BlockVector<double> &src_cell) const;
-
-  /**
-   * Assemble the boundary contributions of the local matrix.
-   * 
-   * @param ordinates_in_sweep Ordinates in the current sweep.
-   * @param fe_face_values Face finite element values.
-   * @param dst_boundary The values of \f$\psi_\text{inc}\f$ on the face.
-   * @param matrices The local (cell) matrices by ordinate.
-   * @param src_cell The source vectors by ordinate (block).
-   */
-  void integrate_boundary_term(const std::vector<Ordinate> &ordinates_in_sweep,
-                               const dealii::FEFaceValues<dim> &fe_face_values,
-                               const dealii::BlockVector<double> &dst_boundary,
-                               std::vector<dealii::FullMatrix<double>> &matrices,
-                               dealii::BlockVector<double> &src_cell) const;
-
-  /**
-   * Assemble the face contributions of the local matrix.
-   * 
-   * @param ordinates_in_sweep Ordinates in the current sweep.
-   * @param fe_face_values Face finite element values.
-   * @param fe_face_values_neighbor Face finite element values of neighbor.
-   * @param dst_boundary The values of \f$\psi\f$ in the neighboring cell.
-   * @param matrices The local (cell) matrices by ordinate.
-   * @param src_cell The source vectors by ordinate (block).
-   */
-  void integrate_face_term(
-      const std::vector<Ordinate> &ordinates_in_sweep,
-      const dealii::FEFaceValuesBase<dim> &fe_face_values,
-      const dealii::FEFaceValuesBase<dim> &fe_face_values_neighbor,
-      const dealii::BlockVector<double> &dst_neighbor,
-      std::vector<dealii::FullMatrix<double>> &matrices,
-      dealii::BlockVector<double> &src_cell) const;
-
   //! DoF handler for the finite elelments.
   const dealii::DoFHandler<dim> &dof_handler;
   //! Angular quadrature.
