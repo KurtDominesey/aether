@@ -127,7 +127,8 @@ void Transport<dim, qdim>::assemble_cell_matrices() {
     fe_values.reinit(cell);
     const std::vector<double> &JxW = fe_values.get_JxW_values();
     cell_matrices.emplace_back(fe_values.dofs_per_cell,
-                               dealii::GeometryInfo<dim>::faces_per_cell);
+                               dealii::GeometryInfo<dim>::faces_per_cell,
+                               quadrature_face.size());
     auto &matrices = cell_matrices.back();
     for (int q = 0; q < fe_values.n_quadrature_points; ++q) {
       for (int i = 0; i < fe_values.dofs_per_cell; ++i) {
@@ -146,13 +147,16 @@ void Transport<dim, qdim>::assemble_cell_matrices() {
       fe_face_values.reinit(cell, f);
       const std::vector<dealii::Tensor<1, dim>> &normals =
           fe_face_values.get_normal_vectors();
-      for (int q = 0; q < fe_face_values.n_quadrature_points; ++q)
+      const std::vector<double> &JxW_face = fe_face_values.get_JxW_values();
+      for (int q = 0; q < fe_face_values.n_quadrature_points; ++q) {
+        matrices.normals[f][q] = normals[q];
         for (int i = 0; i < fe_face_values.dofs_per_cell; ++i)
           for (int j = 0; j < fe_face_values.dofs_per_cell; ++j)
             matrices.outflow[f][i][j] += normals[q] *
                                          fe_face_values.shape_value(i, q) *
                                          fe_face_values.shape_value(j, q) *
-                                         JxW[q];
+                                         JxW_face[q];
+      }
       if (face->at_boundary())
         continue;
       const auto neighbor = cell->neighbor(f);
@@ -168,7 +172,7 @@ void Transport<dim, qdim>::assemble_cell_matrices() {
                   normals[q] *
                   fe_face_values.shape_value(i, q) *
                   fe_face_values_neighbor.shape_value(j, q) *
-                  JxW[q];
+                  JxW_face[q];
       } else {
         for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
           const auto neighbor_child = cell->neighbor_child_on_subface(f, f_sub);
@@ -185,7 +189,7 @@ void Transport<dim, qdim>::assemble_cell_matrices() {
                     subnormals[q] *
                     fe_subface_values.shape_value(i, q) *
                     fe_face_values_neighbor.shape_value(j, q) *
-                    JxW[q];
+                    JxW_face[q];
         }
       }
     }
@@ -235,40 +239,14 @@ void Transport<dim, qdim>::vmult_octant(
     const std::vector<double> &cross_sections,
     const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
   const std::vector<int> &octant_to_global = octants_to_global[oct];
-  // setup finite elements
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
-  dealii::QGauss<dim> quadrature_fe(fe.degree+1);
-  dealii::QGauss<dim-1> quadrature_face(fe.degree+1);
-  const dealii::UpdateFlags update_flags = 
-      dealii::update_values
-      | dealii::update_gradients
-      | dealii::update_quadrature_points
-      | dealii::update_JxW_values;
-  const dealii::UpdateFlags update_flags_face =
-      dealii::update_values 
-      | dealii::update_normal_vectors
-      | dealii::update_quadrature_points
-      | dealii::update_JxW_values;
-  dealii::FEValues<dim> fe_values(fe, quadrature_fe, update_flags);
-  dealii::FEFaceValues<dim> fe_face_values(fe, quadrature_face,
-                                           update_flags_face);
-  dealii::FEFaceValues<dim> fe_face_values_neighbor(fe, quadrature_face,
-                                                    update_flags_face);
-  dealii::FESubfaceValues<dim> fe_subface_values(fe, quadrature_face, 
-                                                 update_flags_face);
   std::vector<dealii::types::global_dof_index> dof_indices(fe.dofs_per_cell);
   std::vector<dealii::types::global_dof_index> dof_indices_neighbor(
       fe.dofs_per_cell);
-  // get ordinates
-  const int num_ords = octant_to_global.size();  // only ords in oct
-  std::vector<Ordinate> ordinates_in_octant;
-  // ordinates_in_octant.reserve(num_ords);
-  for (int n = 0; n < num_ords; ++n)
-    ordinates_in_octant.push_back(ordinates[octant_to_global[n]]);
   // assert each ordinate belongs to this octant
   double norm_a = octant_directions[oct].norm();
-  for (int n = 0; n < ordinates_in_octant.size(); ++n) {
-    Ordinate &ordinate = ordinates_in_octant[n];
+  for (int n_oct = 0; n_oct < octant_to_global.size(); ++n_oct) {
+    const Ordinate &ordinate = ordinates[octant_to_global[n_oct]];
     double cos_angle =
         (octant_directions[oct] * ordinate) / (norm_a * ordinate.norm());
     double angle = std::abs(std::acos(cos_angle));
@@ -278,109 +256,107 @@ void Transport<dim, qdim>::vmult_octant(
            dealii::ExcMessage("Ordinate not of unit magnitude"));
   }
   // setup local storage
-  std::vector<dealii::FullMatrix<double>> matrices(
-      num_ords, dealii::FullMatrix<double>(fe.dofs_per_cell));
-  dealii::BlockVector<double> rhs_cell(num_ords, fe.dofs_per_cell);
-  dealii::BlockVector<double> src_cell(num_ords, fe.dofs_per_cell);
-  dealii::BlockVector<double> dst_cell(num_ords, fe.dofs_per_cell);
-  dealii::BlockVector<double> dst_neighbor(num_ords, fe.dofs_per_cell);
-  dealii::BlockVector<double> dst_boundary(num_ords, fe.dofs_per_cell);
-  std::vector<dealii::BlockVector<double>> boundary_conditions_incident(
-      boundary_conditions.size(), 
-      dealii::BlockVector<double>(num_ords, fe.dofs_per_cell));
-  for (int b = 0; b < boundary_conditions.size(); ++b)
-    for (int n = 0; n < num_ords; ++n)
-      boundary_conditions_incident[b].block(n) =
-          boundary_conditions[b].block(octant_to_global[n]);
+  dealii::FullMatrix<double> matrix(fe.dofs_per_cell);
+  dealii::Vector<double> rhs_cell(fe.dofs_per_cell);
+  dealii::Vector<double> src_cell(fe.dofs_per_cell);
+  dealii::Vector<double> dst_cell(fe.dofs_per_cell);
+  dealii::Vector<double> dst_boundary(fe.dofs_per_cell);
   for (int c : sweep_orders[oct]) {
     const ActiveCell &cell = cells[c];
     if (!cell->is_locally_owned()) 
       continue;
     cell->get_dof_indices(dof_indices);
-    for (int n = 0; n < num_ords; ++n) {
-      matrices[n] = 0;
-      src_cell.block(n) = 0;
-      for (int i = 0; i < fe.dofs_per_cell; ++i)
-        rhs_cell.block(n)[i] = src.block(octant_to_global[n])[dof_indices[i]];
-    }
-    fe_values.reinit(cell);
     int material = cell->material_id();
     double cross_section = cross_sections[material];
-    integrate_cell_term(ordinates_in_octant, fe_values, rhs_cell, cross_section,
-                        matrices, src_cell);
-    for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; f++) {
-      const Face &face = cell->face(f);
-      if (face->at_boundary()) {
-        fe_face_values.reinit(cell, f);
-        if (face->boundary_id() == types::reflecting_boundary_id) {
-          for (int n = 0; n < num_ords; ++n) {
-            int n_global = octant_to_global[n];
-            int n_refl = (n_global + (quadrature.size() / 2)) 
-                         % quadrature.size();
-            dealii::Point<qdim> angle = quadrature.point(n_global);
-            dealii::Point<qdim> angle_refl = quadrature.point(n_refl);
-            Assert(std::abs(angle[0] - (1 - angle_refl[0])) < 1e-12,
-                   dealii::ExcMessage("Polar angle not reflecting"));
-            if (qdim == 2)
-              Assert(std::abs(std::abs(angle[1] - angle_refl[1]) - 0.5) < 1e-12,
-                     dealii::ExcMessage("Azimuthal angle not reflecting"));
-            if (dim == 3) {
-              double cos_theta = ordinates[n_global] * ordinates[n_refl];
-              Assert(std::abs(cos_theta + 1) < 1e-12, dealii::ExcMessage(
-                  "Dot product is "+std::to_string(cos_theta)+" not -1"));
-            }
-            for (int i = 0; i < fe.dofs_per_cell; ++i)
-              dst_boundary.block(n)[i] = dst.block(n_refl)[dof_indices[i]];
-          }
+    const auto &matrices = cell_matrices[c];
+    for (int n_oct = 0; n_oct < octant_to_global.size(); ++n_oct) {
+      int n = octant_to_global[n_oct];
+      const Ordinate &ordinate = ordinates[n];
+      // assemble volume source
+      for (int i = 0; i < dof_indices.size(); ++i)
+        src_cell[i] = src.block(n)[dof_indices[i]];
+      matrices.mass.vmult(rhs_cell, src_cell);
+      // assemble volume integrals
+      for (int i = 0; i < dof_indices.size(); ++i)
+        for (int j = 0; j < dof_indices.size(); ++j)
+          matrix[i][j] = -(ordinate * matrices.grad[i][j])
+                         + cross_section * matrices.mass[i][j];
+      for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
+        // assemble face integrals
+        double ord_dot_normal = ordinate * matrices.normals[f][0];
+        for (int q = 1; q < matrices.normals.size(1); ++q)
+          Assert(ordinate * matrices.normals[f][q] * ord_dot_normal > 0,
+                dealii::ExcMessage("Face is re-entrant"));
+        // outflow
+        if (ord_dot_normal > 0) {
+          for (int i = 0; i < dof_indices.size(); ++i)
+            for (int j = 0; j < dof_indices.size(); ++j)
+              matrix[i][j] += ordinate * matrices.outflow[f][i][j];
         } else {
-          dst_boundary = boundary_conditions_incident[face->boundary_id()];
-        }
-        integrate_boundary_term(ordinates_in_octant, fe_face_values, 
-                                dst_boundary, matrices, src_cell);
-      } else {
-        Assert(cell->neighbor(f).state() == dealii::IteratorState::valid,
-               dealii::ExcInvalidState());
-        const Cell &neighbor = cell->neighbor(f);
-        if (face->has_children()) {
-          Assert(false, dealii::ExcNotImplemented());
-          const int f_neighbor = cell->neighbor_of_neighbor(f);
-          for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
-            const Cell &neighbor_child = 
-                cell->neighbor_child_on_subface(f, f_sub);
-            neighbor_child->get_dof_indices(dof_indices_neighbor);
-            for (int n = 0; n < num_ords; ++n)
-              for (int i = 0; i < fe.dofs_per_cell; ++i)
-                dst_neighbor.block(n)[i] =
-                    dst.block(octant_to_global[n])[dof_indices_neighbor[i]];
-            Assert(!neighbor_child->has_children(), dealii::ExcInvalidState());
-            fe_subface_values.reinit(cell, f, f_sub);
-            fe_face_values_neighbor.reinit(neighbor_child, f_neighbor);
-            integrate_face_term(ordinates_in_octant, fe_subface_values,
-                                fe_face_values_neighbor, dst_neighbor, matrices,
-                                src_cell);
+          const Face face = cell->face(f);
+          if (!face->at_boundary()) {
+            // inflow from neighbor
+            const Cell neighbor = cell->neighbor(f);
+            const int f_neighbor = cell->neighbor_of_neighbor(f);
+            Assert(!face->has_children(), dealii::ExcNotImplemented());
+            if (!face->has_children()) {
+              // one neighbor
+              neighbor->get_dof_indices(dof_indices_neighbor);
+              for (int i = 0; i < dof_indices.size(); ++i)
+                for (int j = 0; j < dof_indices_neighbor.size(); ++j)
+                  rhs_cell[i] -= ordinate * matrices.inflow[f][0][i][j] *
+                                 dst.block(n)[dof_indices_neighbor[j]];
+            } else {
+              // multiple neighbors
+              for (int f_sub = 0; f_sub < face->number_of_children(); ++f_sub) {
+                const Cell &neighbor_child =
+                    cell->neighbor_child_on_subface(f, f_sub);
+                neighbor_child->get_dof_indices(dof_indices_neighbor);
+                for (int i = 0; i < dof_indices.size(); ++i)
+                  for (int j = 0; j < dof_indices_neighbor.size(); ++j)
+                    rhs_cell[i] -= ordinate * matrices.inflow[f][f_sub][i][j] *
+                                   dst.block(n)[dof_indices_neighbor[j]];
+              }
+            }
+          } else {  // face->at_boundary()
+            // inflow from boundary
+            if (face->boundary_id() == types::reflecting_boundary_id) {
+              int n_refl = (n + quadrature.size()/2) % quadrature.size();
+              assert_reflecting(n, n_refl);
+              for (int j = 0; j < dof_indices.size(); ++j)
+                dst_boundary[j] = dst.block(n_refl)[dof_indices[j]];
+            } else {
+              dst_boundary = boundary_conditions[face->boundary_id()].block(n);
+            }
+            for (int i = 0; i < dof_indices.size(); ++i)
+              for (int j = 0; j < dof_indices.size(); ++j)
+                rhs_cell[i] -=
+                    ordinate * matrices.outflow[f][i][j] * dst_boundary[j];
           }
-        } else { // !face->has_children()
-          neighbor->get_dof_indices(dof_indices_neighbor);
-          for (int n = 0; n < num_ords; ++n)
-            for (int i = 0; i < fe.dofs_per_cell; ++i)
-              dst_neighbor.block(n)[i] =
-                  dst.block(octant_to_global[n])[dof_indices_neighbor[i]];
-          const int f_neighbor = cell->neighbor_of_neighbor(f);
-          fe_face_values.reinit(cell, f);
-          fe_face_values_neighbor.reinit(neighbor, f_neighbor);
-          integrate_face_term(ordinates_in_octant, fe_face_values,
-                              fe_face_values_neighbor, dst_neighbor, matrices,
-                              src_cell);
         }
       }
-    }
-    for (int n = 0; n < num_ords; ++n) {
-      dealii::FullMatrix<double> &matrix = matrices[n];
       matrix.gauss_jordan();  // directly invert
-      matrix.vmult(dst_cell.block(n), src_cell.block(n));
-      for (int i = 0; i < fe.dofs_per_cell; ++i)
-        dst.block(octant_to_global[n])[dof_indices[i]] = dst_cell.block(n)[i];
+      matrix.vmult(dst_cell, rhs_cell);
+      for (int i = 0; i < dof_indices.size(); ++i)
+        dst.block(n)[dof_indices[i]] = dst_cell[i];
     }
+  }
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::assert_reflecting(const int &n, const int &n_refl)
+    const {
+  dealii::Point<qdim> angle = quadrature.point(n);
+  dealii::Point<qdim> angle_refl = quadrature.point(n_refl);
+  Assert(std::abs(angle[0] - (1 - angle_refl[0])) < 1e-12,
+        dealii::ExcMessage("Polar angle not reflecting"));
+  if (qdim == 2)
+    Assert(std::abs(std::abs(angle[1] - angle_refl[1]) - 0.5) < 1e-12,
+          dealii::ExcMessage("Azimuthal angle not reflecting"));
+  if (dim == 3) {
+    double cos_theta = ordinates[n] * ordinates[n_refl];
+    Assert(std::abs(cos_theta + 1) < 1e-12, dealii::ExcMessage(
+        "Dot product is "+std::to_string(cos_theta)+" not -1"));
   }
 }
 

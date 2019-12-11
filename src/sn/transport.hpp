@@ -13,13 +13,15 @@
 
 template <int dim>
 struct CellMatrices {
-  CellMatrices(int num_dofs, int num_faces)
+  CellMatrices(int num_dofs, int num_faces, int num_q_points)
       : mass(num_dofs),
         grad(num_dofs, num_dofs),
+        normals(num_faces, num_q_points),
         outflow(num_faces, num_dofs, num_dofs),
         inflow(num_faces) {};
   dealii::FullMatrix<double> mass;
   dealii::Table<2, dealii::Tensor<1, dim>> grad;
+  dealii::Table<2, dealii::Tensor<1, dim>> normals;
   dealii::Table<3, dealii::Tensor<1, dim>> outflow;
   std::vector<std::vector<dealii::Table<2, dealii::Tensor<1, dim>>>> inflow;
 };
@@ -123,6 +125,8 @@ class Transport {
 
  protected:
   void assemble_cell_matrices();
+  void assert_reflecting(const int &n, const int &n_refl) const;
+
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
    * 
