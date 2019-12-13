@@ -8,3 +8,6 @@ CMakeCache.txt
 *.tcl
 *.svg
 *.vtu
+*.csv
+*.asv
+callgrind.out.*
