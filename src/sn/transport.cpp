@@ -348,15 +348,21 @@ void Transport<dim, qdim>::assert_reflecting(const int &n, const int &n_refl)
     const {
   dealii::Point<qdim> angle = quadrature.point(n);
   dealii::Point<qdim> angle_refl = quadrature.point(n_refl);
-  Assert(std::abs(angle[0] - (1 - angle_refl[0])) < 1e-12,
-        dealii::ExcMessage("Polar angle not reflecting"));
+  AssertThrow(std::abs(angle[0] - (1 - angle_refl[0])) < 1e-12,
+              dealii::ExcMessage("Polar angle not reflecting"));
   if (qdim == 2)
-    Assert(std::abs(std::abs(angle[1] - angle_refl[1]) - 0.5) < 1e-12,
-          dealii::ExcMessage("Azimuthal angle not reflecting"));
+    AssertThrow(std::abs(std::abs(angle[1] - angle_refl[1]) - 0.5) < 1e-12,
+        dealii::ExcMessage(
+            "Azimuthal angle " +
+            std::to_string(angle_refl[1]) +
+            " does not reflect " +
+            std::to_string(angle[1])
+          )
+    );
   if (dim == 3) {
     double cos_theta = ordinates[n] * ordinates[n_refl];
-    Assert(std::abs(cos_theta + 1) < 1e-12, dealii::ExcMessage(
-        "Dot product is "+std::to_string(cos_theta)+" not -1"));
+    AssertThrow(std::abs(cos_theta + 1) < 1e-12, dealii::ExcMessage(
+                "Dot product is "+std::to_string(cos_theta)+" not -1"));
   }
 }
 
