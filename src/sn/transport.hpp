@@ -152,7 +152,7 @@ class Transport {
   std::vector<Ordinate> octant_directions;
   //! Active DoF cells in z-order
   std::vector<ActiveCell> cells;
-  //! Downstream ordering of cells, by unique octant of unit sphere.
+  //! Downstream ordering of cells, by ordinate.
   std::vector<std::vector<int>> sweep_orders;
   //! Map of octant ordinate indices to global ordinate indices.
   std::vector<std::vector<int>> octants_to_global;

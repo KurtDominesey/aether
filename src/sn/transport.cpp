@@ -23,7 +23,7 @@ Transport<dim, qdim>::Transport(
   sweep_orders.resize(1);
   sweep_orders[0].resize(cells.size());
   std::iota(sweep_orders[0].begin(), sweep_orders[0].end(), 0);
-  sweep_orders.resize(num_octants, sweep_orders[0]);
+  sweep_orders.resize(num_ordinates, sweep_orders[0]);
   if (dim == 1) {
     octant_directions[0] = dealii::Point<dim>(+1);
     octant_directions[1] = dealii::Point<dim>(-1);
@@ -84,14 +84,13 @@ Transport<dim, qdim>::Transport(
       octants_to_global[octant].push_back(n);
     }
   }
-  for (int octant = 0; octant < octant_directions.size(); ++octant) {
+  for (int n = 0; n < num_ordinates; ++n) {
     const dealii::DoFRenumbering::CompareDownstream<ActiveCell, dim>
-        comparator(octant_directions[octant]);
-    auto compare = [&comparator, this](int a, int b) -> bool {
+        comparator(ordinates[n]);
+    auto compare = [&comparator, this](const int &a, const int &b) -> bool {
       return comparator(this->cells[a], this->cells[b]);
     };
-    std::sort(sweep_orders[octant].begin(), sweep_orders[octant].end(),
-              compare);
+    std::sort(sweep_orders[n].begin(), sweep_orders[n].end(), compare);
   }
   assemble_cell_matrices();
 }
@@ -261,17 +260,17 @@ void Transport<dim, qdim>::vmult_octant(
   dealii::Vector<double> src_cell(fe.dofs_per_cell);
   dealii::Vector<double> dst_cell(fe.dofs_per_cell);
   dealii::Vector<double> dst_boundary(fe.dofs_per_cell);
-  for (int c : sweep_orders[oct]) {
-    const ActiveCell &cell = cells[c];
-    if (!cell->is_locally_owned()) 
-      continue;
-    cell->get_dof_indices(dof_indices);
-    int material = cell->material_id();
-    double cross_section = cross_sections[material];
-    const auto &matrices = cell_matrices[c];
-    for (int n_oct = 0; n_oct < octant_to_global.size(); ++n_oct) {
-      int n = octant_to_global[n_oct];
-      const Ordinate &ordinate = ordinates[n];
+  for (int n_oct = 0; n_oct < octant_to_global.size(); ++n_oct) {
+    const int n = octant_to_global[n_oct];
+    const Ordinate &ordinate = ordinates[n];
+    for (int c : sweep_orders[n]) {
+      const ActiveCell &cell = cells[c];
+      if (!cell->is_locally_owned()) 
+        continue;
+      cell->get_dof_indices(dof_indices);
+      int material = cell->material_id();
+      double cross_section = cross_sections[material];
+      const auto &matrices = cell_matrices[c];
       // assemble volume source
       for (int i = 0; i < dof_indices.size(); ++i)
         src_cell[i] = src.block(n)[dof_indices[i]];
