@@ -3,6 +3,8 @@
 
 #include "transport.hpp"
 
+namespace aether::sn {
+
 /**
  * A group-specific transport operator \f$L^{-1}_g\f$ with boundary conditions
  * given by \f$\psi_\text{inc}\f$.
@@ -63,6 +65,8 @@ void TransportBlock<dim, qdim>::vmult(VectorType &dst, const VectorType &src,
     transport.vmult(dst, src, cross_sections, boundary_conditions_zero);
   else
     transport.vmult(dst, src, cross_sections, boundary_conditions);
+}
+
 }
 
 #endif // AETHER_SN_TRANSPORT_BLOCK_H_

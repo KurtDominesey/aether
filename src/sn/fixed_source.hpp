@@ -6,6 +6,8 @@
 #include "discrete_to_moment.hpp"
 #include "moment_to_discrete.hpp"
 
+namespace aether::sn {
+
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSource {
  public:
@@ -24,5 +26,7 @@ class FixedSource {
   const MomentToDiscrete<qdim> &m2d;
   const DiscreteToMoment<qdim> &d2m;
 };
+
+}  // namespace aether::sn
 
 #endif  // AETHER_SN_FIXED_SOURCE_H_

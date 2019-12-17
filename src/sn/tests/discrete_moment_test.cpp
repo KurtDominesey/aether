@@ -4,6 +4,8 @@
 #include "sn/moment_to_discrete.cpp"
 #include "gtest/gtest.h"
 
+namespace aether::sn {
+
 namespace {
 
 TEST(DiscreteMomentTest, IsotropicD2M) {
@@ -39,3 +41,5 @@ TEST(DiscreteMomentTest, IsotropicM2D) {
 }
 
 }  // namespace
+
+}  // namespace aether::sn

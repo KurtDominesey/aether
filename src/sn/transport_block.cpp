@@ -1,5 +1,7 @@
 #include "transport_block.hpp"
 
+namespace aether::sn {
+
 template <int dim, int qdim>
 TransportBlock<dim, qdim>::TransportBlock(
     const Transport<dim, qdim> &transport, 
@@ -26,3 +28,5 @@ int TransportBlock<dim, qdim>::n_block_rows() const {
 template class TransportBlock<1>;
 template class TransportBlock<2>;
 template class TransportBlock<3>;
+
+}  // namespace aether::sn

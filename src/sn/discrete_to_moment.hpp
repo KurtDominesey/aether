@@ -4,6 +4,8 @@
 #include <deal.II/base/quadrature.h>
 #include <deal.II/lac/block_vector.h>
 
+namespace aether::sn {
+
 template <int qdim>
 class DiscreteToMoment {
  public:
@@ -20,5 +22,7 @@ class DiscreteToMoment {
  protected:
   const dealii::Quadrature<qdim> &quadrature;
 };
+
+}  // namespace aether::sn
 
 #endif  // AETHER_SN_DISCRETE_TO_MOMENT_H_

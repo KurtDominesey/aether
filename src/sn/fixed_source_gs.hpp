@@ -8,6 +8,8 @@
 #include "within_group.hpp"
 #include "scattering_block.hpp"
 
+namespace aether::sn {
+
 /**
  * Block Gauss-Seidel for the multigroup fixed source operator.
  */
@@ -65,5 +67,7 @@ class FixedSourceGS {
   //! Solver to invert the within group operators.
   SolverType &solver;
 };
+
+}  // namespace aether::sn
 
 #endif  // AETHER_FIXED_SOURCE_GS_H_ 

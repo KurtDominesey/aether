@@ -12,6 +12,8 @@
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
 
+namespace aether::sn {
+
 namespace {
 
 class Transport1DTest : public ::testing::TestWithParam<int> {
@@ -410,3 +412,5 @@ TEST_P(TransportMms1DTest, ManufacturedCosine) {
 INSTANTIATE_TEST_CASE_P(FEDegree, TransportMms1DTest, ::testing::Range(0, 4));
 
 }  // namespace
+
+}  // namespace aether::sn

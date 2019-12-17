@@ -1,5 +1,7 @@
 #include "moment_to_discrete.hpp"
 
+namespace aether::sn {
+
 template <int qdim>
 MomentToDiscrete<qdim>::MomentToDiscrete(
     const dealii::Quadrature<qdim> &quadrature)
@@ -61,3 +63,5 @@ void MomentToDiscrete<qdim>::vmult_add(dealii::BlockVector<double> &dst,
 
 template class MomentToDiscrete<1>;
 template class MomentToDiscrete<2>;
+
+}  // namespace aether::sn

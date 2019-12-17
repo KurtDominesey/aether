@@ -1,5 +1,7 @@
 #include "within_group.hpp"
 
+namespace aether::sn {
+
 template <int dim, int qdim>
 WithinGroup<dim, qdim>::WithinGroup(TransportBlock<dim, qdim> &transport,
                                     MomentToDiscrete<qdim> &m2d,
@@ -47,3 +49,5 @@ void WithinGroup<dim, qdim>::vmult(
 template class WithinGroup<1>;
 template class WithinGroup<2>;
 template class WithinGroup<3>;
+
+}  // namespace aether::sn

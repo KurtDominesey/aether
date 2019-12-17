@@ -1,5 +1,7 @@
 #include "scattering.hpp"
 
+namespace aether::sn {
+
 template <int dim>
 Scattering<dim>::Scattering(const dealii::DoFHandler<dim> &dof_handler)
     : dof_handler(dof_handler) {}
@@ -63,3 +65,5 @@ void Scattering<dim>::vmult_add(
 template class Scattering<1>;
 template class Scattering<2>;
 template class Scattering<3>;
+
+}  // namespace aether::sn

@@ -1,5 +1,7 @@
 #include "quadrature.hpp"
 
+namespace aether::sn {
+
 dealii::Quadrature<2> gauss_chebyshev(int order) {
   int num_points = 2 * order - 1;
   dealii::QGauss<1> polar(num_points);
@@ -104,3 +106,5 @@ bool CompareQuadraturePoints<dim>::operator() (const int a,
     throw dealii::ExcNotImplemented();
   }
 }
+
+}  // namespace aether::sn

@@ -1,5 +1,7 @@
 #include "scattering_block.hpp"
 
+namespace aether::sn {
+
 template <int dim>
 ScatteringBlock<dim>::ScatteringBlock(
     const Scattering<dim> &scattering, 
@@ -9,3 +11,5 @@ ScatteringBlock<dim>::ScatteringBlock(
 template class ScatteringBlock<1>;
 template class ScatteringBlock<2>;
 template class ScatteringBlock<3>;
+
+}  // namespace sn

@@ -6,6 +6,8 @@
 #include "sn/scattering_block.hpp"
 #include "gtest/gtest.h"
 
+namespace aether::sn {
+
 namespace {
 
 TEST(ScatteringTest, OneMaterialIsotropic) {
@@ -29,3 +31,5 @@ TEST(ScatteringTest, OneMaterialIsotropic) {
 }
 
 }  // namespace
+
+}  // namespace aether::sn

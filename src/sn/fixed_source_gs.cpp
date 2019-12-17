@@ -1,5 +1,7 @@
 #include "fixed_source_gs.hpp"
 
+namespace aether::sn {
+
 template <class SolverType, int dim, int qdim>
 FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
       const std::vector<WithinGroup<dim, qdim>> &within_groups,
@@ -78,3 +80,5 @@ void FixedSourceGS<SolverType, dim, qdim>::step(
 template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 1>;
 template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 2>;
 template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 3>;
+
+}  // namespace aether::sn

@@ -13,6 +13,8 @@
 #include "sn/fixed_source_gs.cpp"
 #include "gtest/gtest.h"
 
+namespace aether::sn {
+
 namespace {
 
 class FixedSourceAbstractTest : public ::testing::Test {
@@ -243,3 +245,5 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicInfiniteMedium) {
 }
 
 }  // namespace
+
+}  // namespace aether::sn

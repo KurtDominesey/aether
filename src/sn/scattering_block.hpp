@@ -3,6 +3,8 @@
 
 #include "scattering.hpp"
 
+namespace aether::sn {
+
 /**
  * A specific, group-to-group scattering operator, \f$S_{g'\rightarrow g}\f$.
  */
@@ -56,5 +58,7 @@ void ScatteringBlock<dim>::vmult_add(VectorType &dst,
                                             const VectorType &src) const {
   scattering.vmult_add(dst, src, cross_sections);
 }
+
+}  // namespace aether::sn
 
 #endif  // AETHER_SN_SCATTERING_BLOCK_H_

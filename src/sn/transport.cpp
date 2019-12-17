@@ -1,5 +1,7 @@
 #include "transport.hpp"
 
+namespace aether::sn {
+
 template <int dim, int qdim>
 Transport<dim, qdim>::Transport(
     const dealii::DoFHandler<dim> &dof_handler,
@@ -382,3 +384,5 @@ template class Transport<3>;
 template struct CellMatrices<1>;
 template struct CellMatrices<2>;
 template struct CellMatrices<3>;
+
+}  // namespace aether::sn

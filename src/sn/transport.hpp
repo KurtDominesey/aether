@@ -11,6 +11,8 @@
 #include "quadrature.hpp"
 #include "types/types.hpp"
 
+namespace aether::sn {
+
 template <int dim>
 struct CellMatrices {
   CellMatrices(int num_dofs, int num_faces, int num_q_points)
@@ -159,5 +161,7 @@ class Transport {
   //! Cached cell matrices
   std::vector<CellMatrices<dim>> cell_matrices;
 };
+
+}  // namespace aether::sn
 
 #endif  // AETHER_SN_TRANSPORT_H_

@@ -12,6 +12,8 @@
 #include "functions/attenuated.hpp"
 #include "gtest/gtest.h"
 
+namespace aether::sn {
+
 namespace {
 
 template <class SolverType>
@@ -179,3 +181,5 @@ TYPED_TEST(WithinGroupTest, IsotropicInfiniteMedium) {
 }
 
 }  // namespace
+
+}  // namespace aether::sn

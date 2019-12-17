@@ -4,6 +4,8 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/point.h>
 
+namespace aether::sn {
+
 dealii::Quadrature<2> gauss_chebyshev(int order);
 
 template <int dim, int qdim>
@@ -21,5 +23,7 @@ struct CompareQuadraturePoints {
   bool operator() (const int a, const int b) const;
   const std::vector<dealii::Point<dim>> points;
 };
+
+}  // namespace aether::sn
 
 #endif  // AETHER_SN_QUADRATURE_H_

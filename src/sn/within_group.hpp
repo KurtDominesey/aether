@@ -6,6 +6,8 @@
 #include "moment_to_discrete.hpp"
 #include "discrete_to_moment.hpp"
 
+namespace aether::sn {
+
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class WithinGroup {
  public:
@@ -24,5 +26,7 @@ class WithinGroup {
   const MomentToDiscrete<qdim> &m2d;
   const DiscreteToMoment<qdim> &d2m;
 };
+
+}  // namespace aether::sn
 
 #endif  // AETHER_SN_WITHIN_GROUP_H_

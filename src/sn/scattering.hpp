@@ -6,6 +6,8 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
 
+namespace aether::sn {
+
 template <int dim>
 class Scattering {
  public:
@@ -69,5 +71,7 @@ class Scattering {
   //! DoF handler for the finite elements.
   const dealii::DoFHandler<dim> &dof_handler;
 };
+
+}  // aether::sn
 
 #endif  // AETHER_SN_SCATTERING_H_

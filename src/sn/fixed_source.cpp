@@ -1,5 +1,7 @@
 #include "fixed_source.hpp"
 
+namespace aether::sn {
+
 template <int dim, int qdim>
 FixedSource<dim, qdim>::FixedSource(
     std::vector<WithinGroup<dim, qdim>> &within_groups,
@@ -51,3 +53,5 @@ void FixedSource<dim, qdim>::vmult(
 template class FixedSource<1>;
 template class FixedSource<2>;
 template class FixedSource<3>;
+
+}  // namespace aether::sn
