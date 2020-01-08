@@ -26,7 +26,6 @@ class Transport1DTest : public ::testing::TestWithParam<int> {
     dof_handler.initialize(mesh, fe);
     int num_polar = 8;
     quadrature = dealii::QGauss<qdim>(num_polar);
-    quadrature = reorder(quadrature);
     source.reinit(num_polar, dof_handler.n_dofs());
     flux.reinit(num_polar, dof_handler.n_dofs());
     boundary_conditions.resize(
@@ -81,7 +80,7 @@ TEST_P(Transport1DTest, VoidReflected) {
       ASSERT_NEAR(n, flux.block(n)[i], 1e-10);
   for (int n = 0; n < num_ords / 2; ++n)
     for (int i = 0; i < num_dofs; ++i)
-      ASSERT_NEAR(n + num_ords / 2, flux.block(n)[i], 1e-10);
+      ASSERT_NEAR(num_ords-1 - n, flux.block(n)[i], 1e-10);
 }
 
 TEST_P(Transport1DTest, Attenuation) {
@@ -176,20 +175,19 @@ class TransportMmsTest : public ::testing::Test {
     dealii::FE_DGQ<dim> fe(1);
     dof_handler.set_fe(fe);
     int num_polar = 2;
-    dealii::QGauss<1> q_polar(num_polar);
+    dealii::Quadrature<1> q_polar = dealii::QGauss<1>(2 * num_polar);
     if (qdim == 1) {
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_polar);
     } else {
       AssertDimension(qdim, 2);
       int num_azimuthal = num_polar;
-      dealii::QGauss<1> q_base(num_azimuthal);
-      dealii::QIterated<1> q_azimuthal(q_base, 4);
-      dealii::Quadrature<2> q_to_cast(q_polar, q_azimuthal);
+      dealii::QMidpoint<1> q_base;
+      dealii::QIterated<1> q_azimuthal(q_base, 4 * num_polar);
       if (dim == 2)
-        q_to_cast = impose_polar_symmetry(q_to_cast);
+        q_polar = impose_polar_symmetry(q_polar);
+      dealii::QAnisotropic<2> q_to_cast(q_polar, q_azimuthal);
       quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_to_cast);
     }
-    quadrature = reorder(quadrature);
     boundary_conditions.resize(
         dim == 1 ? 2 : 1,
         dealii::BlockVector<double>(quadrature.size(), fe.dofs_per_cell));

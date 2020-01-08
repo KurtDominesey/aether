@@ -46,7 +46,7 @@ int main() {
   // Create quadrature
   std::cout << "create quadrature\n";
   int num_ords_per_oct = 8;
-  dealii::QGauss<1> q_polar(num_ords_per_oct*2);
+  dealii::Quadrature<1> q_polar = dealii::QGauss<1>(num_ords_per_oct*2);
   std::vector<dealii::Point<1>> points(num_ords_per_oct);
   std::vector<double> weights(num_ords_per_oct);
   for (int n = 0; n < num_ords_per_oct; ++n) {
@@ -61,9 +61,8 @@ int main() {
   AssertThrow(std::abs(1 - sum_weights) < 1e-13,
       dealii::ExcMessage("Azimuthal weights sum to " +
                          std::to_string(sum_weights) + " not one"));
-  dealii::QAnisotropic<2> q_asym(q_polar, q_azimuthal);
-  dealii::Quadrature<2> quadrature = sn::impose_polar_symmetry(q_asym);
-  quadrature = sn::reorder(quadrature);
+  q_polar = sn::impose_polar_symmetry(q_polar);
+  dealii::QAnisotropic<2> quadrature(q_polar, q_azimuthal);
   std::ofstream quadrature_csv("quadrature.csv");
   for (int n = 0; n < quadrature.size(); ++n)
     quadrature_csv << quadrature.point(n)[0] << ","

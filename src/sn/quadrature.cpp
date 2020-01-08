@@ -34,23 +34,21 @@ template dealii::Tensor<1, 1> ordinate(const dealii::Point<1>);
 template dealii::Tensor<1, 2> ordinate(const dealii::Point<2>);
 template dealii::Tensor<1, 3> ordinate(const dealii::Point<2>);
 
-dealii::Quadrature<2> impose_polar_symmetry(
-    const dealii::Quadrature<2> &quadrature) {
-  const std::vector<dealii::Point<2>> &points = quadrature.get_points();
+dealii::Quadrature<1> impose_polar_symmetry(
+    const dealii::Quadrature<1> &quadrature) {
+  const std::vector<dealii::Point<1>> &points = quadrature.get_points();
   const std::vector<double> &weights = quadrature.get_weights();
-  std::vector<dealii::Point<2>> points_sym;
+  std::vector<dealii::Point<1>> points_sym;
   std::vector<double> weights_sym;
   points_sym.reserve(points.size()/2);
   weights_sym.reserve(weights.size()/2);
   for (int n = 0; n < points.size(); ++n) {
-    bool both_pos = points[n](0) > 0.5 && points[n](1) > 0.5;
-    bool both_neg = points[n](0) < 0.5 && points[n](1) < 0.5;
-    if (both_pos || both_neg) {
+    if (points[n][0] > 0.5) {
       points_sym.push_back(points[n]);
       weights_sym.push_back(weights[n]*2);
     }
   }
-  dealii::Quadrature<2> quadrature_sym(points_sym, weights_sym);
+  dealii::Quadrature<1> quadrature_sym(points_sym, weights_sym);
   return quadrature_sym;
 }
 

@@ -322,8 +322,51 @@ void Transport<dim, qdim>::vmult_octant(
           } else {  // face->at_boundary()
             // inflow from boundary
             if (face->boundary_id() == types::reflecting_boundary_id) {
-              int n_refl = (n + quadrature.size()/2) % quadrature.size();
-              assert_reflecting(n, n_refl);
+              int n_refl;
+              if (qdim == 2) {
+                Assert(quadrature.is_tensor_product(), 
+                       dealii::ExcNotImplemented());
+                const dealii::Quadrature<1> &q_polar = 
+                    quadrature.get_tensor_basis()[0];
+                const dealii::Quadrature<1> &q_azim = 
+                    quadrature.get_tensor_basis()[1];
+                int n_polar = n % q_polar.size();
+                int n_azim  = n / q_polar.size();
+                Assert(n == n_azim * q_polar.size() + n_polar,
+                       dealii::ExcInvalidState());
+                dealii::Tensor<1, 2> zero_azim({0, 1});
+                dealii::Tensor<1, 2> norm_azim(
+                    {matrices.normals[f][0][0], matrices.normals[f][0][1]});
+                double theta = std::acos(norm_azim * zero_azim);
+                double sector = 2.0 * dealii::numbers::PI
+                                / (double)q_azim.size();
+                Assert(std::fmod(theta/sector, 1.0) < 1e-12,
+                       dealii::ExcInvalidState());
+                int n_pivot = std::round(theta/sector);
+                int n_wrap = n_pivot - 1 - (n_azim - n_pivot);
+                int n_azim_refl = n_wrap >= 0 ? n_wrap : q_azim.size() + n_wrap;
+                bool is_normal_z = 
+                    dim == 3 
+                    && matrices.normals[f][0][0] == 0.0 
+                    && matrices.normals[f][0][1] == 0.0 
+                    && std::abs(matrices.normals[f][0][2]) == 1.0;
+                if (is_normal_z)
+                  n_azim_refl = n_azim;
+                int n_polar_refl = 
+                    dim == 2 ? n_polar
+                             : (q_polar.size() - 1 - n_polar);
+                n_refl = n_azim_refl * q_polar.size() + n_polar_refl;
+              } else {
+                Assert(qdim == 1, dealii::ExcNotImplemented());
+                n_refl = quadrature.size() - 1 - n;
+              }
+              dealii::Tensor<1, dim> ordinate_refl =
+                  ordinates[n] - 2 * (ordinates[n] * matrices.normals[f][0]) *
+                                     matrices.normals[f][0];
+              double error = ordinates[n_refl] * ordinate_refl
+                             - ordinates[n_refl].norm() * ordinate_refl.norm();
+              Assert(std::abs(error) < 1e-12,
+                     dealii::ExcMessage("Ordinates not reflecting"));
               for (int j = 0; j < dof_indices.size(); ++j)
                 dst_boundary[j] = dst.block(n_refl)[dof_indices[j]];
             } else {
