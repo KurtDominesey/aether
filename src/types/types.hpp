@@ -3,7 +3,7 @@
 
 #include <deal.II/base/types.h>
 
-namespace types {
+namespace aether::types {
 
 const dealii::types::boundary_id reflecting_boundary_id 
     = static_cast<dealii::types::boundary_id>(-2);
