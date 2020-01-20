@@ -127,7 +127,6 @@ class Transport {
 
  protected:
   void assemble_cell_matrices();
-  void assert_reflecting(const int &n, const int &n_refl) const;
 
   /**
    * Compute \f$L^{-1}q\f$ for a single octant of the unit sphere.
