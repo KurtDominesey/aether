@@ -1,4 +1,4 @@
-#include "scattering.hpp"
+#include "scattering.h"
 
 namespace aether::sn {
 

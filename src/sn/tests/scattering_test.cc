@@ -2,8 +2,8 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
 
-#include "sn/scattering.hpp"
-#include "sn/scattering_block.hpp"
+#include "sn/scattering.h"
+#include "sn/scattering_block.h"
 #include "gtest/gtest.h"
 
 namespace aether::sn {

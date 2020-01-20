@@ -1,4 +1,4 @@
-#include "quadrature.hpp"
+#include "quadrature.h"
 
 namespace aether::sn {
 

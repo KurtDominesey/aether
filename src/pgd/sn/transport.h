@@ -1,7 +1,7 @@
 #ifndef AETHER_PGD_SN_TRANSPORT_H_
 #define AETHER_PGD_SN_TRANSPORT_H_
 
-#include "sn/transport.hpp"
+#include "sn/transport.h"
 
 namespace aether::pgd::sn {
 

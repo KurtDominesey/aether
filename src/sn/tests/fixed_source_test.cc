@@ -8,9 +8,9 @@
 #include <deal.II/lac/solver_relaxation.h>
 #include <deal.II/lac/precondition.h>
 
-#include "sn/quadrature.hpp"
-#include "sn/fixed_source.hpp"
-#include "sn/fixed_source_gs.cpp"
+#include "sn/quadrature.h"
+#include "sn/fixed_source.h"
+#include "sn/fixed_source_gs.cc"
 #include "gtest/gtest.h"
 
 namespace aether::sn {

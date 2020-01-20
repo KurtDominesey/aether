@@ -3,8 +3,8 @@
 
 #include <deal.II/base/table.h>
 
-#include "sn/fixed_source.hpp"
-#include "pgd/sn/transport.hpp"
+#include "sn/fixed_source.h"
+#include "pgd/sn/transport.h"
 
 namespace aether::pgd::sn {
 

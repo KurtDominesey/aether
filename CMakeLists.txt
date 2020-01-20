@@ -19,7 +19,7 @@ SET(TARGET "aether.exe")
 # SET(TARGET_SRC
 #   ${TARGET}.cc
 #   )
-SET(TARGET_SRC "src/main.cpp")
+SET(TARGET_SRC "src/main.cc")
 
 # SET(CMAKE_CXX_STANDARD 17)
 # SET(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,8 +47,8 @@ DEAL_II_INVOKE_AUTOPILOT()
 find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
-FILE(GLOB_RECURSE TEST_SRC  "src/[!main]*.cpp")
-FILE(GLOB_RECURSE TEST_INC  "src/*.hpp")
+FILE(GLOB_RECURSE TEST_SRC  "src/[!main]*.cc")
+FILE(GLOB_RECURSE TEST_INC  "src/*.h")
 SET(TEST_SRC ${TEST_SRC} ${TEST_INC}) 
 
 enable_testing()

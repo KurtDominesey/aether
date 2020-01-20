@@ -6,7 +6,7 @@
 #include <deal.II/lac/solver_control.h>
 
 #include "../types/matrix_type.hpp"
-#include "cache.hpp"
+#include "cache.h"
 
 namespace pgd {
 

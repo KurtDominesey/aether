@@ -1,7 +1,7 @@
 #ifndef AETHER_SN_SCATTERING_BLOCK_H_
 #define AETHER_SN_SCATTERING_BLOCK_H_
 
-#include "scattering.hpp"
+#include "scattering.h"
 
 namespace aether::sn {
 

@@ -1,4 +1,4 @@
-#include "scattering_block.hpp"
+#include "scattering_block.h"
 
 namespace aether::sn {
 

@@ -7,9 +7,9 @@
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
 
-#include "sn/quadrature.hpp"
-#include "sn/within_group.hpp"
-#include "functions/attenuated.hpp"
+#include "sn/quadrature.h"
+#include "sn/within_group.h"
+#include "functions/attenuated.h"
 #include "gtest/gtest.h"
 
 namespace aether::sn {

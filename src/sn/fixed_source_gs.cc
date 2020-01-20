@@ -1,4 +1,4 @@
-#include "fixed_source_gs.hpp"
+#include "fixed_source_gs.h"
 
 namespace aether::sn {
 

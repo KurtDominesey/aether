@@ -17,7 +17,7 @@ SET(TARGET "c5g7.exe")
 # in the "CMake in user projects" page accessible from the "User info"
 # page of the documentation.
 SET(TARGET_SRC
-  c5g7.cpp
+  c5g7.cc
   )
 
 # SET(CMAKE_CXX_STANDARD 17)

@@ -1,4 +1,4 @@
-#include "pgd/sn/fixed_source.hpp"
+#include "pgd/sn/fixed_source.h"
 
 namespace aether::pgd::sn {
 

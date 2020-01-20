@@ -1,4 +1,4 @@
-#include "moment_to_discrete.hpp"
+#include "moment_to_discrete.h"
 
 namespace aether::sn {
 

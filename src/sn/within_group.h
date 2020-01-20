@@ -1,10 +1,10 @@
 #ifndef AETHER_SN_WITHIN_GROUP_H_
 #define AETHER_SN_WITHIN_GROUP_H_
 
-#include "transport_block.hpp"
-#include "scattering_block.hpp"
-#include "moment_to_discrete.hpp"
-#include "discrete_to_moment.hpp"
+#include "transport_block.h"
+#include "scattering_block.h"
+#include "moment_to_discrete.h"
+#include "discrete_to_moment.h"
 
 namespace aether::sn {
 

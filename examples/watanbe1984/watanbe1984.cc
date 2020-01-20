@@ -10,15 +10,15 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/numerics/data_out.h>
 
-#include "types/types.hpp"
-#include "sn/quadrature.cpp"
-#include "sn/discrete_to_moment.cpp"
-#include "sn/moment_to_discrete.cpp"
-#include "sn/transport.cpp"
-#include "sn/transport_block.cpp"
-#include "sn/scattering.cpp"
-#include "sn/scattering_block.cpp"
-#include "sn/within_group.cpp"
+#include "types/types.h"
+#include "sn/quadrature.cc"
+#include "sn/discrete_to_moment.cc"
+#include "sn/moment_to_discrete.cc"
+#include "sn/transport.cc"
+#include "sn/transport_block.cc"
+#include "sn/scattering.cc"
+#include "sn/scattering_block.cc"
+#include "sn/within_group.cc"
 
 using namespace aether;
 

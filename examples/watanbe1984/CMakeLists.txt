@@ -17,7 +17,7 @@ SET(TARGET "watanbe1984.exe")
 # in the "CMake in user projects" page accessible from the "User info"
 # page of the documentation.
 SET(TARGET_SRC
-  watanbe1984.cpp
+  watanbe1984.cc
   )
 
 # SET(CMAKE_CXX_STANDARD 17)

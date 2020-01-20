@@ -3,10 +3,10 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/base/convergence_table.h>
 
-#include "pgd/sn/transport.hpp"
-#include "sn/quadrature.hpp"
-#include "sn/transport_block.hpp"
-#include "functions/attenuated.hpp"
+#include "pgd/sn/transport.h"
+#include "sn/quadrature.h"
+#include "sn/transport_block.h"
+#include "functions/attenuated.h"
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
 

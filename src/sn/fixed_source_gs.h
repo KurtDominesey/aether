@@ -5,8 +5,8 @@
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/precondition.h>
 
-#include "within_group.hpp"
-#include "scattering_block.hpp"
+#include "within_group.h"
+#include "scattering_block.h"
 
 namespace aether::sn {
 

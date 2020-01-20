@@ -14,18 +14,18 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/data_out_dof_data.h>
 
-#include "mesh/mesh.hpp"
-#include "types/types.hpp"
-#include "sn/quadrature.cpp"
-#include "sn/discrete_to_moment.cpp"
-#include "sn/moment_to_discrete.cpp"
-#include "sn/transport.cpp"
-#include "sn/transport_block.cpp"
-#include "sn/scattering.cpp"
-#include "sn/scattering_block.cpp"
-#include "sn/within_group.cpp"
-#include "sn/fixed_source.cpp"
-#include "sn/fixed_source_gs.cpp"
+#include "mesh/mesh.h"
+#include "types/types.h"
+#include "sn/quadrature.cc"
+#include "sn/discrete_to_moment.cc"
+#include "sn/moment_to_discrete.cc"
+#include "sn/transport.cc"
+#include "sn/transport_block.cc"
+#include "sn/scattering.cc"
+#include "sn/scattering_block.cc"
+#include "sn/within_group.cc"
+#include "sn/fixed_source.cc"
+#include "sn/fixed_source_gs.cc"
 
 using namespace aether;
 

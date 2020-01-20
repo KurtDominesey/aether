@@ -8,8 +8,8 @@
 #include <deal.II/fe/fe_update_flags.h>
 #include <deal.II/fe/fe_values.h>
 
-#include "quadrature.hpp"
-#include "types/types.hpp"
+#include "quadrature.h"
+#include "types/types.h"
 
 namespace aether::sn {
 

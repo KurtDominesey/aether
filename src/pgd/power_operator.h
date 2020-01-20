@@ -5,7 +5,7 @@
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/linear_operator.h>
 
-#include "../types/matrix_type.hpp"
+#include "../types/matrix_type.h"
 
 namespace pgd {
 

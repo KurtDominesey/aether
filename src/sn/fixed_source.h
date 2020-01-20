@@ -1,10 +1,10 @@
 #ifndef AETHER_SN_FIXED_SOURCE_H_
 #define AETHER_SN_FIXED_SOURCE_H_
 
-#include "within_group.hpp"
-#include "scattering_block.hpp"
-#include "discrete_to_moment.hpp"
-#include "moment_to_discrete.hpp"
+#include "within_group.h"
+#include "scattering_block.h"
+#include "discrete_to_moment.h"
+#include "moment_to_discrete.h"
 
 namespace aether::sn {
 
