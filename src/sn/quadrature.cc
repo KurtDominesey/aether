@@ -2,13 +2,6 @@
 
 namespace aether::sn {
 
-dealii::Quadrature<2> gauss_chebyshev(int order) {
-  int num_points = 2 * order - 1;
-  dealii::QGauss<1> polar(num_points);
-  dealii::QGaussChebyshev<1> azimuthal(num_points);
-  return dealii::Quadrature<2>(polar, azimuthal);
-}
-
 template <int dim, int qdim>
 dealii::Tensor<1, dim> ordinate(const dealii::Point<qdim> coordinate) {
   dealii::Point<dim> ordinate;
