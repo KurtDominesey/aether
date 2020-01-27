@@ -86,9 +86,10 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicPureScattering) {
   Transport<dim, qdim> transport(this->dof_handler, this->quadrature);
   Scattering<dim> scattering(this->dof_handler);
   for (int g = 0; g < num_groups; ++g) {
-    TransportBlock<dim, qdim> transport_wg(transport, xs_total[g], 
-                                           boundary_conditions[g]);
-    ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
+    auto transport_wg = std::make_shared<TransportBlock<dim, qdim>>(
+        transport, xs_total[g], boundary_conditions[g]);
+    auto scattering_wg = std::make_shared<ScatteringBlock<dim>>(
+        scattering, xs_scatter[g][g]);
     within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
     for (int up = g - 1; up >= 0; --up)
       downscattering[g].emplace_back(scattering, xs_scatter[g][up]);
@@ -146,9 +147,10 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   Transport<dim, qdim> transport(this->dof_handler, this->quadrature);
   Scattering<dim> scattering(this->dof_handler);
   for (int g = 0; g < num_groups; ++g) {
-    TransportBlock<dim, qdim> transport_wg(transport, xs_total[g], 
-                                           boundary_conditions[g]);
-    ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
+    auto transport_wg = std::make_shared<TransportBlock<dim, qdim>>(
+        transport, xs_total[g], boundary_conditions[g]);
+    auto scattering_wg = std::make_shared<ScatteringBlock<dim>>(
+        scattering, xs_scatter[g][g]);
     within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
     for (int up = g - 1; up >= 0; --up)
       downscattering[g].emplace_back(scattering, xs_scatter[g][up]);
@@ -208,9 +210,10 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicInfiniteMedium) {
   Transport<dim, qdim> transport(this->dof_handler, this->quadrature);
   Scattering<dim> scattering(this->dof_handler);
   for (int g = 0; g < num_groups; ++g) {
-    TransportBlock<dim, qdim> transport_wg(transport, xs_total[g], 
-                                           boundary_conditions[g]);
-    ScatteringBlock<dim> scattering_wg(scattering, xs_scatter[g][g]);
+    auto transport_wg = std::make_shared<TransportBlock<dim, qdim>>(
+        transport, xs_total[g], boundary_conditions[g]);
+    auto scattering_wg = std::make_shared<ScatteringBlock<dim>>(
+        scattering, xs_scatter[g][g]);
     within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
     for (int up = g - 1; up >= 0; --up)
       downscattering[g].emplace_back(scattering, xs_scatter[g][up]);

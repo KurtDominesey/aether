@@ -7,9 +7,21 @@ WithinGroup<dim, qdim>::WithinGroup(TransportBlock<dim, qdim> &transport,
                                     MomentToDiscrete<qdim> &m2d,
                                     ScatteringBlock<dim> &scattering,
                                     DiscreteToMoment<qdim> &d2m)
-    : transport(std::move(transport)), m2d(m2d), 
-      scattering(std::move(scattering)), d2m(d2m) {}
+    : transport(transport), m2d(m2d), 
+      scattering(scattering), d2m(d2m) {}
 
+template <int dim, int qdim>
+WithinGroup<dim, qdim>::WithinGroup(
+    std::shared_ptr<TransportBlock<dim, qdim>> &transport_shared,
+    MomentToDiscrete<qdim> &m2d, 
+    std::shared_ptr<ScatteringBlock<dim>> &scattering_shared,
+    DiscreteToMoment<qdim> &d2m)
+    : transport(*transport_shared.get()), 
+      m2d(m2d), 
+      scattering(*scattering_shared.get()), 
+      d2m(d2m),
+      transport_shared(transport_shared),
+      scattering_shared(scattering_shared) {}
 
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(dealii::Vector<double> &flux,

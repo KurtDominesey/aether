@@ -15,16 +15,22 @@ class WithinGroup {
               MomentToDiscrete<qdim> &m2d,
               ScatteringBlock<dim> &scattering,
               DiscreteToMoment<qdim> &d2m);
+  WithinGroup(std::shared_ptr<TransportBlock<dim, qdim>> &transport_shared,
+              MomentToDiscrete<qdim> &m2d,
+              std::shared_ptr<ScatteringBlock<dim>> &scattering_shared,
+              DiscreteToMoment<qdim> &d2m);
   void vmult(dealii::Vector<double> &dst,
              const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
-  const TransportBlock<dim, qdim> transport;
-  const ScatteringBlock<dim> scattering;
+  const TransportBlock<dim, qdim> &transport;
+  const ScatteringBlock<dim> &scattering;
 
  protected:
   const MomentToDiscrete<qdim> &m2d;
   const DiscreteToMoment<qdim> &d2m;
+  const std::shared_ptr<TransportBlock<dim, qdim>> transport_shared;
+  const std::shared_ptr<ScatteringBlock<dim>> scattering_shared;
 };
 
 }  // namespace aether::sn
