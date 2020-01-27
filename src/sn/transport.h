@@ -11,6 +11,10 @@
 #include "quadrature.h"
 #include "types/types.h"
 
+namespace aether::pgd::sn {
+template <int dim, int qdim> class FixedSourceP;
+}
+
 namespace aether::sn {
 
 template <int dim>
@@ -87,6 +91,8 @@ class Transport {
   Transport(const dealii::DoFHandler<dim> &dof_handler,
             const dealii::Quadrature<qdim> &quadrature);
 
+  virtual ~Transport() {}
+
   /**
    * Compute \f$L^{-1}q\f$.
    * 
@@ -125,6 +131,8 @@ class Transport {
    */ 
   int n_block_rows() const;
 
+  dealii::BlockIndices get_block_indices() const;
+
  protected:
   void assemble_cell_matrices();
 
@@ -159,6 +167,8 @@ class Transport {
   std::vector<std::vector<int>> octants_to_global;
   //! Cached cell matrices
   std::vector<CellMatrices<dim>> cell_matrices;
+
+  friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
 };
 
 }  // namespace aether::sn

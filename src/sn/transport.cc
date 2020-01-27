@@ -397,6 +397,11 @@ int Transport<dim, qdim>::n_block_cols() const {
   return ordinates.size();
 }
 
+template <int dim, int qdim>
+dealii::BlockIndices Transport<dim, qdim>::get_block_indices() const {
+  return dealii::BlockIndices(quadrature.size(), dof_handler.n_dofs());
+}
+
 template class Transport<1>;
 template class Transport<2>;
 template class Transport<3>;

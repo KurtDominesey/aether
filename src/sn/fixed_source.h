@@ -6,6 +6,10 @@
 #include "discrete_to_moment.h"
 #include "moment_to_discrete.h"
 
+namespace aether::pgd::sn {
+template <int dim, int qdim> class FixedSourceP;
+}
+
 namespace aether::sn {
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
@@ -25,6 +29,7 @@ class FixedSource {
   const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering;
   const MomentToDiscrete<qdim> &m2d;
   const DiscreteToMoment<qdim> &d2m;
+  friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
 };
 
 }  // namespace aether::sn

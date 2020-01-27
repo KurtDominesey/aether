@@ -3,6 +3,10 @@
 
 #include "transport.h"
 
+namespace aether::pgd::sn {
+template <int dim, int qdim> class FixedSourceP;
+}
+
 namespace aether::sn {
 
 /**
@@ -24,6 +28,8 @@ class TransportBlock {
       const Transport<dim, qdim> &transport,
       const std::vector<double> &cross_sections,
       const std::vector<dealii::BlockVector<double>> &boundary_conditions);
+
+  virtual ~TransportBlock() {}
 
   /**
    * Apply the linear operator.
@@ -55,6 +61,8 @@ class TransportBlock {
   const std::vector<dealii::BlockVector<double>> &boundary_conditions;
   //! Zero values of \f$\psi_\text{inc}\f$ by boundary id. 
   std::vector<dealii::BlockVector<double>> boundary_conditions_zero;
+
+  friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
 };
 
 template <int dim, int qdim>
