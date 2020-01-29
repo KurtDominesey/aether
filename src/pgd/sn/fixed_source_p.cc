@@ -5,12 +5,16 @@ namespace aether::pgd::sn {
 template <int dim, int qdim>
 FixedSourceP<dim, qdim>::FixedSourceP(
     aether::sn::FixedSource<dim, qdim> &fixed_source,
-    std::vector<double> &cross_sections_total,
-    std::vector<std::vector<double>> &cross_sections_scatter,
+    std::vector<double> &cross_sections_total_w,
+    std::vector<std::vector<double>> &cross_sections_scatter_w,
+    const std::vector<double> &cross_sections_total_r,
+    const std::vector<std::vector<double>> &cross_sections_scatter_r,
     std::vector<dealii::BlockVector<double>> &sources)
       : fixed_source(fixed_source),
-        cross_sections_total(cross_sections_total),
-        cross_sections_scatter(cross_sections_scatter),
+        cross_sections_total_w(cross_sections_total_w),
+        cross_sections_scatter_w(cross_sections_scatter_w),
+        cross_sections_total_r(cross_sections_total_r),
+        cross_sections_scatter_r(cross_sections_scatter_r),
         sources(sources) {}
 
 template <int dim, int qdim>
@@ -83,8 +87,10 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
           collision_c += transport.quadrature.weight(n) * collision_n;
           scattering_c += transport.quadrature.weight(n) * scattering_n;
         }
-        inner_products[m].collision[material] += collision_c;
-        inner_products[m].scattering[material][0] += scattering_c;
+        inner_products[m].collision[material] +=
+            cross_sections_total_r[material] * collision_c;
+        inner_products[m].scattering[material][0] += 
+            cross_sections_scatter_r[material][0] * scattering_c;
       }
     }
   }
@@ -114,11 +120,14 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::set_cross_sections(
       InnerProducts &coefficients) {
-  for (int material = 0; material < cross_sections_total.size(); ++material) {
-    cross_sections_total[material] = 
-        coefficients.collision[material] / coefficients.streaming;
-    cross_sections_scatter[material][0] = 
-        coefficients.scattering[material][0] / coefficients.streaming;                      
+  AssertDimension(cross_sections_total_w.size(), cross_sections_total_r.size());
+  for (int material = 0; material < cross_sections_total_w.size(); ++material) {
+    cross_sections_total_w[material] = cross_sections_total_r[material] *
+                                       coefficients.collision[material] /
+                                       coefficients.streaming;
+    cross_sections_scatter_w[material][0] =
+        cross_sections_scatter_r[material][0] *
+        coefficients.scattering[material][0] / coefficients.streaming;
   }
 }
 
@@ -159,8 +168,8 @@ void FixedSourceP<dim, qdim>::step(
   for (int g = 0; g < fixed_source.within_groups.size(); ++g)
     fixed_source.within_groups[0].transport.vmult(uncollided.block(g), 
                                                   source.block(g), false);
-  dealii::ReductionControl solver_control(50, 1e-6, 1e-2);
-  dealii::SolverGMRES<dealii::BlockVector<double>> solver(solver_control);
+  dealii::ReductionControl solver_control(500, 1e-8, 1e-8);
+  dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
   solver.solve(fixed_source, caches.back().mode, uncollided, 
                dealii::PreconditionIdentity());
   set_last_cache();

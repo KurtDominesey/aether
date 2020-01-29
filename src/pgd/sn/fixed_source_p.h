@@ -27,8 +27,10 @@ template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSourceP : public LinearInterface {
  public:
   FixedSourceP(aether::sn::FixedSource<dim, qdim> &fixed_source,
-               std::vector<double> &cross_sections_total,
-               std::vector<std::vector<double>> &cross_sections_scatter,
+               std::vector<double> &cross_sections_total_w,
+               std::vector<std::vector<double>> &cross_sections_scatter_w,
+               const std::vector<double> &cross_sections_total_r,
+               const std::vector<std::vector<double>> &cross_sections_scatter_r,
                std::vector<dealii::BlockVector<double>> &sources);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
@@ -44,8 +46,10 @@ class FixedSourceP : public LinearInterface {
   std::vector<Cache> caches;
  protected:
   aether::sn::FixedSource<dim, qdim> &fixed_source;
-  std::vector<double> &cross_sections_total;
-  std::vector<std::vector<double>> &cross_sections_scatter;
+  const std::vector<double> &cross_sections_total_r;
+  const std::vector<std::vector<double>> &cross_sections_scatter_r;
+  std::vector<double> &cross_sections_total_w;
+  std::vector<std::vector<double>> &cross_sections_scatter_w;
   std::vector<dealii::BlockVector<double>> &sources;
   void set_last_cache();
   void set_cross_sections(InnerProducts &coefficients_x);
