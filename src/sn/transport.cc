@@ -284,16 +284,24 @@ void Transport<dim, qdim>::vmult_octant(
                          + cross_section * matrices.mass[i][j];
       for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
         // assemble face integrals
-        double ord_dot_normal = ordinate * matrices.normals[f][0];
-        for (int q = 1; q < matrices.normals.size(1); ++q)
-          Assert(ordinate * matrices.normals[f][q] * ord_dot_normal > 0,
-                dealii::ExcMessage("Face is re-entrant"));
+        double ord_dot_normal = 0;
+        for (int q = 0; q < matrices.normals.size(1); ++q) {
+          double ord_dot_normal_q = ordinate * matrices.normals[f][q];
+          if (ord_dot_normal_q == 0)
+            continue;
+          if (ord_dot_normal == 0)
+            ord_dot_normal = ord_dot_normal_q;
+          else
+            Assert(ord_dot_normal_q * ord_dot_normal > 0, 
+                   dealii::ExcMessage("Face is re-entrant"));
+        }
         // outflow
         if (ord_dot_normal > 0) {
           for (int i = 0; i < dof_indices.size(); ++i)
             for (int j = 0; j < dof_indices.size(); ++j)
               matrix[i][j] += ordinate * matrices.outflow[f][i][j];
-        } else {
+        // inflow
+        } else if (ord_dot_normal < 0) {
           const Face face = cell->face(f);
           if (!face->at_boundary()) {
             // inflow from neighbor
