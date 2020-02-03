@@ -52,8 +52,31 @@ QAngle<dim, qdim>::QAngle(const unsigned int num_quadrature_points)
 template <int dim, int qdim>
 QAngle<dim, qdim>::QAngle(
     const typename dealii::Quadrature<qdim>::SubQuadrature &sub_quadrature,
-    const dealii::Quadrature<1>& quadrature)
-    : dealii::Quadrature<qdim>(sub_quadrature, quadrature) {
+    const dealii::Quadrature<1>& quadrature) {
+  if (dim == 2) {
+    // impose polar symmetry
+    AssertDimension(qdim, 2);
+    Assert(sub_quadrature.size() % 2 == 0, 
+           dealii::ExcImpossibleInDimSpacedim(qdim, dim));
+    auto points = sub_quadrature.get_points();
+    auto weights = sub_quadrature.get_weights();
+    for (int n = 0, nn = 0; nn < sub_quadrature.size(); ++n, ++nn) {
+      if (points[n][0] > 0.5) {
+        weights[n] *= 2;
+        continue;
+      }
+      points.erase(points.begin() + n);
+      weights.erase(weights.begin() + n);
+      --n;
+    }
+    Assert(points.size() == weights.size(), dealii::ExcInvalidState());
+    Assert(weights.size() == sub_quadrature.size() / 2,
+           dealii::ExcImpossibleInDimSpacedim(qdim, dim));
+    *this = dealii::Quadrature<qdim>(
+        dealii::Quadrature<qdim-1>(points, weights), quadrature);
+  } else {
+    *this = dealii::Quadrature<qdim>(sub_quadrature, quadrature);
+  }
   q_angle_init();
 }
 
@@ -137,19 +160,10 @@ const std::vector<dealii::Tensor<1, dim>> &QAngle<dim, qdim>::get_ordinates()
 
 template <int dim, int qdim>
 void QAngle<dim, qdim>::q_angle_init() {
-  if (dim == 2) {  // impose polar symmetry
-    const int size_original = this->size();
-    for (int n = 0, nn = 0; n < size_original; ++n, ++nn) {
-      if (this->quadrature_points[nn][0] > 0.5)
-        continue;
-      this->quadrature_points.erase(this->quadrature_points.begin() + nn);
-      this->weights.erase(this->weights.begin() + nn);
-      --nn;
-    }
+  if (dim == 2)  // assert polar symmetry
     for (int n = 0; n < this->size(); ++n)
-      this->weights[n] *= 2;
-    Assert(this->size() == size_original / 2, dealii::ExcImpossibleInDim(dim));
-  }
+      Assert(this->quadrature_points[n][0] > 0.5,
+             dealii::ExcImpossibleInDimSpacedim(qdim, dim));
   quadrature_angles = this->quadrature_points;
   for (int n = 0; n < quadrature_angles.size(); ++n) {
     quadrature_angles[n][0] *= 2;
