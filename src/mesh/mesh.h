@@ -18,7 +18,6 @@ void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
     Assert(radii[i-1] < radii[i], dealii::ExcInvalidState());
   std::vector<dealii::Point<2>> vertices(3*radii.size()+4);
   std::vector<dealii::CellData<2>> cells(2*radii.size()+1);
-  std::vector<dealii::CellData<1>> subcells(2*radii.size()+(radii.size()-1));
   vertices[0] = dealii::Point<2>(0, 0);
   cells[0].vertices[0] = 0;
   cells[0].vertices[1] = 1;
@@ -40,22 +39,13 @@ void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
     cells[2+i*2].vertices[3] = 1 + (i + 1) * 3;
     cells[1+i*2].material_id = materials[i+1];
     cells[2+i*2].material_id = materials[i+1];
-    subcells[i*2].vertices[0] = 2 + i * 3;
-    subcells[i*2].vertices[1] = 3 + i * 3;
-    subcells[i*2+1].vertices[0] = 3 + i * 3;
-    subcells[i*2+1].vertices[1] = 1 + i * 3;
-    subcells[i*2].manifold_id = 1;
-    subcells[i*2+1].manifold_id = 1;
-    subcells[i*2].boundary_id = dealii::numbers::internal_face_boundary_id;
-    subcells[i*2+1].boundary_id = dealii::numbers::internal_face_boundary_id;
   }
   vertices[1+radii.size()*3] = dealii::Point<2>(pitch, 0);
   vertices[2+radii.size()*3] = dealii::Point<2>(0, pitch);
   vertices[3+radii.size()*3] = dealii::Point<2>(pitch, pitch);
-  dealii::SubCellData manifolds;
-  // manifolds.boundary_lines = subcells;
   dealii::GridReordering<2> grid_reordering;
   grid_reordering.reorder_cells(cells, true);
+  dealii::SubCellData manifolds;
   tria.create_triangulation(vertices, cells, manifolds);
   tria.set_all_manifold_ids(1);
   tria.set_all_manifold_ids_on_boundary(dealii::numbers::flat_manifold_id);
