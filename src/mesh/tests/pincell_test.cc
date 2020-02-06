@@ -1,7 +1,7 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_out.h>
 
-#include "mesh/mesh.h"
+#include "mesh/mesh.cc"
 #include "gtest/gtest.h"
 
 namespace {
