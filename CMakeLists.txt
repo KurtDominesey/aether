@@ -1,34 +1,9 @@
-##
-#  CMake script for the step-4 tutorial program:
-##
+cmake_minimum_required(VERSION 2.8.12)
 
-# Set the name of the project and target:
-SET(TARGET "aether.exe")
-# SET(DDEAL_II_DIR, "/home/kurt/dealii/install")
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Declare all source files the target consists of. Here, this is only
-# the one step-X.cc file, but as you expand your project you may wish
-# to add other source files as well. If your project becomes much larger,
-# you may want to either replace the following statement by something like
-  # FILE(GLOB_RECURSE TARGET_SRC  "src/*.cpp")
-  # FILE(GLOB_RECURSE TARGET_INC  "src/*.hpp")
-  # SET(TARGET_SRC ${TARGET_SRC}  ${TARGET_INC}) 
-# or switch altogether to the large project CMakeLists.txt file discussed
-# in the "CMake in user projects" page accessible from the "User info"
-# page of the documentation.
-# SET(TARGET_SRC
-#   ${TARGET}.cc
-#   )
-SET(TARGET_SRC "src/main.cc")
-
-# SET(CMAKE_CXX_STANDARD 17)
-# SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Usually, you will not need to modify anything beyond this point...
-
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
-
-FIND_PACKAGE(deal.II 9.0.0 QUIET
+find_package(deal.II 9.0.0 QUIET
   HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR}
   )
 IF(NOT ${deal.II_FOUND})
@@ -40,21 +15,23 @@ IF(NOT ${deal.II_FOUND})
 ENDIF()
 
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
-PROJECT(${TARGET})
-DEAL_II_INVOKE_AUTOPILOT()
 
-# Make GTest executable
+project(aether)
+
 find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
-FILE(GLOB_RECURSE TEST_SRC  "src/[!main]*.cc")
-FILE(GLOB_RECURSE TEST_INC  "src/*.h")
-SET(TEST_SRC ${TEST_SRC} ${TEST_INC}) 
+set(main "src/main.cc")
+file(GLOB_RECURSE source  "src/[!main]*.cc")
+include_directories(${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src)
 
-enable_testing()
-set(TEST "test.exe")
-add_executable(${TEST} ${TEST_SRC})
-target_compile_options(${TEST} PUBLIC ${GTEST_CFLAGS})
-target_link_libraries(${TEST} ${GTEST_LDFLAGS} gtest gtest_main)
-target_include_directories(${TEST} PUBLIC TEST_SRC "src")
-DEAL_II_SETUP_TARGET(${TEST})
+set(exec "aether.exe")
+set(test "test.exe")
+add_executable(${exec} ${main})
+add_executable(${test} ${source})
+
+target_compile_options(${test} PUBLIC ${GTEST_CFLAGS})
+target_link_libraries(${test} ${GTEST_BOTH_LIBRARIES})
+
+DEAL_II_SETUP_TARGET(${test})
+DEAL_II_SETUP_TARGET(${exec})
