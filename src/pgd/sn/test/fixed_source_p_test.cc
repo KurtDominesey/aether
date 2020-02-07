@@ -33,8 +33,8 @@ class FixedSourcePTest : public ::testing::Test {
     dof_handler.initialize(mesh, fe);
     int num_polar = 4;
     quadrature = dealii::QGauss<qdim>(num_polar);
-    source.reinit(num_polar, dof_handler.n_dofs());
-    flux.reinit(num_polar, dof_handler.n_dofs());
+    source.reinit(1, num_polar * dof_handler.n_dofs());
+    flux.reinit(1, num_polar * dof_handler.n_dofs());
     boundary_conditions.resize(
         2, dealii::BlockVector<double>(num_polar, fe.dofs_per_cell));
   }
