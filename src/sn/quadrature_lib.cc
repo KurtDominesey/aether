@@ -12,7 +12,7 @@ template <int dim, int qdim>
 QPglc<dim, qdim>::QPglc(const int num_polar, const int num_azim)
     : QAngle<dim, qdim>(
           dealii::QGauss<1>(2 * num_polar),
-          dealii::QIterated<1>(dealii::QMidpoint<1>(), 4 * num_azim)) {};
+          dealii::QIterated<1>(dealii::QMidpoint<1>(), 4 * num_azim)) {}
 
 template class QPglc<1>;
 template class QPglc<2>;
