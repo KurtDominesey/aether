@@ -3,6 +3,7 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/base/convergence_table.h>
 
+#include "base/mgxs.h"
 #include "pgd/sn/nonlinear_gs.cc"
 #include "pgd/sn/fixed_source_p.h"
 #include "pgd/sn/transport.h"
@@ -26,6 +27,9 @@ class FixedSourcePTest : public ::testing::Test {
  protected:
   static const int dim = 1;
   static const int qdim = 1;
+  const int num_groups = 1;
+  const int num_materials = 1;
+  const int num_legendre = 1;
 
   void SetUp() override {
     dealii::GridGenerator::subdivided_hyper_cube(mesh, 256, 0, length);
@@ -39,18 +43,15 @@ class FixedSourcePTest : public ::testing::Test {
         2, dealii::BlockVector<double>(num_polar, fe.dofs_per_cell));
   }
 
-  void Test(std::vector<double> &cross_sections_total_r,
-            std::vector<std::vector<double>> &cross_sections_scatter_r,
-            pgd::sn::InnerProducts &exact_x,
-            std::vector<double> &exact_b) {
+  void Test(const Mgxs &mgxs,
+            const pgd::sn::InnerProducts &exact_x,
+            const std::vector<double> &exact_b) {
     pgd::sn::Transport<dim, qdim> transport(dof_handler, quadrature);
     Scattering scattering(dof_handler);
-    std::vector<double> cross_sections_total_w = {std::nan("t")};
-    std::vector<std::vector<double>> cross_sections_scatter_w = 
-        {{std::nan("s")}};
+    Mgxs mgxs_pseudo(num_groups, num_materials, num_legendre);
     pgd::sn::TransportBlock<dim, qdim> transport_block(
-        transport, cross_sections_total_w, boundary_conditions);
-    ScatteringBlock scattering_block(scattering, cross_sections_scatter_w[0]);
+        transport, mgxs_pseudo.total[0], boundary_conditions);
+    ScatteringBlock scattering_block(scattering, mgxs_pseudo.scatter[0][0]);
     DiscreteToMoment d2m(quadrature);
     MomentToDiscrete m2d(quadrature);
     WithinGroup within_group(transport_block, m2d, scattering_block, d2m);
@@ -60,12 +61,8 @@ class FixedSourcePTest : public ::testing::Test {
     std::vector<dealii::BlockVector<double>> sources = {source};
     FixedSource<dim, qdim> fixed_source(within_groups, downscatter, upscatter,
                                         m2d, d2m);
-    pgd::sn::FixedSourceP fixed_source_p(fixed_source,
-                                        cross_sections_total_w,
-                                        cross_sections_scatter_w, 
-                                        cross_sections_total_r,
-                                        cross_sections_scatter_r,
-                                        sources);
+    pgd::sn::FixedSourceP fixed_source_p(
+        fixed_source, mgxs_pseudo, mgxs, sources);
     std::vector<pgd::sn::LinearInterface*> linear_ops = {&fixed_source_p};
     pgd::sn::NonlinearGS nonlinear_gs(linear_ops, 1, 1, 1);
     nonlinear_gs.enrich();
@@ -77,8 +74,8 @@ class FixedSourcePTest : public ::testing::Test {
     TestInnerProductsB(numerical_b, exact_b);
   }
 
-  void TestInnerProductsX(pgd::sn::InnerProducts &numerical_x,
-                          pgd::sn::InnerProducts &exact_x) {
+  void TestInnerProductsX(const pgd::sn::InnerProducts &numerical_x,
+                          const pgd::sn::InnerProducts &exact_x) {
     double tol = 1e-4;
     EXPECT_NEAR(numerical_x.streaming, exact_x.streaming, tol);
     ASSERT_EQ(numerical_x.collision.size(), exact_x.collision.size());
@@ -91,8 +88,8 @@ class FixedSourcePTest : public ::testing::Test {
     }
   }
 
-  void TestInnerProductsB(std::vector<double> &numerical_b,
-                          std::vector<double> &exact_b) {
+  void TestInnerProductsB(const std::vector<double> &numerical_b,
+                          const std::vector<double> &exact_b) {
     double tol = 1e-4;
     ASSERT_EQ(numerical_b.size(), exact_b.size());
     for (int i = 0; i < numerical_b.size(); ++i)
@@ -113,8 +110,9 @@ TEST_F(FixedSourcePTest, NoCouplingAttenuation) {
   double cross_section_total = 3;
   boundary_conditions[0] = strength;
   boundary_conditions[1] = strength;
-  std::vector<double> cross_sections_total = {cross_section_total};
-  std::vector<std::vector<double>> cross_sections_scatter = {{0}};
+  Mgxs mgxs(num_groups, num_materials, num_legendre);
+  mgxs.total[0][0] = cross_section_total;
+  mgxs.scatter[0][0][0] = 0;
   pgd::sn::InnerProducts exact_x(1, 1);
   for (int n = 0; n < quadrature.size(); ++n) {
     double mu = std::abs(2 * quadrature.point(n)[0] - 1);
@@ -124,7 +122,7 @@ TEST_F(FixedSourcePTest, NoCouplingAttenuation) {
   }
   exact_x.streaming = -exact_x.collision[0];
   std::vector<double> exact_b = {0};
-  Test(cross_sections_total, cross_sections_scatter, exact_x, exact_b);
+  Test(mgxs, exact_x, exact_b);
 }
 
 TEST_F(FixedSourcePTest, NoCouplingUniform) {
@@ -132,14 +130,15 @@ TEST_F(FixedSourcePTest, NoCouplingUniform) {
   double cross_section_total = 3;
   boundary_conditions[0] = strength;
   boundary_conditions[1] = strength;
+  Mgxs mgxs(num_groups, num_materials, num_legendre);
+  mgxs.total[0][0] = cross_section_total;
+  mgxs.scatter[0][0][0] = cross_section_total * (1-1e-8);
   std::vector<double> cross_sections_total = {cross_section_total};
-  std::vector<std::vector<double>> cross_sections_scatter = 
-      {{cross_section_total*(1-1e-8)}};
   pgd::sn::InnerProducts exact_x(1, 1);
   exact_x.collision[0] = strength * cross_section_total * strength * length;
   exact_x.scattering[0][0] = exact_x.collision[0];
   std::vector<double> exact_b = {0};
-  Test(cross_sections_total, cross_sections_scatter, exact_x, exact_b);
+  Test(mgxs, exact_x, exact_b);
 }
 
 }  // namespace

@@ -5,16 +5,10 @@ namespace aether::pgd::sn {
 template <int dim, int qdim>
 FixedSourceP<dim, qdim>::FixedSourceP(
     aether::sn::FixedSource<dim, qdim> &fixed_source,
-    std::vector<double> &cross_sections_total_w,
-    std::vector<std::vector<double>> &cross_sections_scatter_w,
-    const std::vector<double> &cross_sections_total_r,
-    const std::vector<std::vector<double>> &cross_sections_scatter_r,
+    Mgxs &mgxs_pseudo, const Mgxs &mgxs,
     std::vector<dealii::BlockVector<double>> &sources)
-      : fixed_source(fixed_source),
-        cross_sections_total_w(cross_sections_total_w),
-        cross_sections_scatter_w(cross_sections_scatter_w),
-        cross_sections_total_r(cross_sections_total_r),
-        cross_sections_scatter_r(cross_sections_scatter_r),
+      : fixed_source(fixed_source), 
+        mgxs_pseudo(mgxs_pseudo), mgxs(mgxs),
         sources(sources) {}
 
 template <int dim, int qdim>
@@ -87,10 +81,13 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
           collision_c += transport.quadrature.weight(n) * collision_n;
           scattering_c += transport.quadrature.weight(n) * scattering_n;
         }
-        inner_products[m].collision[material] +=
-            cross_sections_total_r[material] * collision_c;
-        inner_products[m].scattering[material][0] += 
-            cross_sections_scatter_r[material][0] * scattering_c;
+        inner_products[m].collision[material] += mgxs.total[g][material] 
+                                                 * collision_c;
+        double mgxs_scatter_g_gp = 0;
+        for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp)
+          mgxs_scatter_g_gp += mgxs.scatter[g][gp][material];
+        inner_products[m].scattering[material][0] += mgxs_scatter_g_gp
+                                                     * scattering_c;
       }
     }
   }
@@ -120,14 +117,23 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::set_cross_sections(
       InnerProducts &coefficients) {
-  AssertDimension(cross_sections_total_w.size(), cross_sections_total_r.size());
-  for (int material = 0; material < cross_sections_total_w.size(); ++material) {
-    cross_sections_total_w[material] = cross_sections_total_r[material] *
+  AssertDimension(mgxs_pseudo.total.size(), mgxs.total.size());
+  for (int g = 0; g < mgxs.total.size(); ++g) {
+    AssertDimension(mgxs_pseudo.total[g].size(), mgxs.total[g].size());
+    AssertDimension(mgxs_pseudo.scatter[g].size(), mgxs.scatter[g].size());
+    for (int material = 0; material < mgxs.total[g].size(); ++material) {
+      mgxs_pseudo.total[g][material] = mgxs.total[g][material] *
                                        coefficients.collision[material] /
                                        coefficients.streaming;
-    cross_sections_scatter_w[material][0] =
-        cross_sections_scatter_r[material][0] *
-        coefficients.scattering[material][0] / coefficients.streaming;
+      for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp) {
+        AssertDimension(mgxs_pseudo.scatter[g][gp].size(), 
+                        mgxs.scatter[g][gp].size());
+        mgxs_pseudo.scatter[g][gp][material] = 
+            mgxs.scatter[g][gp][material] *
+            coefficients.scattering[material][0] /
+            coefficients.streaming;
+      }
+    }
   }
 }
 

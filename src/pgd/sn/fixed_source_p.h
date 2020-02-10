@@ -6,6 +6,7 @@
 #include <deal.II/lac/solver_richardson.h>
 #include <deal.II/lac/precondition.h>
 
+#include "base/mgxs.h"
 #include "sn/fixed_source.h"
 #include "pgd/sn/transport_block.h"
 #include "pgd/sn/inner_products.h"
@@ -27,10 +28,7 @@ template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSourceP : public LinearInterface {
  public:
   FixedSourceP(aether::sn::FixedSource<dim, qdim> &fixed_source,
-               std::vector<double> &cross_sections_total_w,
-               std::vector<std::vector<double>> &cross_sections_scatter_w,
-               const std::vector<double> &cross_sections_total_r,
-               const std::vector<std::vector<double>> &cross_sections_scatter_r,
+               Mgxs &mgxs_psuedo, const Mgxs &mgxs,
                std::vector<dealii::BlockVector<double>> &sources);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
@@ -46,10 +44,8 @@ class FixedSourceP : public LinearInterface {
   std::vector<Cache> caches;
  protected:
   aether::sn::FixedSource<dim, qdim> &fixed_source;
-  const std::vector<double> &cross_sections_total_r;
-  const std::vector<std::vector<double>> &cross_sections_scatter_r;
-  std::vector<double> &cross_sections_total_w;
-  std::vector<std::vector<double>> &cross_sections_scatter_w;
+  const Mgxs &mgxs;
+  Mgxs &mgxs_pseudo;
   std::vector<dealii::BlockVector<double>> &sources;
   void set_last_cache();
   void set_cross_sections(InnerProducts &coefficients_x);
