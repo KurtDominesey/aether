@@ -46,7 +46,7 @@ class FixedSourceP : public LinearInterface {
   aether::sn::FixedSource<dim, qdim> &fixed_source;
   const Mgxs &mgxs;
   Mgxs &mgxs_pseudo;
-  std::vector<dealii::BlockVector<double>> &sources;
+  const std::vector<dealii::BlockVector<double>> &sources;
   void set_last_cache();
   void set_cross_sections(InnerProducts &coefficients_x);
   void get_source(dealii::BlockVector<double> &source,

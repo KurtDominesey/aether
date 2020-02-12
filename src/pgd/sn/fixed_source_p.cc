@@ -106,10 +106,11 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
       dealii::BlockVector<double> source_g(transport.get_block_indices());
       dealii::BlockVector<double> collided_g(transport.get_block_indices());
       mode_g = caches.back().mode.block(g);
+      source_g = sources[i].block(g);
       transport.collide(collided_g, source_g);
       for (int n = 0; n < transport.quadrature.size(); ++n)
-        inner_products[i] +=
-            transport.quadrature.weight(n) * (mode_g * collided_g);
+        inner_products[i] += transport.quadrature.weight(n) 
+                             * (mode_g.block(n) * collided_g.block(n));
     }
   }
 }
@@ -172,8 +173,8 @@ void FixedSourceP<dim, qdim>::step(
   coefficients_x.pop_back();
   get_source(source, coefficients_x, coefficients_b, denominator);
   for (int g = 0; g < fixed_source.within_groups.size(); ++g)
-    fixed_source.within_groups[0].transport.vmult(uncollided.block(g), 
-                                                  source.block(g), false);
+    fixed_source.within_groups[g].transport.vmult(
+        uncollided.block(g),  source.block(g), false);
   dealii::ReductionControl solver_control(500, 1e-8, 1e-8);
   dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
   solver.solve(fixed_source, caches.back().mode, uncollided, 
@@ -199,6 +200,7 @@ void FixedSourceP<dim, qdim>::enrich() {
                       1,
                       transport.dof_handler.n_dofs());
   caches.back().mode = 1;
+  set_last_cache();
 }
 
 template <int dim, int qdim>
