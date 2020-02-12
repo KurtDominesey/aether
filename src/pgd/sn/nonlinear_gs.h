@@ -19,6 +19,7 @@ class NonlinearGS {
   std::vector<std::vector<double>> inner_products_b;
  protected:
   std::vector<LinearInterface*> &linear_ops;
+  InnerProducts inner_products_one;
 };
 
 }  // namespace aether::pgd::sn

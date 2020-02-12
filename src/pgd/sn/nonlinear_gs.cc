@@ -5,10 +5,11 @@ namespace aether::pgd::sn {
 NonlinearGS::NonlinearGS(std::vector<LinearInterface*> &linear_ops,
                          int num_materials, int num_legendre, int num_sources)
     : linear_ops(linear_ops),
-      inner_products_x(linear_ops.size(),
-                       std::vector<InnerProducts>(
-                           1, InnerProducts(num_materials, num_legendre))),
-      inner_products_b(linear_ops.size(), std::vector<double>(num_sources)) {}
+      inner_products_x(linear_ops.size()),
+      inner_products_b(linear_ops.size(), std::vector<double>(num_sources)),
+      inner_products_one(num_materials, num_legendre) {
+  inner_products_one = 1;
+}
 
 void NonlinearGS::step(dealii::BlockVector<double> x, 
                        const dealii::BlockVector<double> b) {
@@ -35,7 +36,7 @@ void NonlinearGS::step(dealii::BlockVector<double> x,
 
 void NonlinearGS::enrich() {
   for (int i = 0; i < linear_ops.size(); ++i) {
-    inner_products_x[i].push_back(inner_products_x[i].back());
+    inner_products_x[i].push_back(inner_products_one);
     linear_ops[i]->enrich();
     if (i > 0)
       linear_ops[i]->get_inner_products(inner_products_x[i], 
