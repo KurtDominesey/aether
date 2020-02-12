@@ -12,12 +12,7 @@ namespace aether::pgd::sn {
 
 class EnergyMgFull : public LinearInterface {
  public:
-  template <typename T>
-  using vector2 = std::vector<std::vector<T>>;
-  template <typename T>
-  using vector4 = vector2<vector2<T>>;
-  EnergyMgFull(const vector2<double> &cross_sections_total,
-               const vector4<double> &cross_sections_scatter,
+  EnergyMgFull(const Mgxs &mgxs,
                const std::vector<dealii::Vector<double>> &sources);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
@@ -32,8 +27,7 @@ class EnergyMgFull : public LinearInterface {
   void enrich();
   std::vector<dealii::Vector<double>> modes;
  protected:
-  const vector2<double> &cross_sections_total;
-  const vector4<double> &cross_sections_scatter;
+  const Mgxs &mgxs;
   const std::vector<dealii::Vector<double>> &sources;
   dealii::FullMatrix<double> matrix;
   dealii::Vector<double> source;
