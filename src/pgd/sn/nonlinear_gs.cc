@@ -30,6 +30,8 @@ void NonlinearGS::step(dealii::BlockVector<double> x,
         coefficients_b[n] *= inner_products_b[j][n];
     }
     linear_ops[i]->step(x, b, coefficients_x, coefficients_b);
+    if (i > 0)
+      linear_ops[i]->normalize();
     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
   }
 }
@@ -38,9 +40,11 @@ void NonlinearGS::enrich() {
   for (int i = 0; i < linear_ops.size(); ++i) {
     inner_products_x[i].push_back(inner_products_one);
     linear_ops[i]->enrich();
-    if (i > 0)
+    if (i > 0) {
+      linear_ops[i]->normalize();
       linear_ops[i]->get_inner_products(inner_products_x[i], 
                                         inner_products_b[i]);
+    }
   }
 }
 

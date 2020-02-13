@@ -41,6 +41,7 @@ class FixedSourceP : public LinearInterface {
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
   void enrich();
+  void normalize();
   std::vector<Cache> caches;
  protected:
   aether::sn::FixedSource<dim, qdim> &fixed_source;

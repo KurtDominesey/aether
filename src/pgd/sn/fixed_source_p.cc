@@ -211,6 +211,11 @@ void FixedSourceP<dim, qdim>::get_inner_products(
   get_inner_products_b(inner_products_b);
 }
 
+template <int dim, int qdim>
+void FixedSourceP<dim, qdim>::normalize() {
+  throw dealii::ExcNotImplemented();
+}
+
 template class FixedSourceP<1>;
 template class FixedSourceP<2>;
 template class FixedSourceP<3>;

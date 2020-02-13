@@ -25,6 +25,7 @@ class EnergyMgFull : public LinearInterface {
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
   void enrich();
+  void normalize();
   std::vector<dealii::Vector<double>> modes;
  protected:
   const Mgxs &mgxs;

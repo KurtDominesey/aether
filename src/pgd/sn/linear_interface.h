@@ -21,6 +21,7 @@ class LinearInterface {
   void virtual get_inner_products(std::vector<InnerProducts> &inner_products_x,
                                   std::vector<double> &inner_products_b) = 0;
   void virtual enrich() = 0;
+  void virtual normalize() = 0;
 };
 
 }  // namespace aether::pgd::sn

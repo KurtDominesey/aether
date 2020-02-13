@@ -40,6 +40,10 @@ void EnergyMgFull::enrich() {
   modes.back() = 1;
 }
 
+void EnergyMgFull::normalize() {
+  modes.back() /= modes.back().l2_norm();
+}
+
 void EnergyMgFull::set_matrix(InnerProducts coefficients_x) {
   matrix = 0;
   for (int g = 0; g < mgxs.total.size(); ++g) {
