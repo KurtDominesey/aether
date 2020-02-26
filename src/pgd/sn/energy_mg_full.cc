@@ -38,6 +38,7 @@ void EnergyMgFull::step(dealii::BlockVector<double>&,
 void EnergyMgFull::enrich() {
   modes.emplace_back(mgxs.total.size());
   modes.back() = 1;
+  normalize();
 }
 
 void EnergyMgFull::normalize() {
@@ -47,13 +48,12 @@ void EnergyMgFull::normalize() {
 void EnergyMgFull::set_matrix(InnerProducts coefficients_x) {
   matrix = 0;
   for (int g = 0; g < mgxs.total.size(); ++g) {
-    std::cout << coefficients_x.streaming << std::endl;
     matrix[g][g] += coefficients_x.streaming;
     for (int j = 0; j < mgxs.total[g].size(); ++j) {
       matrix[g][g] +=  coefficients_x.collision[j] * mgxs.total[g][j];
       for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp) {
         for (int ell = 0; ell < 1; ++ell) {
-          matrix[g][gp] -= coefficients_x.scattering[j][ell]
+          matrix[g][gp] += coefficients_x.scattering[j][ell]
                            * mgxs.scatter[g][gp][j];
         }
       }
@@ -66,7 +66,6 @@ void EnergyMgFull::set_source(std::vector<double> coefficients_b,
   source = 0;
   AssertDimension(coefficients_b.size(), sources.size());
   for (int i = 0; i < coefficients_b.size(); ++i) {
-    std::cout << coefficients_b[i] << std::endl;
     source.add(coefficients_b[i], sources[i]);
   }
   AssertDimension(coefficients_x.size(), modes.size() - 1);
@@ -113,9 +112,9 @@ void EnergyMgFull::get_inner_products(
                 modes.back()[g] 
                 * mgxs.scatter[g][gp][j]
                 * modes[m][g];
-          }
         }
       }
+    }
     }
   }
 }

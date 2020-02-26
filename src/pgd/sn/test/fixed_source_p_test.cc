@@ -136,7 +136,7 @@ TEST_F(FixedSourcePTest, NoCouplingUniform) {
   std::vector<double> cross_sections_total = {cross_section_total};
   pgd::sn::InnerProducts exact_x(1, 1);
   exact_x.collision[0] = strength * cross_section_total * strength * length;
-  exact_x.scattering[0][0] = exact_x.collision[0];
+  exact_x.scattering[0][0] = -exact_x.collision[0];
   std::vector<double> exact_b = {0};
   Test(mgxs, exact_x, exact_b);
 }

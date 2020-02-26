@@ -21,6 +21,7 @@ void FixedSourceP<dim, qdim>::set_last_cache() {
             fixed_source.within_groups[g].transport);
     transport.stream(caches.back().streamed.block(g), 
                      caches.back().mode.block(g));
+    caches.back().moments.block(g) *= -1;
   }
 }
 
@@ -35,10 +36,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
                                             transport.dof_handler.n_dofs());
     mode_last_g = caches.back().mode.block(g);
     for (int m = 0; m < caches.size(); ++m) {
-      inner_products[m].streaming = 0;
-      inner_products[m].collision = 0;
-      for (int mat = 0; mat < inner_products[m].scattering.size(); ++mat)
-        inner_products[m].scattering[mat] = 0;
+      inner_products[m] = 0;
       dealii::BlockVector<double> mode_g(mode_last_g.get_block_indices());
       dealii::BlockVector<double> mode_m2d_g(mode_last_g.get_block_indices());
       dealii::BlockVector<double> streamed_g(mode_last_g.get_block_indices());
@@ -91,7 +89,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
       }
     }
   }
-}
+  }
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products_b(
@@ -175,11 +173,10 @@ void FixedSourceP<dim, qdim>::step(
   for (int g = 0; g < fixed_source.within_groups.size(); ++g)
     fixed_source.within_groups[g].transport.vmult(
         uncollided.block(g),  source.block(g), false);
-  dealii::ReductionControl solver_control(500, 1e-8, 1e-8);
-  dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
+  dealii::SolverControl solver_control(3000, 1e-8);
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver(solver_control);
   solver.solve(fixed_source, caches.back().mode, uncollided, 
                dealii::PreconditionIdentity());
-  set_last_cache();
 }
 
 template <int dim, int qdim>
@@ -200,13 +197,13 @@ void FixedSourceP<dim, qdim>::enrich() {
                       1,
                       transport.dof_handler.n_dofs());
   caches.back().mode = 1;
-  set_last_cache();
 }
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products(
     std::vector<InnerProducts> &inner_products_x, 
     std::vector<double> &inner_products_b) {
+  set_last_cache();
   get_inner_products_x(inner_products_x);
   get_inner_products_b(inner_products_b);
 }
