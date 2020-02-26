@@ -111,7 +111,7 @@ void EnergyMgFull::get_inner_products(
             inner_products_x[m].scattering[j][ell] +=
                 modes.back()[g] 
                 * mgxs.scatter[g][gp][j]
-                * modes[m][g];
+                * modes[m][gp];
         }
       }
     }
