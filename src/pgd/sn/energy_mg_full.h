@@ -21,7 +21,8 @@ class EnergyMgFull : public LinearInterface {
   void step(dealii::BlockVector<double> &x,
             const dealii::BlockVector<double> &b,
             std::vector<InnerProducts> coefficients_x,
-            std::vector<double> coefficients_b);
+            std::vector<double> coefficients_b,
+            double omega = 1.);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
   void enrich();

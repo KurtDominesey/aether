@@ -12,7 +12,8 @@ NonlinearGS::NonlinearGS(std::vector<LinearInterface*> &linear_ops,
 }
 
 void NonlinearGS::step(dealii::BlockVector<double> x, 
-                       const dealii::BlockVector<double> b) {
+                       const dealii::BlockVector<double> b,
+                       const bool should_normalize) {
   std::vector<InnerProducts> coefficients_x(inner_products_x[0].size(),
                                             inner_products_x[0].back());
   std::vector<double> coefficients_b(inner_products_b[0].size());
@@ -30,7 +31,7 @@ void NonlinearGS::step(dealii::BlockVector<double> x,
         coefficients_b[n] *= inner_products_b[j][n];
     }
     linear_ops[i]->step(x, b, coefficients_x, coefficients_b);
-    if (i > 0)
+    if (should_normalize)
       linear_ops[i]->normalize();
     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
   }
@@ -40,12 +41,17 @@ void NonlinearGS::enrich() {
   for (int i = 0; i < linear_ops.size(); ++i) {
     inner_products_x[i].push_back(inner_products_one);
     linear_ops[i]->enrich();
+    linear_ops[i]->normalize();
     if (i > 0) {
-      linear_ops[i]->normalize();
       linear_ops[i]->get_inner_products(inner_products_x[i], 
                                         inner_products_b[i]);
     }
   }
+}
+
+void NonlinearGS::set_inner_products() {
+  for (int i = 0; i < linear_ops.size(); ++i)
+    linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
 }
 
 }  // namespace aether::pgd::sn

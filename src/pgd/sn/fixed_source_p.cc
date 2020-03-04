@@ -89,7 +89,12 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
       }
     }
   }
+  std::cout << "ip x " << inner_products[0].streaming << std::endl;
+  for (int j = 0; j < inner_products[0].collision.size(); ++j) {
+    std::cout << "ip x " << inner_products[0].collision[0] << std::endl;
+    std::cout << "ip x " << inner_products[0].scattering[0][0] << std::endl;
   }
+}
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products_b(
@@ -110,6 +115,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
         inner_products[i] += transport.quadrature.weight(n) 
                              * (mode_g.block(n) * collided_g.block(n));
     }
+    std::cout << "ip b " << inner_products[i] << std::endl;
   }
 }
 
@@ -145,7 +151,7 @@ void FixedSourceP<dim, qdim>::get_source(
   source = 0;
   for (int i = 0; i < coefficients_b.size(); ++i)
     source.add(coefficients_b[i], sources[i]);
-  // subtract_modes_from_source(source, coefficients_x);
+  subtract_modes_from_source(source, coefficients_x);
   source /= denominator;
 }
 
@@ -153,8 +159,49 @@ template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::subtract_modes_from_source(
     dealii::BlockVector<double> &source,
     std::vector<InnerProducts> coefficients_x) {
+  AssertDimension(coefficients_x.size(), caches.size() - 1);
   for (int m = 0; m < caches.size() - 1; ++m) {
-
+    for (int g = 0; g < fixed_source.within_groups.size(); ++g) {
+      const auto &transport = fixed_source.within_groups[g].transport.transport;
+      dealii::BlockVector<double> source_g(transport.quadrature.size(), 
+                                           transport.dof_handler.n_dofs());
+      dealii::BlockVector<double> mode_g(source_g.get_block_indices());
+      dealii::BlockVector<double> mode_m2d_g(source_g.get_block_indices());
+      dealii::BlockVector<double> streamed_g(source_g.get_block_indices());
+      dealii::BlockVector<double> moments_g(1, transport.dof_handler.n_dofs());
+      std::vector<dealii::types::global_dof_index> dof_indices(
+          transport.dof_handler.get_fe().dofs_per_cell);
+      dealii::Vector<double> streamed_k(dof_indices.size());
+      dealii::Vector<double> projected_k(dof_indices.size());
+      source_g = source.block(g);
+      mode_g = caches[m].mode.block(g);
+      streamed_g = caches[m].streamed.block(g);
+      moments_g = caches[m].moments.block(g);
+      fixed_source.m2d.vmult(mode_m2d_g, moments_g);
+      int c = 0;
+      for (auto cell = transport.dof_handler.begin_active(); 
+           cell != transport.dof_handler.end(); ++cell, ++c) {
+        cell->get_dof_indices(dof_indices);
+        int material = cell->material_id();
+        dealii::FullMatrix<double> mass(transport.cell_matrices[c].mass);
+        mass.gauss_jordan();
+        for (int n = 0; n < transport.quadrature.size(); ++n) {
+          streamed_k = 0;
+          for (int i = 0; i < dof_indices.size(); ++i)
+            streamed_k[i] = streamed_g.block(n)[dof_indices[i]];
+          mass.vmult(projected_k, streamed_k);
+          for (int i = 0; i < dof_indices.size(); ++i) {
+            source_g.block(n)[dof_indices[i]] +=
+                - coefficients_x[m].streaming * projected_k[i]
+                - coefficients_x[m].collision[material]
+                  * mode_g.block(n)[dof_indices[i]]
+                - coefficients_x[m].scattering[material][0]
+                  * mode_m2d_g.block(n)[dof_indices[i]];
+          }
+        }
+      }
+      source.block(g) = source_g;
+    }
   }
 }
 
@@ -163,7 +210,8 @@ void FixedSourceP<dim, qdim>::step(
       dealii::BlockVector<double>&,
       const dealii::BlockVector<double>&,
       std::vector<InnerProducts> coefficients_x,
-      std::vector<double> coefficients_b) {
+      std::vector<double> coefficients_b,
+      double omega) {
   dealii::BlockVector<double> source(caches.back().mode.get_block_indices());
   dealii::BlockVector<double> uncollided(caches.back().mode.get_block_indices());
   set_cross_sections(coefficients_x.back());
@@ -172,11 +220,13 @@ void FixedSourceP<dim, qdim>::step(
   get_source(source, coefficients_x, coefficients_b, denominator);
   for (int g = 0; g < fixed_source.within_groups.size(); ++g)
     fixed_source.within_groups[g].transport.vmult(
-        uncollided.block(g),  source.block(g), false);
+        uncollided.block(g), source.block(g), false);
+  dealii::BlockVector<double> solution(caches.back().mode);
   dealii::SolverControl solver_control(3000, 1e-8);
-  dealii::SolverGMRES<dealii::BlockVector<double>> solver(solver_control);
-  solver.solve(fixed_source, caches.back().mode, uncollided, 
+  dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
+  solver.solve(fixed_source, solution, uncollided, 
                dealii::PreconditionIdentity());
+  caches.back().mode.sadd(1 - omega, omega, solution);
 }
 
 template <int dim, int qdim>
@@ -210,7 +260,8 @@ void FixedSourceP<dim, qdim>::get_inner_products(
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::normalize() {
-  throw dealii::ExcNotImplemented();
+  caches.back().mode /= caches.back().mode.l2_norm();
+  // throw dealii::ExcNotImplemented();
 }
 
 template class FixedSourceP<1>;

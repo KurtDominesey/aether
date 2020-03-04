@@ -17,7 +17,8 @@ class LinearInterface {
   void virtual step(dealii::BlockVector<double> &x,
                     const dealii::BlockVector<double> &b,
                     std::vector<InnerProducts> coefficients_x,
-                    std::vector<double> coefficients_b) = 0;
+                    std::vector<double> coefficients_b,
+                    double omega = 1.) = 0;
   void virtual get_inner_products(std::vector<InnerProducts> &inner_products_x,
                                   std::vector<double> &inner_products_b) = 0;
   void virtual enrich() = 0;

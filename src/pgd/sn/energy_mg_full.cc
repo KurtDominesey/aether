@@ -23,7 +23,8 @@ void EnergyMgFull::vmult(dealii::BlockVector<double>&,
 void EnergyMgFull::step(dealii::BlockVector<double>&,
                         const dealii::BlockVector<double>&,
                         std::vector<InnerProducts> coefficients_x,
-                        std::vector<double> coefficients_b) {
+                        std::vector<double> coefficients_b,
+                        double omega) {
   AssertDimension(coefficients_x.size(), modes.size());
   AssertDimension(coefficients_b.size(), sources.size());
   set_matrix(coefficients_x.back());
@@ -32,7 +33,10 @@ void EnergyMgFull::step(dealii::BlockVector<double>&,
   matrix.print(std::cout);
   source.print(std::cout);
   matrix.gauss_jordan();
-  matrix.vmult(modes.back(), source);
+  dealii::Vector<double> solution(modes.back());
+  matrix.vmult(solution, source);
+  modes.back().sadd(1 - omega, omega, solution);
+  modes.back().print(std::cout);
 }
 
 void EnergyMgFull::enrich() {
@@ -42,7 +46,12 @@ void EnergyMgFull::enrich() {
 }
 
 void EnergyMgFull::normalize() {
-  modes.back() /= modes.back().l2_norm();
+  // modes.back() /= modes.back().l2_norm();
+  // double sum = 0;
+  // for (int g = 0; g < modes.back().size(); ++g)
+  //   sum += modes.back()[g];
+  // if (sum < 0)
+  //   modes.back() *= -1;
 }
 
 void EnergyMgFull::set_matrix(InnerProducts coefficients_x) {
@@ -97,6 +106,7 @@ void EnergyMgFull::get_inner_products(
     for (int g = 0; g < modes.back().size(); ++g) {
       inner_products_b[i] += modes.back()[g] * sources[i][g];
     }
+    std::cout << "e ip b " << inner_products_b[i] << std::endl;
   }
   AssertDimension(modes.size(), inner_products_x.size());
   for (int m = 0; m < modes.size(); ++m) {
@@ -112,9 +122,14 @@ void EnergyMgFull::get_inner_products(
                 modes.back()[g] 
                 * mgxs.scatter[g][gp][j]
                 * modes[m][gp];
+          }
         }
       }
     }
+    std::cout << "e ip x " << inner_products_x[m].streaming << std::endl;
+    for (int j = 0; j < inner_products_x[m].collision.size(); ++j) {
+      std::cout << "e ip x " << inner_products_x[m].collision[j] << std::endl;
+      std::cout << "e ip x " << inner_products_x[m].scattering[j][0] << std::endl;
     }
   }
 }

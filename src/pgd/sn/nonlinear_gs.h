@@ -13,8 +13,11 @@ class NonlinearGS {
  public:
   NonlinearGS(std::vector<LinearInterface*> &linear_ops, 
               int num_materials, int num_legendre, int num_sources);
-  void step(dealii::BlockVector<double> x, const dealii::BlockVector<double> b);
+  void step(dealii::BlockVector<double> x, 
+            const dealii::BlockVector<double> b,
+            const bool should_normalize = true);
   void enrich();
+  void set_inner_products();
   std::vector<std::vector<InnerProducts>> inner_products_x;
   std::vector<std::vector<double>> inner_products_b;
  protected:
