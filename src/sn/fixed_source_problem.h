@@ -25,9 +25,9 @@ class FixedSourceProblem {
   void sweep_source(dealii::BlockVector<double> &dst, 
                     const dealii::BlockVector<double> &src) const;
   FixedSource<dim, qdim> fixed_source;
+  TransportType transport;
 
  protected:
-  TransportType transport;
   Scattering<dim> scattering;
   DiscreteToMoment<qdim> d2m;
   MomentToDiscrete<qdim> m2d;
