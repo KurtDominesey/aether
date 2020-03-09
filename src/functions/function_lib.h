@@ -52,7 +52,7 @@ class CosineFunction : public dealii::Function<dim> {
                std::cos(period * p(1)) *
                std::cos(period * p(2));
       default:
-        Assert(false, ExcNotImplemented());
+        Assert(false, dealii::ExcNotImplemented());
       }
     return 0.0;
   };
@@ -79,7 +79,7 @@ class CosineFunction : public dealii::Function<dim> {
                      std::sin(period * p(2));
         break;
       default:
-        Assert(false, ExcNotImplemented());
+        Assert(false, dealii::ExcNotImplemented());
     }
     return result;
   }
