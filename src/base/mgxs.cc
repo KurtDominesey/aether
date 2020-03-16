@@ -17,6 +17,8 @@ Mgxs read_mgxs(
   auto nu_fission_pivot = total_pivot;
   Mgxs mgxs(num_groups, num_materials, num_legendre);
   for (int j = 0; j < num_materials; ++j) {
+    if (materials[j] == "void")
+      continue;
     HDF5::Group material = file.open_group(materials[j]);
     int order = material.get_attribute<int>("order");
     Assert(order < num_legendre, dealii::ExcInvalidState());
