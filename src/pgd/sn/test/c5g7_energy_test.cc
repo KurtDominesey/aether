@@ -5,7 +5,6 @@
 #include <deal.II/base/function_lib.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/data_out_dof_data.h>
-#include <deal.II/lac/lapack_full_matrix.h>
 
 #include "mesh/mesh.h"
 #include "sn/quadrature.h"
@@ -14,8 +13,10 @@
 #include "sn/quadrature.h"
 #include "sn/quadrature_lib.h"
 #include "base/mgxs.cc"
+#include "base/lapack_full_matrix.h"
 #include "functions/function_lib.h"
 #include "sn/fixed_source_problem.cc"
+#include "sn/fixed_source_gs.h"
 #include "pgd/sn/energy_mg_full.h"
 #include "pgd/sn/fixed_source_p.h"
 #include "pgd/sn/nonlinear_gs.h"
@@ -32,8 +33,8 @@ class C5G7EnergyTest : public ::testing::Test {
  protected:
   static const int dim = 2;
   static const int qdim = 2;
-  static const int num_mats = 2;
-  const int num_groups = 7;
+  // static const int num_mats = 2;
+  // const int num_groups = 7;
   const int num_ell = 1;
   const double pitch = 0.63;
   const double radius = 0.54;
@@ -42,12 +43,12 @@ class C5G7EnergyTest : public ::testing::Test {
   Mgxs ReadMgxs() {
     const std::string filename = "/mnt/c/Users/kurt/Documents/projects/aether/examples/c5g7/c5g7.h5";
     const std::string temperature = "294K";
-    const std::vector<std::string> materials =  {"water", "uo2"};
-    AssertDimension(materials.size(), num_mats);
+    const std::vector<std::string> materials =  {"water", "uo2", "void"};
     Mgxs mgxs = read_mgxs(filename, temperature, materials);
+    const int num_groups = mgxs.total.size();
     for (int g = 0; g < num_groups; ++g) {
       for (int gp = 0; gp < num_groups; ++gp) {
-        for (int j = 0; j < num_mats; ++j) {
+        for (int j = 0; j < materials.size(); ++j) {
           std::cout << mgxs.scatter[g][gp][j] << " ";
         }
       }
@@ -56,8 +57,25 @@ class C5G7EnergyTest : public ::testing::Test {
     return mgxs;
   }
 
+  Mgxs ReadMgxsCladded(const std::string &group_structure) {
+    const std::string filename = 
+        "/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/mgxs-"
+        + group_structure + ".h5";
+    const std::string temperature = "294K";
+    const std::vector<std::string> materials = 
+        {"void", "water", "uo2", "zr", "al"};
+    Mgxs mgxs = read_mgxs(filename, temperature, materials);
+    return mgxs;
+  }
+
   void MeshQuarterPincell() {
     mesh_quarter_pincell(mesh, {radius}, pitch, {1, 0});
+    TransformMesh();
+  }
+
+  void MeshQuarterPincellCladded() {
+    std::vector<double> radii{0.4095, 0.4180, 0.4750, 0.4850, 0.5400};
+    mesh_quarter_pincell(mesh, radii, pitch, {2, 0, 3, 0, 4, 1});
     TransformMesh();
   }
 
@@ -98,6 +116,8 @@ class C5G7EnergyTest : public ::testing::Test {
   }
 
   void TestFullOrder(const Mgxs &mgxs) {
+    const int num_groups = mgxs.total.size();
+    const int num_materials = mgxs.total[0].size();
     // Create quadrature
     const QPglc<dim, qdim> quadrature(1, 2);
     // Create finite elements
@@ -143,9 +163,9 @@ class C5G7EnergyTest : public ::testing::Test {
         dealii::VectorTools::interpolate(dof_handler, solution, source_iso);
         dealii::Vector<double> source_collision(source_iso);
         dealii::Vector<double> source_scattering(source_iso);
-        std::vector<double> collision(num_mats);
-        std::vector<double> scattering(num_mats);
-        for (int j = 0; j < num_mats; ++j) {
+        std::vector<double> collision(num_materials);
+        std::vector<double> scattering(num_materials);
+        for (int j = 0; j < num_materials; ++j) {
           collision[j] = solution_energy[g] * mgxs.total[g][j];
           for (int gp = 0; gp < num_groups; ++gp)
             scattering[j] += solution_energy[gp] * mgxs.scatter[g][gp][j];
@@ -243,9 +263,11 @@ class C5G7EnergyTest : public ::testing::Test {
   }
 
   void Test(const Mgxs &mgxs) {
-    Mgxs mgxs_one(1, num_mats, num_ell);
-    Mgxs mgxs_pseudo(1, num_mats, num_ell);
-    for (int j = 0; j < num_mats; ++j) {
+    const int num_groups = mgxs.total.size();
+    const int num_materials = mgxs.total[0].size();
+    Mgxs mgxs_one(1, num_materials, num_ell);
+    Mgxs mgxs_pseudo(1, num_materials, num_ell);
+    for (int j = 0; j < num_materials; ++j) {
       mgxs_one.total[0][j] = 1;
       mgxs_one.scatter[0][0][j] = 1;
     }
@@ -303,7 +325,7 @@ class C5G7EnergyTest : public ::testing::Test {
       std::vector<pgd::sn::LinearInterface*> linear_ops = 
           {&fixed_source_p, &energy_mg};
       pgd::sn::NonlinearGS nonlinear_gs(
-          linear_ops, num_mats, num_ell, num_sources);
+          linear_ops, num_materials, num_ell, num_sources);
       nonlinear_gs.enrich();
       for (int k = 0; k < 40; ++k) {
         nonlinear_gs.step(dealii::BlockVector<double>(),
@@ -383,9 +405,11 @@ class C5G7EnergyTest : public ::testing::Test {
   }
 
 void TestMultiple(const Mgxs &mgxs) {
-    Mgxs mgxs_one(1, num_mats, num_ell);
-    Mgxs mgxs_pseudo(1, num_mats, num_ell);
-    for (int j = 0; j < num_mats; ++j) {
+    const int num_groups = mgxs.total.size();
+    const int num_materials = mgxs.total[0].size();
+    Mgxs mgxs_one(1, num_materials, num_ell);
+    Mgxs mgxs_pseudo(1, num_materials, num_ell);
+    for (int j = 0; j < num_materials; ++j) {
       mgxs_one.total[0][j] = 1;
       mgxs_one.scatter[0][0][j] = 1;
     }
@@ -441,7 +465,7 @@ void TestMultiple(const Mgxs &mgxs) {
       std::vector<pgd::sn::LinearInterface*> linear_ops = 
           {&fixed_source_p, &energy_mg};
       pgd::sn::NonlinearGS nonlinear_gs(
-          linear_ops, num_mats, num_ell, num_sources);
+          linear_ops, num_materials, num_ell, num_sources);
       const int num_modes = 5;  //num_solutions;
       for (int m = 0; m < num_modes; ++m) {
         nonlinear_gs.enrich();
@@ -529,12 +553,13 @@ void TestMultiple(const Mgxs &mgxs) {
         const dealii::DoFHandler<dim> &dof_handler,
         const QAngle<qdim> &quadrature,
         const Mgxs &mgxs) {
+    const int num_materials = mgxs.total[0].size();
     AssertDimension(solutions_spaceangle.size(), solutions_energy.size());
     AssertDimension(sources_spaceangle.size(), 0);
     AssertDimension(sources_energy.size(), 0);
     const int num_groups = mgxs.total.size();
     const int num_solutions = solutions_spaceangle.size();
-    const int num_sources_per_solution = 1 + 2 * num_mats;
+    const int num_sources_per_solution = 1 + 2 * num_materials;
     const int num_sources = num_solutions * num_sources_per_solution;
     sources_spaceangle.resize(num_sources, 
         dealii::BlockVector<double>(1, quadrature.size()*dof_handler.n_dofs()));
@@ -556,13 +581,13 @@ void TestMultiple(const Mgxs &mgxs) {
       dealii::Vector<double> source_spaceangle_iso(dof_handler.n_dofs());
       dealii::VectorTools::interpolate(
           dof_handler, solutions_spaceangle[i], source_spaceangle_iso);
-      for (int j = 0; j < num_mats; ++j) {
+      for (int j = 0; j < num_materials; ++j) {
         for (int g = 0; g < num_groups; ++g) {
           sources_energy[s+1+j][g] = mgxs.total[g][j] 
                                       * solutions_energy[i][g];
           for (int gp = 0; gp < num_groups; ++gp)
-            sources_energy[s+1+num_mats+j][g] += mgxs.scatter[g][gp][j]
-                                                  * solutions_energy[i][gp];
+            sources_energy[s+1+num_materials+j][g] += mgxs.scatter[g][gp][j]
+                                                      * solutions_energy[i][gp];
         }
         // double collision = 0;
         // double scattering = 0;
@@ -591,8 +616,8 @@ void TestMultiple(const Mgxs &mgxs) {
         for (int n = 0; n < quadrature.size(); ++n)
           source_spaceangle.block(n) = source_spaceangle_iso_j;
         sources_spaceangle[s+1+j].block(0) = source_spaceangle;
-        sources_spaceangle[s+1+num_mats+j].block(0) = source_spaceangle;
-        sources_spaceangle[s+1+num_mats+j].block(0) *= -1;
+        sources_spaceangle[s+1+num_materials+j].block(0) = source_spaceangle;
+        sources_spaceangle[s+1+num_materials+j].block(0) *= -1;
       }
     }
   }
@@ -608,7 +633,7 @@ void TestMultiple(const Mgxs &mgxs) {
     const int num_groups = mgxs.total.size();
     const int num_materials = mgxs.total[0].size();
     const int num_sources = num_materials;
-    AssertDimension(num_materials, 2);
+    // AssertDimension(num_materials, 2);
     std::vector<dealii::Vector<double>> sources_energy(
         num_sources, dealii::Vector<double>(num_groups));
     std::vector<dealii::BlockVector<double>> sources_spaceangle(num_sources, 
@@ -637,6 +662,8 @@ void TestMultiple(const Mgxs &mgxs) {
     std::vector<dealii::BlockVector<double>> boundary_conditions_one;
     std::vector<std::vector<dealii::BlockVector<double>>> 
         boundary_conditions(num_groups);
+    // Set group structure
+    const std::vector<int> g_maxes = {10, 14, 18, 24, 43, 55, 65, 70};
     // Run full order
     dealii::BlockVector<double> source_full(
         num_groups, quadrature.size() * dof_handler.n_dofs());
@@ -645,8 +672,21 @@ void TestMultiple(const Mgxs &mgxs) {
         source_full.block(g).add(
             sources_energy[j][g], sources_spaceangle[j].block(0));
     dealii::BlockVector<double> flux_full(source_full.get_block_indices());
-    RunFullOrder(flux_full, source_full, boundary_conditions, 
-                 dof_handler, quadrature, mgxs);
+    FixedSourceProblem<dim, qdim> problem_full(
+        dof_handler, quadrature, mgxs, boundary_conditions);
+    RunFullOrder(flux_full, source_full, problem_full);
+    dealii::BlockVector<double> flux_full_iso(num_groups, dof_handler.n_dofs());
+    for (int g = 0; g < num_groups; ++g)
+      problem_full.d2m.vmult(flux_full_iso.block(g), flux_full.block(g));
+    Mgxs mgxs_coarse = collapse_mgxs(
+        flux_full_iso, dof_handler, problem_full.transport, mgxs, g_maxes);
+    const std::string temperature = "294K";
+    const std::vector<std::string> materials = 
+        {"void", "water", "uo2", "zr", "al"};
+    write_mgxs(mgxs_coarse, "mgxs_coarse.h5", temperature, materials);
+    return;
+    // RunFullOrder(flux_full, source_full, boundary_conditions, 
+    //              dof_handler, quadrature, mgxs);
     // Run pgd
     Mgxs mgxs_one(1, num_materials, num_ell);
     Mgxs mgxs_pseudo(1, num_materials, num_ell);
@@ -664,23 +704,69 @@ void TestMultiple(const Mgxs &mgxs) {
     std::vector<pgd::sn::LinearInterface*> linear_ops = 
         {&fixed_source_p, &energy_mg};
     pgd::sn::NonlinearGS nonlinear_gs(
-        linear_ops, num_mats, num_ell, num_sources);
-    const int num_modes = 50;  //num_solutions;
+        linear_ops, num_materials, num_ell, num_sources);
+    const double nonlinear_tol = 1e-6;
+    const int num_modes = 20;  //num_solutions;
     for (int m = 0; m < num_modes; ++m) {
       nonlinear_gs.enrich();
-      const int num_iters = 100;
+      const int num_iters = 50;
+      double res = std::nan("a");
+      double res_prev = std::nan("b");
       for (int k = 0; k < num_iters; ++k) {
-        nonlinear_gs.step(dealii::BlockVector<double>(),
-                          dealii::BlockVector<double>(),
-                          k < num_iters - 1);
+        res_prev = res;
+        res = nonlinear_gs.step(dealii::BlockVector<double>(),
+                                dealii::BlockVector<double>(),
+                                k < num_iters - 1);
+        std::cout << "nonlinear residual " << res << std::endl;
+        bool diverging = k >= 1 && (res - res_prev) > (res_prev / 10.);
+        if (res < nonlinear_tol || diverging)
+          break;
       }
+      std::cout << "finalize\n";
+      nonlinear_gs.finalize();
+      std::cout << "update\n";
+      nonlinear_gs.update();
     }
+    dealii::BlockVector<double> source(flux_full.get_block_indices());
+    dealii::BlockVector<double> uncollided(flux_full.get_block_indices());
+    dealii::BlockVector<double> operated(flux_full.get_block_indices());
+    for (int i = 0; i < num_sources; ++i)
+      for (int g = 0; g < num_groups; ++g)
+        source.block(g).add(sources_energy[i][g], 
+                            sources_spaceangle[i].block(0));
+    problem_full.sweep_source(uncollided, source);
+    // Get SVD of full-order solution
+    // LAPACKFullMatrix<double> flux_full_matrix(
+    //     num_groups, quadrature.size() * dof_handler.n_dofs());
+    // for (int g = 0; g < num_groups; ++g) {
+    //   for (int n = 0; n < quadrature.size(); ++n) {
+    //     for (int i = 0; i < dof_handler.n_dofs(); ++i) {
+    //       flux_full_matrix(g, n*dof_handler.n_dofs() + i) =
+    //           flux_full.block(g)[n*dof_handler.n_dofs() + i];
+    //     }
+    //   }
+    // }
+    // flux_full_matrix.compute_svd();
+    // const dealii::LAPACKFullMatrix<double> svd_spaceangle =
+    //     flux_full_matrix.get_svd_u();
+    // const dealii::LAPACKFullMatrix<double> svd_energy =
+    //     flux_full_matrix.get_svd_vt();
+    // std::vector<dealii::BlockVector<double>> svd_vectors_spaceangle(num_groups, 
+    //     dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
+    // std::vector<dealii::Vector<double>> svd_vectors_energy(num_groups,
+    //     dealii::Vector<double>(num_groups));
+    // for (int g = 0; g < num_groups; ++g) {
+    //   svd_vectors_energy[g] = 
+    // }
     dealii::BlockVector<double> diff(num_groups, dof_handler.n_dofs());
     dealii::BlockVector<double> diff_g(
         quadrature.size(), dof_handler.n_dofs());
     dealii::BlockVector<double> flux_g(diff_g.get_block_indices());
+    dealii::BlockVector<double> flux_iso_g(1, dof_handler.n_dofs());
+    dealii::BlockVector<double> diff_iso_g(1, dof_handler.n_dofs());
     dealii::Vector<double> diff_l2(dof_handler.n_dofs());
     dealii::BlockVector<double> flux_pgd(flux_full.get_block_indices());
+    dealii::BlockVector<double> moments_pgd(num_groups, 1*dof_handler.n_dofs());
     const int num_ordinates = quadrature.size();
     std::vector<double> l2_errors(num_modes+1);
     std::vector<std::vector<double>> l2_errors_g(
@@ -688,6 +774,11 @@ void TestMultiple(const Mgxs &mgxs) {
     std::vector<std::vector<std::vector<double>>> l2_errors_n(
         num_modes+1, std::vector<std::vector<double>>(
             num_groups, std::vector<double>(num_ordinates)));
+    auto l2_errors_iso_g(l2_errors_g);
+    auto l2_errors_iso(l2_errors);
+    auto l2_residuals_n(l2_errors_n);
+    auto l2_residuals_g(l2_errors_g);
+    auto l2_residuals(l2_errors);
     std::vector<double> l2_norms(num_modes+1);
     for (int m = 0; m <= num_modes; ++m) {
       for (int g = 0; g < num_groups; ++g) {
@@ -707,15 +798,36 @@ void TestMultiple(const Mgxs &mgxs) {
             sum_energy += std::pow(energy_mg.modes[m-1][g], 2);
           l2_norm = std::sqrt(l2_norm * sum_energy);
           l2_norms[m] = l2_norm;
-        }      
+        }
+        problem.d2m.vmult(moments_pgd.block(g), flux_pgd.block(g));
         diff_g = flux_full.block(g);
         flux_g = flux_pgd.block(g);
+        problem.d2m.vmult(diff_iso_g, diff_g);
+        problem.d2m.vmult(flux_iso_g, flux_g);
         diff_g -= flux_g;
+        diff_iso_g -= flux_iso_g;
         for (int n = 0; n < quadrature.size(); ++n) {
           problem.transport.collide(diff_l2, diff_g.block(n));
           l2_errors_n[m][g][n] = std::sqrt(diff_g.block(n) * diff_l2);
-          if (m == num_modes - 1)
-            diff.block(g).add(quadrature.weight(n), diff_g.block(n));
+          if (m == num_modes)
+            diff.block(g) = diff_iso_g.block(0);
+            // diff.block(g).add(quadrature.weight(n), diff_g.block(n));
+        }
+        problem.transport.collide(diff_l2, diff_iso_g.block(0));
+        l2_errors_iso_g[m][g] = std::sqrt(diff_iso_g.block(0) * diff_l2);
+      }
+      Mgxs mgxs_coarse = collapse_mgxs(
+          moments_pgd, dof_handler, problem.transport, mgxs, g_maxes);
+      problem_full.fixed_source.vmult(operated, flux_pgd);
+      operated.sadd(-1, 1, uncollided);  // residual
+      for (int g = 0; g < num_groups; ++g) {
+        dealii::BlockVector<double> residual_g(
+            quadrature.size(), dof_handler.n_dofs());
+        residual_g = operated.block(g);
+        for (int n = 0; n < quadrature.size(); ++n) {
+          dealii::Vector<double> residual_l2(dof_handler.n_dofs());
+          problem.transport.collide(residual_l2, residual_g.block(n));
+          l2_residuals_n[m][g][n] = std::sqrt(residual_g.block(n)*residual_l2);
         }
       }
     }
@@ -724,31 +836,46 @@ void TestMultiple(const Mgxs &mgxs) {
         for (int n = 0; n < quadrature.size(); ++n) {
           l2_errors_g[m][g] += quadrature.weight(n) *
                                std::pow(l2_errors_n[m][g][n], 2);
+          l2_residuals_g[m][g] += quadrature.weight(n) *
+                                  std::pow(l2_residuals_n[m][g][n], 2);
         }
         l2_errors[m] += l2_errors_g[m][g];
         l2_errors_g[m][g] = std::sqrt(l2_errors_g[m][g]);
+        l2_residuals[m] += l2_residuals_g[m][g];
+        l2_residuals_g[m][g] = std::sqrt(l2_residuals_g[m][g]);
+        l2_errors_iso[m] += std::pow(l2_errors_iso_g[m][g], 2);
       }
       l2_errors[m] = std::sqrt(l2_errors[m]);
+      l2_residuals[m] = std::sqrt(l2_residuals[m]);
+      l2_errors_iso[m] = std::sqrt(l2_errors_iso[m]);
     }
     dealii::ConvergenceTable convergence_table;
-    for (int g = 0; g < num_groups; ++g) {
-      std::string key = "g" + std::to_string(g);
-      for (int m = 0; m <= num_modes; ++m)
-        convergence_table.add_value(key, l2_errors_g[m][g]);
-      convergence_table.set_scientific(key, true);
-    }
+    // for (int g = 0; g < num_groups; ++g) {
+    //   std::string key = "g" + std::to_string(g);
+    //   for (int m = 0; m <= num_modes; ++m)
+    //     convergence_table.add_value(key, l2_errors_g[m][g]);
+    //   convergence_table.set_scientific(key, true);
+    // }
     for (int m = 0; m <= num_modes; ++m) {
-      convergence_table.add_value("total", l2_errors[m]);
-      convergence_table.add_value("L2-norm", l2_norms[m]);
+      convergence_table.add_value("error", l2_errors[m]);
+      convergence_table.add_value("error_iso", l2_errors_iso[m]);
+      convergence_table.add_value("norm", l2_norms[m]);
+      convergence_table.add_value("residual", l2_residuals[m]);
     }
-    convergence_table.set_scientific("total", true);
-    convergence_table.set_scientific("L2-norm", true);
+    convergence_table.set_scientific("error", true);
+    convergence_table.set_scientific("error_iso", true);
+    convergence_table.set_scientific("norm", true);
+    convergence_table.set_scientific("residual", true);
     std::ofstream table_out("convergence_compare.txt");
     convergence_table.write_text(table_out);
     dealii::DataOut<dim> data_out;
     data_out.attach_dof_handler(dof_handler);
     for (int g = 0; g < num_groups; ++g) {
-      data_out.add_data_vector(diff.block(g), "g"+std::to_string(g));
+      diff.block(g).ratio(diff.block(g), flux_full_iso.block(g));
+      int pad = std::to_string(num_groups).size() - std::to_string(g).size();
+      std::string g_pad = std::string(pad, '0') + std::to_string(g);
+      data_out.add_data_vector(diff.block(g), "diff_g"+g_pad);
+      data_out.add_data_vector(flux_full_iso.block(g), "flux_g"+g_pad);
     }
     data_out.build_patches();
     std::ofstream output("diff.vtu");
@@ -758,13 +885,7 @@ void TestMultiple(const Mgxs &mgxs) {
   template <int dim, int qdim>
   void RunFullOrder(dealii::BlockVector<double> &flux,
                     const dealii::BlockVector<double> &source,
-                    const std::vector<std::vector<dealii::BlockVector<double>>> 
-                        &boundary_conditions,
-                    const dealii::DoFHandler<dim> &dof_handler,
-                    const QAngle<dim, qdim> &quadrature,
-                    const Mgxs &mgxs) {
-    FixedSourceProblem<dim, qdim> problem(
-        dof_handler, quadrature, mgxs, boundary_conditions);
+                    const FixedSourceProblem<dim, qdim> &problem) {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
     dealii::SolverControl control(3000, 1e-8);
@@ -815,6 +936,14 @@ TEST_F(C5G7EnergyTest, MmsFullEighth) {
 TEST_F(C5G7EnergyTest, CompareQuarter) {
   Mgxs mgxs = ReadMgxs();
   MeshQuarterPincell();
+  Compare(mgxs);
+}
+
+TEST_F(C5G7EnergyTest, CompareQuarterCladded) {
+  Mgxs mgxs = ReadMgxsCladded("CASMO-70");
+  std::cout << "G=" << mgxs.total.size() << std::endl;
+  std::cout << "J=" << mgxs.total[0].size() << std::endl;
+  MeshQuarterPincellCladded();
   Compare(mgxs);
 }
 
