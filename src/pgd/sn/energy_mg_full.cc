@@ -36,12 +36,34 @@ void EnergyMgFull::step(dealii::BlockVector<double>&,
   dealii::Vector<double> solution(modes.back());
   matrix.vmult(solution, source);
   modes.back().sadd(1 - omega, omega, solution);
+  // matrix.vmult(solution, modes.back());
+  // source -= solution;
+  // modes.back() += source;
   modes.back().print(std::cout);
+}
+
+double EnergyMgFull::get_residual(
+                        std::vector<InnerProducts> coefficients_x,
+                        std::vector<double> coefficients_b) {
+  AssertDimension(coefficients_x.size(), modes.size());
+  AssertDimension(coefficients_b.size(), sources.size());
+  set_matrix(coefficients_x.back());
+  coefficients_x.pop_back();
+  set_source(coefficients_b, coefficients_x);
+  dealii::Vector<double> operated(modes.back());
+  matrix.vmult(operated, modes.back());
+  dealii::Vector<double> residual(source);
+  residual -= operated;
+  return residual.l2_norm() / source.l2_norm();
 }
 
 void EnergyMgFull::enrich() {
   modes.emplace_back(mgxs.total.size());
   modes.back() = 1;
+  if (modes.size() > 1) {
+    modes.back() /= modes.back().l2_norm();
+    modes.back() *= modes[modes.size()-2].l2_norm();
+  }
   normalize();
 }
 
@@ -100,26 +122,35 @@ void EnergyMgFull::set_source(std::vector<double> coefficients_b,
 void EnergyMgFull::get_inner_products(
     std::vector<InnerProducts> &inner_products_x,
     std::vector<double> &inner_products_b) {
+  const int m_row = modes.size() - 1;
+  const int m_col_start = 0;
+  get_inner_products(inner_products_x, inner_products_b, m_row, m_col_start);
+}
+
+void EnergyMgFull::get_inner_products(
+    std::vector<InnerProducts> &inner_products_x,
+    std::vector<double> &inner_products_b,
+    const int m_row, const int m_col_start) {
   AssertDimension(sources.size(), inner_products_b.size());
   for (int i = 0; i < sources.size(); ++i) {
     inner_products_b[i] = 0;
     for (int g = 0; g < modes.back().size(); ++g) {
-      inner_products_b[i] += modes.back()[g] * sources[i][g];
+      inner_products_b[i] += modes[m_row][g] * sources[i][g];
     }
     std::cout << "e ip b " << inner_products_b[i] << std::endl;
   }
   AssertDimension(modes.size(), inner_products_x.size());
-  for (int m = 0; m < modes.size(); ++m) {
+  for (int m = m_col_start; m < modes.size(); ++m) {
     inner_products_x[m] = 0;
     for (int g = 0; g < modes.back().size(); ++g) {
-      inner_products_x[m].streaming += modes.back()[g] * modes[m][g];
+      inner_products_x[m].streaming += modes[m_row][g] * modes[m][g];
       for (int j = 0; j < mgxs.total[g].size(); ++j) {
         inner_products_x[m].collision[j] += 
-            modes.back()[g] * mgxs.total[g][j] * modes[m][g];
+            modes[m_row][g] * mgxs.total[g][j] * modes[m][g];
         for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp) {
           for (int ell = 0; ell < 1; ++ell) {
             inner_products_x[m].scattering[j][ell] +=
-                modes.back()[g] 
+                modes[m_row][g] 
                 * mgxs.scatter[g][gp][j]
                 * modes[m][gp];
           }
@@ -130,6 +161,65 @@ void EnergyMgFull::get_inner_products(
     for (int j = 0; j < inner_products_x[m].collision.size(); ++j) {
       std::cout << "e ip x " << inner_products_x[m].collision[j] << std::endl;
       std::cout << "e ip x " << inner_products_x[m].scattering[j][0] << std::endl;
+    }
+  }
+}
+
+void EnergyMgFull::update(
+      std::vector<std::vector<InnerProducts>> coefficients_x,
+      std::vector<std::vector<double>> coefficients_b) {
+  AssertDimension(coefficients_x.size(), modes.size());
+  AssertDimension(coefficients_b.size(), modes.size());
+  const int num_groups = modes[0].size();
+  dealii::FullMatrix<double> matrix_u(modes.size() * num_groups);
+  dealii::Vector<double> source_u(modes.size() * num_groups);
+  for (int m_row = 0; m_row < modes.size(); ++m_row) {
+    int mm_row = m_row * num_groups;
+    // Set matrix
+    for (int m_col = 0; m_col < modes.size(); ++m_col) {
+      int mm_col = m_col * num_groups;
+      for (int g = 0; g < mgxs.total.size(); ++g) {
+        matrix_u[mm_row+g][mm_col+g] += coefficients_x[m_row][m_col].streaming;
+        for (int j = 0; j < mgxs.total[g].size(); ++j) {
+          matrix_u[mm_row+g][mm_col+g] += 
+              coefficients_x[m_row][m_col].collision[j] * mgxs.total[g][j];
+          for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp) {
+            for (int ell = 0; ell < 1; ++ell) {
+              matrix_u[mm_row+g][mm_col+gp] += 
+                  coefficients_x[m_row][m_col].scattering[j][ell]
+                  * mgxs.scatter[g][gp][j];
+            }
+          }
+        }
+      }
+    }
+    // Set source
+    for (int g = 0; g < num_groups; ++g) {
+      for (int i = 0; i < coefficients_b[m_row].size(); ++i) {
+        source_u[mm_row+g] += coefficients_b[m_row][i] * sources[i][g];
+      }
+    }
+  }
+  dealii::Vector<double> solution_u(source_u.size());
+  if (true) {
+    for (int m = 0; m < modes.size(); ++m) {
+      int mm = m * num_groups;
+      for (int g = 0; g < num_groups; ++g) {
+        solution_u[mm+g] = modes[m][g];
+      }
+    }
+    dealii::SolverControl control(5000, 1e-6);
+    dealii::SolverGMRES<dealii::Vector<double>> solver(control);
+    solver.solve(matrix_u, solution_u, source_u, 
+                 dealii::PreconditionIdentity());
+  } else {
+    matrix_u.gauss_jordan();
+    matrix_u.vmult(solution_u, source_u);
+  }
+  for (int m = 0; m < modes.size(); ++m) {
+    int mm = m * num_groups;
+    for (int g = 0; g < num_groups; ++g) {
+      modes[m][g] = solution_u[mm+g];
     }
   }
 }

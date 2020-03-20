@@ -3,14 +3,17 @@
 
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
+#include <deal.II/lac/solver_gmres.h>
+#include <deal.II/lac/solver_control.h>
+#include <deal.II/lac/precondition.h>
 
 #include "pgd/sn/inner_products.h"
-#include "pgd/sn/linear_interface.h"
+#include "pgd/sn/linear_updatable_interface.h"
 #include "base/mgxs.h"
 
 namespace aether::pgd::sn {
 
-class EnergyMgFull : public LinearInterface {
+class EnergyMgFull : public LinearUpdatableInterface {
  public:
   EnergyMgFull(const Mgxs &mgxs,
                const std::vector<dealii::Vector<double>> &sources);
@@ -22,11 +25,18 @@ class EnergyMgFull : public LinearInterface {
             const dealii::BlockVector<double> &b,
             std::vector<InnerProducts> coefficients_x,
             std::vector<double> coefficients_b,
-            double omega = 1.);
+            double omega = 1.0);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
+  void get_inner_products(std::vector<InnerProducts> &inner_products_x,
+                          std::vector<double> &inner_products_b,
+                          const int m_row, const int m_col_start);
   void enrich();
   void normalize();
+  double get_residual(std::vector<InnerProducts> coefficients_x,
+                      std::vector<double> coefficients_b);
+  void update(std::vector<std::vector<InnerProducts>> coefficients_x,
+              std::vector<std::vector<double>> coefficients_b);
   std::vector<dealii::Vector<double>> modes;
  protected:
   const Mgxs &mgxs;
