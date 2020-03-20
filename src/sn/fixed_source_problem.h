@@ -26,11 +26,11 @@ class FixedSourceProblem {
                     const dealii::BlockVector<double> &src) const;
   FixedSource<dim, qdim> fixed_source;
   TransportType transport;
+  DiscreteToMoment<qdim> d2m;
+  MomentToDiscrete<qdim> m2d;
 
  protected:
   Scattering<dim> scattering;
-  DiscreteToMoment<qdim> d2m;
-  MomentToDiscrete<qdim> m2d;
   std::vector<WithinGroup<dim, qdim>> within_groups;
   std::vector<std::vector<ScatteringBlock<dim>>> downscattering;
   std::vector<std::vector<ScatteringBlock<dim>>> upscattering;
