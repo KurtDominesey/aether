@@ -10,9 +10,24 @@
 
 #include "quadrature.h"
 #include "types/types.h"
+#include "base/mgxs.h"
 
 namespace aether::pgd::sn {
 template <int dim, int qdim> class FixedSourceP;
+}
+
+namespace aether::sn {
+template <int dim, int qdim> class Transport;
+}
+
+namespace aether {
+struct Mgxs;
+template <int dim, int qdim>
+Mgxs collapse_mgxs(const dealii::BlockVector<double>&,
+                   const dealii::DoFHandler<dim>&,
+                   const sn::Transport<dim, qdim>&,
+                   const Mgxs&,
+                   const std::vector<int>&);
 }
 
 namespace aether::sn {
@@ -169,6 +184,11 @@ class Transport {
   std::vector<CellMatrices<dim>> cell_matrices;
 
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
+  friend Mgxs collapse_mgxs<dim, qdim>(const dealii::BlockVector<double>&,
+                                       const dealii::DoFHandler<dim>&,
+                                       const sn::Transport<dim, qdim>&,
+                                       const Mgxs&,
+                                       const std::vector<int>&);
 };
 
 }  // namespace aether::sn
