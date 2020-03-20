@@ -27,15 +27,16 @@ void FixedSourceP<dim, qdim>::set_last_cache() {
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products_x(
-    std::vector<InnerProducts> &inner_products) {
+    std::vector<InnerProducts> &inner_products, 
+    const int m_row, const int m_col_start) {
   for (int g = 0; g < fixed_source.within_groups.size(); ++g) {
     const Transport<dim, qdim> &transport =
         dynamic_cast<const Transport<dim, qdim>&>(
             fixed_source.within_groups[g].transport.transport);
     dealii::BlockVector<double> mode_last_g(transport.quadrature.size(),
                                             transport.dof_handler.n_dofs());
-    mode_last_g = caches.back().mode.block(g);
-    for (int m = 0; m < caches.size(); ++m) {
+    mode_last_g = caches[m_row].mode.block(g);
+    for (int m = m_col_start; m < caches.size(); ++m) {
       inner_products[m] = 0;
       dealii::BlockVector<double> mode_g(mode_last_g.get_block_indices());
       dealii::BlockVector<double> mode_m2d_g(mode_last_g.get_block_indices());
@@ -98,7 +99,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products_b(
-    std::vector<double> &inner_products) {
+    std::vector<double> &inner_products, const int m_row) {
   for (int i = 0; i < sources.size(); ++i) {
     inner_products[i] = 0;
     for (int g = 0; g < fixed_source.within_groups.size(); ++g) {
@@ -108,7 +109,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
       dealii::BlockVector<double> mode_g(transport.get_block_indices());
       dealii::BlockVector<double> source_g(transport.get_block_indices());
       dealii::BlockVector<double> collided_g(transport.get_block_indices());
-      mode_g = caches.back().mode.block(g);
+      mode_g = caches[m_row].mode.block(g);
       source_g = sources[i].block(g);
       transport.collide(collided_g, source_g);
       for (int n = 0; n < transport.quadrature.size(); ++n)
@@ -222,11 +223,34 @@ void FixedSourceP<dim, qdim>::step(
     fixed_source.within_groups[g].transport.vmult(
         uncollided.block(g), source.block(g), false);
   dealii::BlockVector<double> solution(caches.back().mode);
+  // fixed_source.vmult(solution, caches.back().mode);
+  // uncollided -= solution;
+  // caches.back().mode += uncollided;
   dealii::SolverControl solver_control(3000, 1e-8);
   dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
   solver.solve(fixed_source, solution, uncollided, 
                dealii::PreconditionIdentity());
   caches.back().mode.sadd(1 - omega, omega, solution);
+}
+
+template <int dim, int qdim>
+double FixedSourceP<dim, qdim>::get_residual(
+      std::vector<InnerProducts> coefficients_x,
+      std::vector<double> coefficients_b) {
+  dealii::BlockVector<double> source(caches.back().mode.get_block_indices());
+  dealii::BlockVector<double> uncollided(caches.back().mode.get_block_indices());
+  set_cross_sections(coefficients_x.back());
+  double denominator = coefficients_x.back().streaming;
+  coefficients_x.pop_back();
+  get_source(source, coefficients_x, coefficients_b, denominator);
+  for (int g = 0; g < fixed_source.within_groups.size(); ++g)
+    fixed_source.within_groups[g].transport.vmult(
+        uncollided.block(g), source.block(g), false);
+  dealii::BlockVector<double> operated(caches.back().mode);
+  fixed_source.vmult(operated, caches.back().mode);
+  dealii::BlockVector<double> residual(uncollided);
+  residual -= operated;
+  return residual.l2_norm() / uncollided.l2_norm();
 }
 
 template <int dim, int qdim>
@@ -254,8 +278,19 @@ void FixedSourceP<dim, qdim>::get_inner_products(
     std::vector<InnerProducts> &inner_products_x, 
     std::vector<double> &inner_products_b) {
   set_last_cache();
-  get_inner_products_x(inner_products_x);
-  get_inner_products_b(inner_products_b);
+  const int m_row = caches.size() - 1;
+  const int m_col_start = 0;
+  get_inner_products_x(inner_products_x, m_row, m_col_start);
+  get_inner_products_b(inner_products_b, m_row);
+}
+
+template <int dim, int qdim>
+void FixedSourceP<dim, qdim>::get_inner_products(
+    std::vector<InnerProducts> &inner_products_x, 
+    std::vector<double> &inner_products_b,
+    const int m_row, const int m_col_start) {
+  get_inner_products_x(inner_products_x, m_row, m_col_start);
+  get_inner_products_b(inner_products_b, m_row);
 }
 
 template <int dim, int qdim>

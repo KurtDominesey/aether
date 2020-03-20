@@ -38,11 +38,16 @@ class FixedSourceP : public LinearInterface {
             const dealii::BlockVector<double> &b,
             std::vector<InnerProducts> coefficients_x,
             std::vector<double> coefficients_b,
-            double omega = 1.);
+            double omega = 1.0);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
+  void get_inner_products(std::vector<InnerProducts> &inner_products_x,
+                          std::vector<double> &inner_products_b,
+                          const int m_row, const int m_col_start);
   void enrich();
   void normalize();
+  double get_residual(std::vector<InnerProducts> coefficients_x,
+                      std::vector<double> coefficients_b);
   std::vector<Cache> caches;
  protected:
   aether::sn::FixedSource<dim, qdim> &fixed_source;
@@ -57,8 +62,10 @@ class FixedSourceP : public LinearInterface {
                   double denominator);
   void subtract_modes_from_source(dealii::BlockVector<double> &source,
                                   std::vector<InnerProducts> coefficients_x);
-  void get_inner_products_x(std::vector<InnerProducts> &inner_products);
-  void get_inner_products_b(std::vector<double> &inner_products);
+  void get_inner_products_x(std::vector<InnerProducts> &inner_products,
+                            const int m_row, const int m_col_start);
+  void get_inner_products_b(std::vector<double> &inner_products, 
+                            const int m_row);
 };
 
 
