@@ -11,3 +11,8 @@ CMakeCache.txt
 *.csv
 *.asv
 callgrind.out.*
+*.a
+*.pdf
+*.png
+*.txt
+!CMakeLists.txt
