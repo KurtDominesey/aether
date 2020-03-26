@@ -148,6 +148,9 @@ class Transport {
 
   dealii::BlockIndices get_block_indices() const;
 
+  //! Cached cell matrices
+  std::vector<CellMatrices<dim>> cell_matrices;
+
  protected:
   void assemble_cell_matrices();
 
@@ -180,8 +183,6 @@ class Transport {
   std::vector<std::vector<int>> sweep_orders;
   //! Map of octant ordinate indices to global ordinate indices.
   std::vector<std::vector<int>> octants_to_global;
-  //! Cached cell matrices
-  std::vector<CellMatrices<dim>> cell_matrices;
 
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
   friend Mgxs collapse_mgxs<dim, qdim>(const dealii::BlockVector<double>&,
