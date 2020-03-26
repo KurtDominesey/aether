@@ -16,3 +16,4 @@ callgrind.out.*
 *.png
 *.txt
 !CMakeLists.txt
+*.h5
