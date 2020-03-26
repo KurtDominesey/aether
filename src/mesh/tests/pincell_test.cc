@@ -4,6 +4,8 @@
 #include "mesh/mesh.cc"
 #include "gtest/gtest.h"
 
+namespace aether {
+
 namespace {
 
 TEST(MeshTest, QuarterPincell) {
@@ -26,4 +28,6 @@ TEST(MeshTest, Pincell) {
   grid_out.write_svg(triangulation, file);
 }
 
-}
+}  // namespace
+
+}  // namespace aether

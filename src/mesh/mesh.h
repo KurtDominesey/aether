@@ -7,6 +7,10 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_generator.h>
 
+#include "types/types.h"
+
+namespace aether {
+
 void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
                           const std::vector<double> radii,
                           const double pitch,
@@ -21,5 +25,10 @@ void mesh_pincell(dealii::Triangulation<2> &tria,
                   const std::vector<double> &radii,
                   const double &pitch,
                   const std::vector<int> &materials);
+
+template <int dim>
+void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh);
+
+}  // namespace aether
 
 #endif  // AETHER_MESH_H_

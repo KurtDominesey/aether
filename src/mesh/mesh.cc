@@ -1,5 +1,7 @@
 #include "mesh/mesh.h"
 
+namespace aether {
+
 void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
                           const std::vector<double> radii,
                           const double pitch,
@@ -125,3 +127,23 @@ void mesh_pincell(dealii::Triangulation<2> &tria,
   trans_manifold.initialize(tria);
   tria.set_manifold(2, trans_manifold);
 }
+
+template <int dim>
+void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh) {
+  using Cell = typename dealii::Triangulation<dim>::active_cell_iterator;
+  using Face = typename dealii::Triangulation<dim>::active_face_iterator;
+  for (Cell cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
+    for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
+      Face face = cell->face(f);
+      if (face->at_boundary()) {
+        face->set_boundary_id(types::reflecting_boundary_id);
+      }
+    }
+  }
+}
+
+template void set_all_boundaries_reflecting<1>(dealii::Triangulation<1>&);
+template void set_all_boundaries_reflecting<2>(dealii::Triangulation<2>&);
+template void set_all_boundaries_reflecting<3>(dealii::Triangulation<3>&);
+
+}  // namespace aether
