@@ -11,11 +11,25 @@ Mgxs read_mgxs(
   const int num_groups =  file.get_attribute<int>("energy_groups");
   const int num_materials = materials.size();
   const int num_legendre = 1;
+  Mgxs mgxs(num_groups, num_materials, num_legendre);
+  read_mgxs(mgxs, filename, temperature, materials);
+  return mgxs;
+}
+
+void read_mgxs(
+    Mgxs &mgxs,
+    const std::string &filename, 
+    const std::string &temperature,
+    const std::vector<std::string> &materials) {
+  namespace HDF5 = dealii::HDF5;
+  HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+  const int num_groups =  file.get_attribute<int>("energy_groups");
+  const int num_materials = materials.size();
+  const int num_legendre = 1;
   std::vector<std::vector<double>> total_pivot(
     num_materials, std::vector<double>(num_groups));
   auto chi_pivot = total_pivot;
   auto nu_fission_pivot = total_pivot;
-  Mgxs mgxs(num_groups, num_materials, num_legendre);
   for (int j = 0; j < num_materials; ++j) {
     if (materials[j] == "void")
       continue;
@@ -62,7 +76,6 @@ Mgxs read_mgxs(
       mgxs.nu_fission[g][j] = nu_fission_pivot[j][g];
     }
   }
-  return mgxs;
 }
 
 void write_mgxs(

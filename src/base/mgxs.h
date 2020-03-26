@@ -33,6 +33,16 @@ Mgxs read_mgxs(const std::string &filename,
                const std::string &temperature,
                const std::vector<std::string> &materials);
 
+void read_mgxs(Mgxs &mgxs,
+               const std::string &filename, 
+               const std::string &temperature,
+               const std::vector<std::string> &materials);
+
+void write_mgxs(const Mgxs& mgxs,
+                const std::string &filename, 
+                const std::string &temperature,
+                const std::vector<std::string> &materials);
+
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
                    const dealii::DoFHandler<dim> &dof_handler,
