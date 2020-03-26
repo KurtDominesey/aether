@@ -1,4 +1,4 @@
-#include "test_harness.cc"
+#include "harness_test.cc"
 
 namespace {
 

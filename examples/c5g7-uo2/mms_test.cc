@@ -1,4 +1,4 @@
-#include "test_harness.cc"
+#include "harness_test.cc"
 
 class C5G7MmsOrderTest : public C5G7Test, 
                          public ::testing::WithParamInterface<int> {
