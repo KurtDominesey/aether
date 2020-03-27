@@ -30,7 +30,7 @@ deal_ii_setup_target(aether)
 
 set(test "test.exe")
 add_executable(${test} "test.cc" 
-    "harness_test.cc" "mms_test.cc" "compare_test.cc")
+    "c5g7_test.cc" "mms_test.cc" "compare_test.cc")
 target_link_libraries(${test} aether)
 
 target_compile_options(${test} PUBLIC ${GTEST_CFLAGS})

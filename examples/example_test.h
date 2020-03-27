@@ -1,3 +1,6 @@
+#ifndef AETHER_EXAMPLES_EXAMPLE_TEST_H_
+#define AETHER_EXAMPLES_EXAMPLE_TEST_H_
+
 #include <regex>
 
 #include <deal.II/fe/fe_dgq.h>
@@ -33,25 +36,13 @@
 using namespace aether;
 using namespace aether::sn;
 
-class C5G7Test : public ::testing::Test {
+template <int dim, int qdim = dim == 1 ? 1 : 2>
+class ExampleTest : public ::testing::Test {
  protected:
-  static const int dim = 2;
-  static const int qdim = 2;
-  const double pitch = 0.63;
   dealii::Triangulation<dim> mesh;
   dealii::DoFHandler<dim> dof_handler;
   QAngle<qdim> quadrature;
   std::shared_ptr<Mgxs> mgxs;
-
-  void SetUp() override {
-    const std::vector<std::string> materials =  {"water", "uo2"};
-    mgxs = std::make_shared<Mgxs>(7, materials.size(), 1);
-    read_mgxs(*mgxs, "c5g7.h5", "294K", materials);
-    quadrature = QPglc<qdim>(1, 2);
-    mesh_quarter_pincell(mesh, {0.54}, pitch, {0, 1});
-    set_all_boundaries_reflecting(mesh);
-    mesh.refine_global(0);
-  }
 
   void WriteConvergenceTable(dealii::ConvergenceTable &table) {
     const ::testing::TestInfo* const test_info =
@@ -65,3 +56,5 @@ class C5G7Test : public ::testing::Test {
     out.close();
   }
 };
+
+#endif  // AETHER_EXAMPLES_EXAMPLE_TEST_H_
