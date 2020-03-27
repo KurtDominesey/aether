@@ -21,27 +21,19 @@ project(c5g7-uo2)
 find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
-include_directories("../../src")
-
-# set(main "main.cc")
-file(GLOB_RECURSE source "[!main]*.cc")
 file(GLOB_RECURSE source_lib "../../src/*.cc")
 include_directories(${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src)
 
-add_library(lib ${source_lib})
-# target_include_directories(lib PUBLIC "../../src")
-deal_ii_setup_target(lib)
+add_library(aether ${source_lib})
+target_include_directories(aether PUBLIC "../../src")
+deal_ii_setup_target(aether)
 
-# set(exec "aether.exe")
 set(test "test.exe")
-# add_executable(${exec} ${main})
-add_executable(${test} ${source})
-target_link_libraries(${test} lib)
+add_executable(${test} "test.cc" 
+    "harness_test.cc" "mms_test.cc" "compare_test.cc")
+target_link_libraries(${test} aether)
 
 target_compile_options(${test} PUBLIC ${GTEST_CFLAGS})
-target_link_libraries(${test} ${GTEST_BOTH_LIBRARIES})
+target_link_libraries(${test} GTest::GTest)
 
-target_include_directories(${test} PUBLIC "../../src")
-
-DEAL_II_SETUP_TARGET(${test})
-# DEAL_II_SETUP_TARGET(${exec})
+deal_ii_setup_target(${test})
