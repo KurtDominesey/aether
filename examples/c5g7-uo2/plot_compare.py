@@ -21,6 +21,14 @@ def plot_compare(filename, savename):
     plt.ylabel('L2 Error')
     plt.xlabel('Modes')
     plt.savefig(savename)
+    plt.close()
+
+def main(ext):
+    name_base = 'C5G7CompareTest{mode}'
+    modes = ('Progressive', 'WithUpdate')
+    for mode in modes:
+        name = name_base.format(mode=mode)
+        plot_compare(name+'.txt', name+'.'+ext)
 
 if __name__ == '__main__':
-    plot_compare(*sys.argv[1:])
+    main(sys.argv[1])

@@ -27,10 +27,14 @@ def plot_rate(name_base, degrees, plot_theoretical=True, **kwargs):
     plt.yscale('log')
     plt.legend(loc='lower left')
 
+def plot_mms(savename):
+    name_base = 'FEDegree_C5G7MmsTest{rom}_{{degree}}.txt'
+    degrees = range(0, 3)
+    plot_rate(name_base.format(rom='FullOrder'), degrees, 
+              True, ls='--', marker='o', alpha=0.75)
+    plot_rate(name_base.format(rom='Pgd'), degrees, 
+              False, ls=':', marker='s', alpha=0.75)
+    plt.savefig(savename)
+
 if __name__ == '__main__':
-    name_base = 'FEDegree_C5G7MmsOrderTest{rom}_{{degree}}.txt'
-    plot_rate(name_base.format(rom='FullOrder'), range(0, 3), True, 
-              ls='--', marker='o', alpha=0.75)
-    plot_rate(name_base.format(rom='Pgd'), range(0, 3), False, 
-              ls=':', marker='s', alpha=0.75)
-    plt.savefig(sys.argv[1])
+    plot_mms(sys.argv[1])
