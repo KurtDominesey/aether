@@ -307,81 +307,95 @@ class C5G7CompareTest : public C5G7Test {
     table.set_scientific(key, true);
     table.set_precision(key, 16);
   }
+
+  void Compare(const int num_modes,
+               const int max_iters_nonlinear,
+               const double tol_nonlinear,
+               const int max_iters_fullorder,
+               const double tol_fullorder,
+               const bool do_update) {
+    const int num_groups = mgxs->total.size();
+    const int num_materials = mgxs->total[0].size();
+    // Create sources
+    std::vector<dealii::Vector<double>> sources_energy;
+    std::vector<dealii::BlockVector<double>> sources_spaceangle;
+    WriteUniformFissionSource(sources_energy, sources_spaceangle);
+    const int num_sources = sources_energy.size();
+    // Create boundary conditions
+    std::vector<dealii::BlockVector<double>> boundary_conditions_one;
+    std::vector<std::vector<dealii::BlockVector<double>>> 
+        boundary_conditions(num_groups);
+    // Run full order
+    dealii::BlockVector<double> flux_full(
+        num_groups, quadrature.size()*dof_handler.n_dofs());
+    dealii::BlockVector<double> source_full(flux_full.get_block_indices());
+    for (int g = 0; g < num_groups; ++g)
+      for (int j = 0; j < num_sources; ++j)
+        source_full.block(g).add(
+            sources_energy[j][g], sources_spaceangle[j].block(0));
+    FixedSourceProblem<dim, qdim> problem_full(
+        dof_handler, quadrature, *mgxs, boundary_conditions);
+    RunFullOrder(flux_full, source_full, problem_full, 
+                 max_iters_fullorder, tol_fullorder);
+    // Run pgd model
+    Mgxs mgxs_one(1, num_materials, 1);
+    Mgxs mgxs_pseudo(1, num_materials, 1);
+    for (int j = 0; j < num_materials; ++j) {
+      mgxs_one.total[0][j] = 1;
+      mgxs_one.scatter[0][0][j] = 1;
+    }
+    using TransportType = pgd::sn::Transport<dim, qdim>;
+    using TransportBlockType = pgd::sn::TransportBlock<dim, qdim>;
+    FixedSourceProblem<dim, qdim, TransportType, TransportBlockType> problem(
+        dof_handler, quadrature, mgxs_pseudo, boundary_conditions);
+    pgd::sn::FixedSourceP fixed_source_p(
+        problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
+    pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
+    std::vector<pgd::sn::LinearInterface*> linear_ops = 
+        {&fixed_source_p, &energy_mg};
+    pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
+    RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
+           do_update);
+    std::cout << "done running pgd\n";
+    std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
+        dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
+    for (int m = 0; m < num_modes; ++m)
+      modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
+    dealii::ConvergenceTable table;
+    std::vector<double> l2_errors_d(num_modes+1);
+    std::vector<double> l2_errors_m(num_modes+1);
+    std::vector<double> l2_residuals(num_modes+1);
+    std::vector<double> l2_residuals_streamed(num_modes+1);
+    std::vector<double> l2_residuals_swept(num_modes+1);
+    std::vector<double> l2_norms(num_modes+1);
+    std::cout << "get l2 errors discrete\n";
+    GetL2ErrorsDiscrete(l2_errors_d, modes_spaceangle, energy_mg.modes, flux_full, 
+                        problem.transport, table, "error_d");
+    GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_mg.modes, flux_full, 
+                      problem.transport, problem.d2m, table, "error_m");  
+    GetL2Residuals(l2_residuals, fixed_source_p.caches, energy_mg.modes, 
+                  source_full, problem.transport, problem.m2d, problem_full,
+                  false, table, "residual");
+    GetL2Residuals(l2_residuals_streamed, fixed_source_p.caches, energy_mg.modes, 
+                  source_full, problem.transport, problem.m2d, problem_full,
+                  true, table, "residual_streamed");
+    GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
+              table, "norm");
+    dealii::BlockVector<double> uncollided(source_full.get_block_indices());
+    problem_full.sweep_source(uncollided, source_full);
+    GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
+                      uncollided, problem.transport, problem_full, table, 
+                      "residual_swept");
+    WriteConvergenceTable(table);
+  }
 };
 
-TEST_F(C5G7CompareTest, Compare) {
-  const int num_groups = mgxs->total.size();
-  const int num_materials = mgxs->total[0].size();
-  // Create sources
-  std::vector<dealii::Vector<double>> sources_energy;
-  std::vector<dealii::BlockVector<double>> sources_spaceangle;
-  WriteUniformFissionSource(sources_energy, sources_spaceangle);
-  const int num_sources = sources_energy.size();
-  // Create boundary conditions
-  std::vector<dealii::BlockVector<double>> boundary_conditions_one;
-  std::vector<std::vector<dealii::BlockVector<double>>> 
-      boundary_conditions(num_groups);
-  // Run full order
-  dealii::BlockVector<double> flux_full(
-      num_groups, quadrature.size()*dof_handler.n_dofs());
-  dealii::BlockVector<double> source_full(flux_full.get_block_indices());
-  for (int g = 0; g < num_groups; ++g)
-    for (int j = 0; j < num_sources; ++j)
-      source_full.block(g).add(
-          sources_energy[j][g], sources_spaceangle[j].block(0));
-  FixedSourceProblem<dim, qdim> problem_full(
-      dof_handler, quadrature, *mgxs, boundary_conditions);
-  RunFullOrder(flux_full, source_full, problem_full, 1000, 1e-6);
-  // Run pgd model
-  Mgxs mgxs_one(1, num_materials, 1);
-  Mgxs mgxs_pseudo(1, num_materials, 1);
-  for (int j = 0; j < num_materials; ++j) {
-    mgxs_one.total[0][j] = 1;
-    mgxs_one.scatter[0][0][j] = 1;
-  }
-  using TransportType = pgd::sn::Transport<dim, qdim>;
-  using TransportBlockType = pgd::sn::TransportBlock<dim, qdim>;
-  FixedSourceProblem<dim, qdim, TransportType, TransportBlockType> problem(
-      dof_handler, quadrature, mgxs_pseudo, boundary_conditions);
-  pgd::sn::FixedSourceP fixed_source_p(
-      problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
-  pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
-  std::vector<pgd::sn::LinearInterface*> linear_ops = 
-      {&fixed_source_p, &energy_mg};
-  pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
-  const int num_modes = 50;
-  RunPgd(nonlinear_gs, num_modes, 50, 1e-6, false);
-  std::cout << "done running pgd\n";
-  std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
-      dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
-  for (int m = 0; m < num_modes; ++m)
-    modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
-  dealii::ConvergenceTable table;
-  std::vector<double> l2_errors_d(num_modes+1);
-  std::vector<double> l2_errors_m(num_modes+1);
-  std::vector<double> l2_residuals(num_modes+1);
-  std::vector<double> l2_residuals_streamed(num_modes+1);
-  std::vector<double> l2_residuals_swept(num_modes+1);
-  std::vector<double> l2_norms(num_modes+1);
-  std::cout << "get l2 errors discrete\n";
-  GetL2ErrorsDiscrete(l2_errors_d, modes_spaceangle, energy_mg.modes, flux_full, 
-                      problem.transport, table, "error_d");
-  GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_mg.modes, flux_full, 
-                     problem.transport, problem.d2m, table, "error_m");  
-  GetL2Residuals(l2_residuals, fixed_source_p.caches, energy_mg.modes, 
-                 source_full, problem.transport, problem.m2d, problem_full,
-                 false, table, "residual");
-  GetL2Residuals(l2_residuals_streamed, fixed_source_p.caches, energy_mg.modes, 
-                 source_full, problem.transport, problem.m2d, problem_full,
-                 true, table, "residual_streamed");
-  GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
-             table, "norm");
-  dealii::BlockVector<double> uncollided(source_full.get_block_indices());
-  problem_full.sweep_source(uncollided, source_full);
-  GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
-                     uncollided, problem.transport, problem_full, table, 
-                     "residual_swept");
-  WriteConvergenceTable(table);
+TEST_F(C5G7CompareTest, CompareProgressive) {
+  Compare(10, 50, 1e-6, 1000, 1e-6, false);
+}
+
+TEST_F(C5G7CompareTest, CompareWithUpdate) {
+  Compare(10, 50, 1e-6, 1000, 1e-6, true);
 }
 
 }
