@@ -110,15 +110,13 @@ void write_mgxs(
 }
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
-Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
-                   const dealii::DoFHandler<dim> &dof_handler,
-                   const sn::Transport<dim, qdim> &transport,
-                   const Mgxs &mgxs,
-                   const std::vector<int> &g_maxes) {
-  const int num_groups = mgxs.total.size();
-  const int num_materials = mgxs.total[0].size();
-  std::vector<std::vector<double>> integrals(num_groups,
-      std::vector<double>(num_materials));
+void collapse_spectra(std::vector<dealii::Vector<double>> &spectra,
+                      const dealii::BlockVector<double> &flux,
+                      const dealii::DoFHandler<dim> &dof_handler,
+                      const sn::Transport<dim, qdim> &transport) {
+  Assert(spectra.empty(), dealii::ExcInvalidState());
+  const int num_groups = flux.n_blocks();
+  spectra.resize(1, dealii::Vector<double>(num_groups));
   std::vector<dealii::types::global_dof_index> dof_indices(
       dof_handler.get_fe().dofs_per_cell);
   for (int g = 0; g < num_groups; ++g) {
@@ -132,36 +130,59 @@ Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
       ++c;
       cell->get_dof_indices(dof_indices);
       const int material = cell->material_id();
+      if (material+1 > spectra.size())
+        spectra.resize(material+1, dealii::Vector<double>(num_groups));
       const dealii::FullMatrix<double> &mass = transport.cell_matrices[c].mass;
       for (int i = 0; i < mass.n(); ++i)
         for (int j = 0; j < mass.m(); ++j)
-          integrals[g][material] += mass[i][j]*flux_g.block(0)[dof_indices[j]];
+          spectra[material][g] += mass[i][j] * flux_g.block(0)[dof_indices[j]];
     }
   }
+}
+
+template <int dim, int qdim = dim == 1 ? 1 : 2>
+Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
+                   const dealii::DoFHandler<dim> &dof_handler,
+                   const sn::Transport<dim, qdim> &transport,
+                   const Mgxs &mgxs,
+                   const std::vector<int> &g_maxes) {
+  std::vector<dealii::Vector<double>> spectra;
+  collapse_spectra(spectra, flux, dof_handler, transport);
+  AssertDimension(spectra.size(), mgxs.total.size());
+  AssertDimension(spectra[0].size(), mgxs.total[0].size());
+  return collapse_mgxs(spectra, mgxs, g_maxes);
+}
+
+Mgxs collapse_mgxs(const dealii::Vector<double> &spectrum,
+                   const Mgxs &mgxs, const std::vector<int> &g_maxes) {
+  const int num_materials = mgxs.total[0].size();
+  std::vector<dealii::Vector<double>> spectra(num_materials, spectrum);
+  return collapse_mgxs(spectra, mgxs, g_maxes);
+}
+
+Mgxs collapse_mgxs(const std::vector<dealii::Vector<double>> &spectra,
+                   const Mgxs &mgxs, const std::vector<int> &g_maxes) {
+  const int num_materials = mgxs.total[0].size();
   const int num_groups_coarse = g_maxes.size();
   Mgxs mgxs_coarse(num_groups_coarse, num_materials, 1);
-  int g_min = 0;
-  int g_max = 0;
   for (int g_coarse = 0; g_coarse < num_groups_coarse; ++g_coarse) {
-    g_min = g_max;
-    g_max = g_maxes[g_coarse];
+    int g_min = g_coarse == 0 ? 0 : g_maxes[g_coarse-1];
+    int g_max = g_maxes[g_coarse];
     std::vector<double> collision(num_materials);
     std::vector<double> denominator(num_materials);
     std::vector<std::vector<double>> scattering(num_groups_coarse,
         std::vector<double>(num_materials));
     for (int g = g_min; g < g_max; ++g) {
       for (int j = 0; j < num_materials; ++j) {
-        collision[j] += mgxs.total[g][j] * integrals[g][j];
-        denominator[j] += integrals[g][j];
+        collision[j] += mgxs.total[g][j] * spectra[j][g];
+        denominator[j] += spectra[j][g];
         // For convenience, the usual meanings of g and g' (gp) are reversed
         // That is to say, neutrons scatter from g to g'
-        int gp_min = 0;
-        int gp_max = 0;
         for (int gp_coarse = 0; gp_coarse < num_groups_coarse; ++gp_coarse) {
-          int gp_min = gp_max;
+          int gp_min = gp_coarse == 0 ? 0 : g_maxes[gp_coarse-1];
           int gp_max = g_maxes[gp_coarse];
           for (int gp = gp_min; gp < gp_max; ++gp) {
-            scattering[gp_coarse][j] += mgxs.scatter[g][gp][j]*integrals[g][j];
+            scattering[gp_coarse][j] += mgxs.scatter[g][gp][j] * spectra[j][g];
           }
         }
       }
