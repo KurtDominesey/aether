@@ -44,14 +44,22 @@ class ExampleTest : public ::testing::Test {
   QAngle<qdim> quadrature;
   std::shared_ptr<Mgxs> mgxs;
 
-  void WriteConvergenceTable(dealii::ConvergenceTable &table) {
+  void WriteConvergenceTable(dealii::ConvergenceTable &table,
+                             const std::string suffix="") {
     const ::testing::TestInfo* const test_info =
         ::testing::UnitTest::GetInstance()->current_test_info();
+    std::string name = test_info->name();
+    auto this_with_param = 
+      dynamic_cast<::testing::WithParamInterface<std::string>*>(this);
+    if (this_with_param != nullptr)
+      name = std::regex_replace(name, std::regex("/[0-9]+"), 
+                                "/" + this_with_param->GetParam());
     std::string filename = test_info->test_case_name();
-    filename += test_info->name();
+    filename += name;
+    filename += suffix;
     filename += ".txt";
     filename = std::regex_replace(filename, std::regex("/"), "_");
-    std::ofstream out(filename, std::ofstream::trunc);
+    std::ofstream out(filename, std::ofstream::out | std::ofstream::trunc);
     table.write_text(out);
     out.close();
   }
