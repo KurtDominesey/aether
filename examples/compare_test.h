@@ -1,6 +1,10 @@
 #ifndef AETHER_EXAMPLES_COMPARE_TEST_H_
 #define AETHER_EXAMPLES_COMPARE_TEST_H_
 
+#include "example_test.h"
+
+#include "base/lapack_full_matrix.cc"
+
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
  protected:
@@ -60,8 +64,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       }
       if (do_update) {
         nonlinear_gs.finalize();
-        if (m > 0)
-          nonlinear_gs.update();
+        // if (m > 0)
+        nonlinear_gs.update();
       }
     }
   }
@@ -303,6 +307,32 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     table.set_precision(key, 16);
   }
 
+  void ComputeSvd(std::vector<dealii::BlockVector<double>> &svecs_spaceangle,
+                  std::vector<dealii::Vector<double>> &svecs_energy,
+                  const dealii::BlockVector<double> &flux) {
+    AssertDimension(svecs_spaceangle.size(), 0);
+    AssertDimension(svecs_energy.size(), 0);
+    const int num_groups = flux.n_blocks();
+    const int num_qdofs = flux.block(0).size();
+    dealii::LAPACKFullMatrix_<double> flux_matrix(num_groups, num_qdofs);
+    for (int g = 0; g < num_groups; ++g)
+      for (int i = 0; i < num_qdofs; ++i)
+        flux_matrix(g, i) = flux.block(g)[i];
+    flux_matrix.compute_svd();
+    const int num_svecs = std::min(num_groups, num_qdofs);
+    AssertDimension(num_qdofs, quadrature.size() * dof_handler.n_dofs());
+    svecs_spaceangle.resize(num_svecs, 
+        dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
+    svecs_energy.resize(num_svecs, dealii::Vector<double>(num_groups));  
+    for (int s = 0; s < num_svecs; ++s) {
+      for (int i = 0; i < num_qdofs; ++i)
+        svecs_spaceangle[s][i] = flux_matrix.get_svd_vt()(s, i);
+      for (int g = 0; g < num_groups; ++g)
+        svecs_energy[s][g] = flux_matrix.get_svd_u()(g, s);
+      svecs_energy[s] *= flux_matrix.singular_value(s);
+    }
+  }
+
   void Compare(const int num_modes,
                const int max_iters_nonlinear,
                const double tol_nonlinear,
@@ -317,7 +347,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     WriteUniformFissionSource(sources_energy, sources_spaceangle);
     const int num_sources = sources_energy.size();
     // Create boundary conditions
-    std::vector<dealii::BlockVector<double>> boundary_conditions_one;
+    std::vector<std::vector<dealii::BlockVector<double>>> 
+        boundary_conditions_one(1);
     std::vector<std::vector<dealii::BlockVector<double>>> 
         boundary_conditions(num_groups);
     // Run full order
@@ -332,6 +363,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         dof_handler, quadrature, *mgxs, boundary_conditions);
     RunFullOrder(flux_full, source_full, problem_full, 
                  max_iters_fullorder, tol_fullorder);
+    // Compute svd of full order
+    std::vector<dealii::BlockVector<double>> svecs_spaceangle;
+    std::vector<dealii::Vector<double>> svecs_energy;
+    ComputeSvd(svecs_spaceangle, svecs_energy, flux_full);
+    const int num_svecs = svecs_spaceangle.size();
     // Run pgd model
     Mgxs mgxs_one(1, num_materials, 1);
     Mgxs mgxs_pseudo(1, num_materials, 1);
@@ -342,7 +378,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     using TransportType = pgd::sn::Transport<dim, qdim>;
     using TransportBlockType = pgd::sn::TransportBlock<dim, qdim>;
     FixedSourceProblem<dim, qdim, TransportType, TransportBlockType> problem(
-        dof_handler, quadrature, mgxs_pseudo, boundary_conditions);
+        dof_handler, quadrature, mgxs_pseudo, boundary_conditions_one);
     pgd::sn::FixedSourceP fixed_source_p(
         problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
     pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
@@ -357,6 +393,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     for (int m = 0; m < num_modes; ++m)
       modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
     dealii::ConvergenceTable table;
+    std::vector<double> l2_errors_svd_d(num_svecs+1);
+    std::vector<double> l2_errors_svd_m(num_svecs+1);
     std::vector<double> l2_errors_d(num_modes+1);
     std::vector<double> l2_errors_m(num_modes+1);
     std::vector<double> l2_residuals(num_modes+1);
@@ -364,11 +402,21 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     std::vector<double> l2_residuals_swept(num_modes+1);
     std::vector<double> l2_norms(num_modes+1);
     std::cout << "get l2 errors discrete\n";
+    GetL2ErrorsDiscrete(l2_errors_svd_d, svecs_spaceangle, svecs_energy, 
+                        flux_full, problem.transport, table, "error_svd_d");
+    GetL2ErrorsMoments(l2_errors_svd_m, svecs_spaceangle, svecs_energy, 
+                       flux_full, problem.transport, problem.d2m, table, 
+                       "error_svd_m");
+    for (int pad = 0; pad < num_modes - num_svecs; ++pad) {
+      table.add_value("error_svd_d", std::nan("p"));
+      table.add_value("error_svd_m", std::nan("p"));
+    }
     GetL2ErrorsDiscrete(l2_errors_d, modes_spaceangle, energy_mg.modes, 
                         flux_full, problem.transport, table, "error_d");
     GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_mg.modes, 
                        flux_full, problem.transport, problem.d2m, table, 
-                       "error_m");  
+                       "error_m");
+    if (num_groups < 800) {
     GetL2Residuals(l2_residuals, fixed_source_p.caches, energy_mg.modes, 
                    source_full, problem.transport, problem.m2d, problem_full,
                    false, table, "residual");
@@ -377,11 +425,12 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                    problem_full, true, table, "residual_streamed");
     GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
                table, "norm");
-    dealii::BlockVector<double> uncollided(source_full.get_block_indices());
-    problem_full.sweep_source(uncollided, source_full);
-    GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
-                       uncollided, problem.transport, problem_full, table, 
-                       "residual_swept");
+    // dealii::BlockVector<double> uncollided(source_full.get_block_indices());
+    // problem_full.sweep_source(uncollided, source_full);
+    // GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
+    //                    uncollided, problem.transport, problem_full, table, 
+    //                    "residual_swept");
+    }
     this->WriteConvergenceTable(table);
   }
 };
