@@ -201,14 +201,14 @@ void EnergyMgFull::update(
     }
   }
   dealii::Vector<double> solution_u(source_u.size());
-  if (true) {
+  if (modes.size() * num_groups > 1000) {
     for (int m = 0; m < modes.size(); ++m) {
       int mm = m * num_groups;
       for (int g = 0; g < num_groups; ++g) {
         solution_u[mm+g] = modes[m][g];
       }
     }
-    dealii::SolverControl control(5000, 1e-6);
+    dealii::SolverControl control(5000, 1e-6*source_u.l2_norm());
     dealii::SolverGMRES<dealii::Vector<double>> solver(control);
     solver.solve(matrix_u, solution_u, source_u, 
                  dealii::PreconditionIdentity());
