@@ -17,9 +17,18 @@ void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
                           const std::vector<int> materials);
 
 void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
-                          const std::vector<double> radii,
+                          std::vector<double> radii,
                           const double pitch,
-                          const std::vector<int> materials);
+                          std::vector<int> materials,
+                          const int trans_mani_id = 2,
+                          const int sph_mani_id = 1);
+
+void mesh_eighth_pincell_ul(dealii::Triangulation<2> &tria,
+                            std::vector<double> radii,
+                            const double pitch,
+                            std::vector<int> materials,
+                            const int trans_mani_id = 2,
+                            const int sph_mani_id = 1);
 
 void mesh_pincell(dealii::Triangulation<2> &tria,
                   const std::vector<double> &radii,
@@ -28,6 +37,8 @@ void mesh_pincell(dealii::Triangulation<2> &tria,
 
 template <int dim>
 void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh);
+
+void mesh_mox_assembly(dealii::Triangulation<2> &mesh);
 
 }  // namespace aether
 
