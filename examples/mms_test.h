@@ -100,7 +100,8 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
     }
   }
 
-  void TestFullOrder(const int max_iters, 
+  void TestFullOrder(const int num_cycles,
+                     const int max_iters, 
                      const double tol, 
                      const double period) {
     const int num_groups = this->mgxs->total.size();
@@ -108,7 +109,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
     std::vector<std::vector<dealii::BlockVector<double>>> boundary_conditions(
         num_groups, std::vector<dealii::BlockVector<double>>());
     // Create solution
-    using Solution = CosineFunction<dim_>;
+    using Solution = CosineFunction<dim>;
     std::vector<Solution> solutions_spaceangle;
     solutions_spaceangle.emplace_back(period);
     std::vector<dealii::Vector<double>> solutions_energy(1,
@@ -117,7 +118,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       solutions_energy[0][g] = g + 1;
     // Run MMS refinement cycles
     dealii::ConvergenceTable convergence_table;
-    int num_cycles = 5;
     std::vector<double> l2_errors(num_cycles);
     std::vector<std::vector<double>> l2_errors_g(
         num_cycles, std::vector<double>(
@@ -140,7 +140,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       this->CreateSource(source, solutions_spaceangle, solutions_energy,
                         dof_handler, quadrature, *mgxs);
       // Run problem
-      FixedSourceProblem<dim_, qdim_> problem(
+      FixedSourceProblem<dim, qdim> problem(
           dof_handler, quadrature, *mgxs, boundary_conditions);
       dealii::BlockVector<double> uncollided(source.get_block_indices());
       dealii::BlockVector<double> flux(source.get_block_indices());
@@ -162,7 +162,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           dealii::VectorTools::integrate_difference(
               dof_handler, flux_g.block(n), solutions_spaceangle[0],
               difference_per_cell, 
-              dealii::QGauss<dim_>(dof_handler.get_fe().degree + 2),
+              dealii::QGauss<dim>(dof_handler.get_fe().degree + 2),
               dealii::VectorTools::L2_norm);
           double l2_error_sq = 0;
           for (int i = 0; i < difference_per_cell.size(); ++i)
@@ -197,7 +197,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
     this->WriteConvergenceTable(convergence_table);
   }
 
-  void TestPgd(const int max_iters, const double period) {
+  void TestPgd(const int num_cycles, const int max_iters, const double period) {
     const int num_groups = this->mgxs->total.size();
     const int num_materials = this->mgxs->total[0].size();
     std::vector<std::vector<dealii::BlockVector<double>>> boundary_conditions(
@@ -210,7 +210,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       mgxs_one.scatter[0][0][j] = 1;
     }
     // Create solution
-    using Solution = CosineFunction<dim_>;
+    using Solution = CosineFunction<dim>;
     std::vector<Solution> solutions_spaceangle;
     solutions_spaceangle.emplace_back(period);
     std::vector<dealii::Vector<double>> solutions_energy(1,
@@ -219,7 +219,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       solutions_energy[0][g] = g + 1;
     // Run MMS refinement cycles
     dealii::ConvergenceTable convergence_table;
-    int num_cycles = 5;
     std::vector<double> l2_errors(num_cycles);
     std::vector<std::vector<double>> l2_errors_g(
         num_cycles, std::vector<double>(
@@ -247,9 +246,9 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
         sources_energy[s] /= factor;
         sources_spaceangle[s] *= factor;
       }
-      using TransportType = pgd::sn::Transport<dim_, qdim_>;
-      using TransportBlockType = pgd::sn::TransportBlock<dim_, qdim_>;
-      FixedSourceProblem<dim_, qdim_, TransportType, TransportBlockType> problem(
+      using TransportType = pgd::sn::Transport<dim, qdim>;
+      using TransportBlockType = pgd::sn::TransportBlock<dim, qdim>;
+      FixedSourceProblem<dim, qdim, TransportType, TransportBlockType> problem(
           dof_handler, quadrature, mgxs_pseudo, boundary_conditions);
       pgd::sn::FixedSourceP fixed_source_p(
           problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
@@ -286,7 +285,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           dealii::VectorTools::integrate_difference(
               dof_handler, flux_g.block(n), solutions_spaceangle[0],
               difference_per_cell, 
-              dealii::QGauss<dim_>(dof_handler.get_fe().degree + 2),
+              dealii::QGauss<dim>(dof_handler.get_fe().degree + 2),
               dealii::VectorTools::L2_norm);
           double l2_error_sq = 0;
           for (int i = 0; i < difference_per_cell.size(); ++i)
