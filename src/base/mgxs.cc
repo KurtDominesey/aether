@@ -182,7 +182,7 @@ Mgxs collapse_mgxs(const std::vector<dealii::Vector<double>> &spectra,
           int gp_min = gp_coarse == 0 ? 0 : g_maxes[gp_coarse-1];
           int gp_max = g_maxes[gp_coarse];
           for (int gp = gp_min; gp < gp_max; ++gp) {
-            scattering[gp_coarse][j] += mgxs.scatter[g][gp][j] * spectra[j][g];
+            scattering[gp_coarse][j] += mgxs.scatter[gp][g][j] * spectra[j][g];
           }
         }
       }
@@ -190,7 +190,7 @@ Mgxs collapse_mgxs(const std::vector<dealii::Vector<double>> &spectra,
     for (int j = 0; j < num_materials; ++j) {
       mgxs_coarse.total[g_coarse][j] = collision[j] / denominator[j];
       for (int gp_coarse = 0; gp_coarse < num_groups_coarse; ++gp_coarse) {
-        mgxs_coarse.scatter[g_coarse][gp_coarse][j] = 
+        mgxs_coarse.scatter[gp_coarse][g_coarse][j] = 
             scattering[gp_coarse][j] / denominator[j];
       }
     }
