@@ -94,17 +94,29 @@ void write_mgxs(
     material.set_attribute<int>("order", num_legendre - 1);
     HDF5::Group library = material.create_group(temperature);
     std::vector<double> total(num_groups);
+    std::vector<double> chi(num_groups);
+    std::vector<double> nu_fission(num_groups);
     std::vector<double> scatter_matrix(num_groups * num_groups);
+    bool is_fissionable = false;
     for (int g = 0; g < num_groups; ++g) {
       total[g] = mgxs.total[g][j];
+      chi[g] = mgxs.chi[g][j];
+      nu_fission[g] = mgxs.nu_fission[g][j];
+      if (chi[g] > 0 || nu_fission[g] > 0)
+        is_fissionable = true;
       for (int gp = 0; gp < num_groups; ++gp) {
         scatter_matrix[g*num_groups + gp] = mgxs.scatter[gp][g][j];
       }
     }
     library.write_dataset("total", total);
+    if (is_fissionable) {
+      library.write_dataset("chi", chi);
+      library.write_dataset("nu-fission", nu_fission);
+    }
+    material.set_attribute<int>("fissionable", is_fissionable);
     HDF5::Group scatter_data = library.create_group("scatter_data");
-    scatter_data.write_dataset("g_max", std::vector<int>(num_groups, 1));
-    scatter_data.write_dataset("g_min", std::vector<int>(num_groups, num_groups));
+    scatter_data.write_dataset("g_min", std::vector<int>(num_groups, 1));
+    scatter_data.write_dataset("g_max", std::vector<int>(num_groups, num_groups));
     scatter_data.write_dataset("scatter_matrix", scatter_matrix);
   }
 }
