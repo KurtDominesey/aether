@@ -14,7 +14,9 @@ namespace aether {
 void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
                           const std::vector<double> radii,
                           const double pitch,
-                          const std::vector<int> materials);
+                          const std::vector<int> materials,
+                          const int trans_mani_id = 2,
+                          const int sph_mani_id = 1);
 
 void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
                           std::vector<double> radii,

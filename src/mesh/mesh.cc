@@ -5,7 +5,9 @@ namespace aether {
 void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
                           const std::vector<double> radii,
                           const double pitch,
-                          const std::vector<int> materials) {
+                          const std::vector<int> materials,
+                          const int trans_mani_id,
+                          const int sph_mani_id) {
   AssertDimension(materials.size(), radii.size()+1);
   if (!radii.empty())
     Assert(radii.back() < pitch, dealii::ExcInvalidState());
@@ -42,16 +44,16 @@ void mesh_quarter_pincell(dealii::Triangulation<2> &tria,
   grid_reordering.reorder_cells(cells, true);
   dealii::SubCellData manifolds;
   tria.create_triangulation(vertices, cells, manifolds);
-  tria.set_all_manifold_ids(1);
+  tria.set_all_manifold_ids(sph_mani_id);
   tria.set_all_manifold_ids_on_boundary(dealii::numbers::flat_manifold_id);
-  tria.begin()->set_manifold_id(2);
+  tria.begin()->set_manifold_id(trans_mani_id);
   int i = 0;
   for (auto cell = tria.last(); i < 2; ++i, --cell)
-    cell->set_manifold_id(2);
+    cell->set_manifold_id(trans_mani_id);
   tria.set_manifold(1, dealii::SphericalManifold<2>());
   dealii::TransfiniteInterpolationManifold<2> trans_manifold;
   trans_manifold.initialize(tria);
-  tria.set_manifold(2, trans_manifold);
+  tria.set_manifold(trans_mani_id, trans_manifold);
 }
 
 void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
