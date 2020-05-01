@@ -10,8 +10,10 @@ class CathalauMgxsTest : public CathalauTest,
   using CathalauTest::materials;
 
   void SetUp() override {
+    materials[2] = this->GetParam();
+    group_structure = "SHEM-361";
     CathalauTest::SetUp();
-    this->mesh.refine_global(2);
+    this->mesh.refine_global(1);
     dealii::FE_DGQ<dim_> fe(1);
     this->dof_handler.initialize(this->mesh, fe);
   };
@@ -22,24 +24,13 @@ class CathalauMgxsTest : public CathalauTest,
                    const int max_iters_fullorder,
                    const double tol_fullorder,
                    const bool do_update) {
-    std::vector<int> g_maxes;
-    if (this->GetParam() == "CASMO-70")
-      throw dealii::ExcInvalidState();
-      // g_maxes = {24, 55, 65, 70};
-      // g_maxes = {10, 14, 18, 24, 43, 55, 65, 70};
-    else if (this->GetParam() == "XMAS-172")
-      throw dealii::ExcInvalidState();
-      // g_maxes = {37, 125, 150, 172};
-      // g_maxes = {12, 20, 26, 37, 80, 125, 150, 172};
-    else if (this->GetParam() == "SHEM-361")
-      // g_maxes = {34, 302, 338, 361};
-      // g_maxes = {12, 18, 24, 34, 85, 302, 338, 361};
-      g_maxes = {
-          2, 4, 5, 7, 8, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 21, 23, 24, 26,
-          26, 27, 29, 31, 34, 36, 36, 38, 39, 41, 42, 44, 45, 47, 48, 49, 51,
-          55, 60, 64, 66, 73, 81, 85, 138, 160, 190, 208, 227, 248, 275, 289,
-          293, 296, 300, 302, 305, 308, 312, 318, 321, 324, 328, 331, 335, 338,
-          343, 347, 349, 352, 361};
+    // SHEM-361 to CASMO-70
+    std::vector<int> g_maxes = {
+        8, 11, 13, 17, 22, 25, 29, 32, 36, 39, 42, 48, 52, 55, 58, 60, 64, 67,
+        71, 85, 112, 133, 152, 170, 200, 222, 275, 279, 287, 294, 296, 300, 305,
+        309, 311, 313, 314, 316, 317, 318, 320, 321, 322, 323, 324, 326, 329,
+        332, 333, 335, 336, 337, 338, 339, 340, 342, 344, 346, 347, 348, 349,
+        350, 351, 352, 353, 354, 356, 357, 358, 360, 361};
     AssertDimension(regions.size(), radii.size()+1);
     std::vector<double> volumes(materials.size());
     std::vector<double> areas(radii.size());  // ring areas
@@ -55,10 +46,10 @@ class CathalauMgxsTest : public CathalauTest,
 };
 
 TEST_P(CathalauMgxsTest, ToCasmo70) {
-  this->CompareMgxs(30, 100, 1e-6, 1000, 1e-6, true);
+  this->CompareMgxs(50, 100, 1e-8, 1000, 1e-8, true);
 }
 
-INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauMgxsTest,
-    ::testing::Values("SHEM-361"));
+INSTANTIATE_TEST_CASE_P(Fuel, CathalauMgxsTest, 
+                        ::testing::Values("uo2", "mox43"));
 
 }  // namespace cathalau

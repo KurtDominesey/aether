@@ -8,8 +8,9 @@ class CathalauCompareTest : public CathalauTest,
                             public ::testing::WithParamInterface<std::string> {
  protected:
   void SetUp() override {
+    group_structure = this->GetParam();
     CathalauTest::SetUp();
-    this->mesh.refine_global(2);
+    this->mesh.refine_global(1);
     dealii::FE_DGQ<dim_> fe(1);
     this->dof_handler.initialize(mesh, fe);
   }  
