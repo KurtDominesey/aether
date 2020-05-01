@@ -220,6 +220,26 @@ void mesh_pincell(dealii::Triangulation<2> &tria,
   tria.set_manifold(2, trans_manifold);
 }
 
+void mesh_symmetric_quarter_pincell(dealii::Triangulation<2> &tria,
+                                    const std::vector<double> &radii,
+                                    const double &pitch,
+                                    const std::vector<int> &materials,
+                                    const int trans_mani_id,
+                                    const int sph_mani_id) {
+  dealii::Triangulation<2> octant_ul;
+  dealii::Triangulation<2> octant_lr;
+  mesh_eighth_pincell(octant_lr, radii, pitch, materials, 
+                      trans_mani_id, sph_mani_id);
+  mesh_eighth_pincell_ul(octant_ul, radii, pitch, materials,
+                         trans_mani_id, sph_mani_id);
+  dealii::GridGenerator::merge_triangulations(
+      octant_ul, octant_lr, tria, 1e-12, true);
+  tria.set_manifold(sph_mani_id, dealii::SphericalManifold<2>());
+  dealii::TransfiniteInterpolationManifold<2> trans_manifold;
+  trans_manifold.initialize(tria);
+  tria.set_manifold(trans_mani_id, trans_manifold);
+}
+
 template <int dim>
 void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh) {
   using Cell = typename dealii::Triangulation<dim>::active_cell_iterator;

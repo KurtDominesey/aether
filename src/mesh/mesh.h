@@ -35,6 +35,13 @@ void mesh_pincell(dealii::Triangulation<2> &tria,
                   const double &pitch,
                   const std::vector<int> &materials);
 
+void mesh_symmetric_quarter_pincell(dealii::Triangulation<2> &tria,
+                                    const std::vector<double> &radii,
+                                    const double &pitch,
+                                    const std::vector<int> &materials,
+                                    const int trans_mani_id = 2,
+                                    const int sph_mani_id = 1);
+
 template <int dim>
 void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh);
 
