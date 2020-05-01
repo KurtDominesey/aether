@@ -18,6 +18,16 @@ FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
         solver(solver) {}
 
 template <class SolverType, int dim, int qdim>
+FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
+      const FixedSource<dim, qdim> &fixed_source, SolverType &solver)
+      : within_groups(fixed_source.within_groups),
+        downscattering(fixed_source.downscattering),
+        upscattering(fixed_source.upscattering),
+        m2d(fixed_source.m2d), 
+        d2m(fixed_source.d2m),
+        solver(solver) {}
+
+template <class SolverType, int dim, int qdim>
 void FixedSourceGS<SolverType, dim, qdim>::vmult(
     dealii::BlockVector<double> &dst, 
     const dealii::BlockVector<double> &src) const {

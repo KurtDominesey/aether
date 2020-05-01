@@ -12,6 +12,8 @@ template <int dim, int qdim> class FixedSourceP;
 
 namespace aether::sn {
 
+template <class SolverType, int dim, int qdim> class FixedSourceGS;
+
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSource {
  public:
@@ -30,6 +32,8 @@ class FixedSource {
   const MomentToDiscrete<qdim> &m2d;
   const DiscreteToMoment<qdim> &d2m;
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
+  template <class SolverType, int dimm, int qdimm>
+  friend class FixedSourceGS;
 };
 
 }  // namespace aether::sn

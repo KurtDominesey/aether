@@ -5,8 +5,9 @@
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/precondition.h>
 
-#include "within_group.h"
-#include "scattering_block.h"
+#include "sn/within_group.h"
+#include "sn/scattering_block.h"
+#include "sn/fixed_source.h"
 
 namespace aether::sn {
 
@@ -34,6 +35,8 @@ class FixedSourceGS {
       const MomentToDiscrete<qdim> &m2d,
       const DiscreteToMoment<qdim> &d2m,
       SolverType &solver);
+
+  FixedSourceGS(const FixedSource<dim, qdim> &fixed_source, SolverType &solver);
 
   /**
    * Apply the Gauss-Seidel linear operator.
