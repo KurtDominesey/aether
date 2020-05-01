@@ -153,13 +153,15 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
                    problem_full.transport, problem.d2m, *mgxs, g_maxes);
     std::cout << "got mgxs coarses\n";
     for (int j = 0; j < num_materials; ++j) {
+      if (j != 2)
+        continue;
       // std::string material = materials[j];
       for (int g_coarse = 0; g_coarse < g_maxes.size(); ++g_coarse) {
-        int gg_coarse = g_maxes.size() - g_coarse;
-        if (gg_coarse < 15 || gg_coarse > 27)
-          continue;
+        // int gg_coarse = g_maxes.size() - g_coarse;
+        // if (g_coarse < 14 || g_coarse > 26)
+        //   continue;
         std::string key = "j" + std::to_string(j) 
-                        + "g" + std::to_string(gg_coarse);
+                        + "g" + std::to_string(g_coarse+1);
         table.add_value(key, std::nan("a"));
         table.add_value(key+"inf", std::nan("b"));
         table.add_value(key+"svd", std::nan("c"));

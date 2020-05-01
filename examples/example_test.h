@@ -44,8 +44,7 @@ class ExampleTest : public ::testing::Test {
   QAngle<qdim> quadrature;
   std::shared_ptr<Mgxs> mgxs;
 
-  void WriteConvergenceTable(dealii::ConvergenceTable &table,
-                             const std::string suffix="") {
+  std::string GetTestName() {
     const ::testing::TestInfo* const test_info =
         ::testing::UnitTest::GetInstance()->current_test_info();
     std::string name = test_info->name();
@@ -54,11 +53,17 @@ class ExampleTest : public ::testing::Test {
     if (this_with_param != nullptr)
       name = std::regex_replace(name, std::regex("/[0-9]+"), 
                                 "/" + this_with_param->GetParam());
-    std::string filename = test_info->test_case_name();
-    filename += name;
+    std::string case_name = test_info->test_case_name();
+    case_name += name;
+    case_name = std::regex_replace(case_name, std::regex("/"), "_");
+    return case_name;
+  }
+
+  void WriteConvergenceTable(dealii::ConvergenceTable &table,
+                             const std::string suffix="") {
+    std::string filename = GetTestName();
     filename += suffix;
     filename += ".txt";
-    filename = std::regex_replace(filename, std::regex("/"), "_");
     std::ofstream out(filename, std::ofstream::out | std::ofstream::trunc);
     table.write_text(out);
     out.close();

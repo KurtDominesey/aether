@@ -46,8 +46,12 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                     const int max_iters, const double tol) {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
-    dealii::SolverControl control(max_iters, tol);
+    // dealii::ReductionControl control_wg(500, 1e-6, 1e-4);
+    // dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+    // FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim, qdim>
+    //     preconditioner(problem.fixed_source, solver_wg);
     dealii::PreconditionIdentity preconditioner;
+    dealii::SolverControl control(max_iters, tol);
     dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
     solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
   }
@@ -416,6 +420,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_mg.modes, 
                        flux_full, problem.transport, problem.d2m, table, 
                        "error_m");
+    GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
+               table, "norm");
     if (num_groups < 800) {
     GetL2Residuals(l2_residuals, fixed_source_p.caches, energy_mg.modes, 
                    source_full, problem.transport, problem.m2d, problem_full,
@@ -423,13 +429,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     GetL2Residuals(l2_residuals_streamed, fixed_source_p.caches, 
                    energy_mg.modes, source_full, problem.transport, problem.m2d,
                    problem_full, true, table, "residual_streamed");
-    GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
-               table, "norm");
-    // dealii::BlockVector<double> uncollided(source_full.get_block_indices());
-    // problem_full.sweep_source(uncollided, source_full);
-    // GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
-    //                    uncollided, problem.transport, problem_full, table, 
-    //                    "residual_swept");
+    dealii::BlockVector<double> uncollided(source_full.get_block_indices());
+    problem_full.sweep_source(uncollided, source_full);
+    GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
+                       uncollided, problem.transport, problem_full, table, 
+                       "residual_swept");
     }
     this->WriteConvergenceTable(table);
   }
