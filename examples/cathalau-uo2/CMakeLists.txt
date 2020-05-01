@@ -29,8 +29,9 @@ target_include_directories(aether PUBLIC "../../src")
 deal_ii_setup_target(aether)
 
 set(test "test.exe")
-add_executable(${test} "test.cc" 
-    "cathalau_test.cc" "mms_test.cc" "compare_test.cc" "mgxs_test.cc")
+add_executable(${test} "test.cc" "cathalau_test.cc" 
+    "mms_test.cc" "compare_test.cc" "mgxs_test.cc" "coarse_test.cc" 
+    "checkerboard_test.cc")
 target_link_libraries(${test} aether)
 
 target_compile_options(${test} PUBLIC ${GTEST_CFLAGS})
