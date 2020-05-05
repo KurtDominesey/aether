@@ -44,9 +44,10 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
 }
 
 void NonlinearGS::enrich() {
+  double last = std::nan("a");
   for (int i = 0; i < linear_ops.size(); ++i) {
     inner_products_x[i].push_back(inner_products_one);
-    linear_ops[i]->enrich();
+    last = linear_ops[i]->enrich(last);
     linear_ops[i]->normalize();
     if (i > 0) {
       linear_ops[i]->get_inner_products(inner_products_x[i], 

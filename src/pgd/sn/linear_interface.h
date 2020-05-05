@@ -26,7 +26,7 @@ class LinearInterface {
                                   const int m_row, const int m_col_start) = 0;
   double virtual get_residual(std::vector<InnerProducts> coefficients_x,
                               std::vector<double> coefficients_b) = 0;
-  void virtual enrich() = 0;
+  double virtual enrich(const double factor) = 0;
   void virtual normalize() = 0;
 };
 

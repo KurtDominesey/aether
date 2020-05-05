@@ -262,7 +262,7 @@ void FixedSourceP<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
 }
 
 template <int dim, int qdim>
-void FixedSourceP<dim, qdim>::enrich() {
+double FixedSourceP<dim, qdim>::enrich(const double factor) {
   const Transport<dim, qdim> &transport =
       dynamic_cast<const Transport<dim, qdim>&>(
           fixed_source.within_groups[0].transport.transport);
@@ -271,6 +271,7 @@ void FixedSourceP<dim, qdim>::enrich() {
                       1,
                       transport.dof_handler.n_dofs());
   caches.back().mode = 1;
+  return caches.back().mode.l2_norm();
 }
 
 template <int dim, int qdim>

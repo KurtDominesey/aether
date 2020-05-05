@@ -57,14 +57,17 @@ double EnergyMgFull::get_residual(
   return residual.l2_norm() / source.l2_norm();
 }
 
-void EnergyMgFull::enrich() {
+double EnergyMgFull::enrich(const double factor) {
   modes.emplace_back(mgxs.total.size());
   modes.back() = 1;
+  modes.back() /= modes.back().l2_norm();
   if (modes.size() > 1) {
-    modes.back() /= modes.back().l2_norm();
     modes.back() *= modes[modes.size()-2].l2_norm();
+  } else {
+    modes.back() *= factor;
   }
   normalize();
+  return modes.back().l2_norm();
 }
 
 void EnergyMgFull::normalize() {

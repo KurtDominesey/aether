@@ -44,7 +44,7 @@ class FixedSourceP : public LinearInterface {
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b,
                           const int m_row, const int m_col_start);
-  void enrich();
+  double enrich(const double factor);
   void normalize();
   double get_residual(std::vector<InnerProducts> coefficients_x,
                       std::vector<double> coefficients_b);
