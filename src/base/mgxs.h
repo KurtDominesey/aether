@@ -31,12 +31,14 @@ struct Mgxs {
 
 Mgxs read_mgxs(const std::string &filename, 
                const std::string &temperature,
-               const std::vector<std::string> &materials);
+               const std::vector<std::string> &materials,
+               const bool read_structure=false);
 
 void read_mgxs(Mgxs &mgxs,
                const std::string &filename, 
                const std::string &temperature,
-               const std::vector<std::string> &materials);
+               const std::vector<std::string> &materials,
+               const bool read_structure=false);
 
 void write_mgxs(const Mgxs& mgxs,
                 const std::string &filename, 

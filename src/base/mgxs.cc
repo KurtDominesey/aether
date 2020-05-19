@@ -5,14 +5,15 @@ namespace aether {
 Mgxs read_mgxs(
     const std::string &filename, 
     const std::string &temperature,
-    const std::vector<std::string> &materials) {
+    const std::vector<std::string> &materials,
+    const bool read_structure) {
   namespace HDF5 = dealii::HDF5;
   HDF5::File file(filename, HDF5::File::FileAccessMode::open);
   const int num_groups =  file.get_attribute<int>("energy_groups");
   const int num_materials = materials.size();
   const int num_legendre = 1;
   Mgxs mgxs(num_groups, num_materials, num_legendre);
-  read_mgxs(mgxs, filename, temperature, materials);
+  read_mgxs(mgxs, filename, temperature, materials, read_structure);
   return mgxs;
 }
 
@@ -20,12 +21,16 @@ void read_mgxs(
     Mgxs &mgxs,
     const std::string &filename, 
     const std::string &temperature,
-    const std::vector<std::string> &materials) {
+    const std::vector<std::string> &materials,
+    const bool read_structure) {
   namespace HDF5 = dealii::HDF5;
   HDF5::File file(filename, HDF5::File::FileAccessMode::open);
   const int num_groups =  file.get_attribute<int>("energy_groups");
   const int num_materials = materials.size();
   const int num_legendre = 1;
+  if (read_structure)
+    mgxs.group_structure =
+        file.open_dataset("group structure").read<std::vector<double>>();
   std::vector<std::vector<double>> total_pivot(
     num_materials, std::vector<double>(num_groups));
   auto chi_pivot = total_pivot;
