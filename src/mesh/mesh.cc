@@ -68,9 +68,10 @@ void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
   for (int i = 1; i < radii.size(); ++i)
     Assert(radii[i-1] < radii[i], dealii::ExcInvalidState());
   // double r0 = radii[0] / (1 + std::sqrt(0.5));
-  double a = dealii::numbers::PI_4 / 2;
-  double r0 = std::sqrt(dealii::numbers::PI * std::sin(a) * std::cos(a)
-                        / 3.0) * radii[0];
+  // double r0 = radii[0] / std::sqrt(3.0);
+  double a = dealii::numbers::PI_4 / 4;
+  double r0 = std::sqrt(dealii::numbers::PI / 
+                        (1.5 * 32 * std::sin(a) * std::cos(a))) * radii[0];
   radii.insert(radii.begin(), r0);
   materials.insert(materials.begin(), materials[0]);
   std::vector<dealii::Point<2>> vertices(3*radii.size()+4);
@@ -88,11 +89,11 @@ void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
     vertices[1+i*3] = dealii::Point<2>(radii[i], 0);
     vertices[2+i*3] = dealii::Point<2>(diag, diag);
     vertices[3+i*3] = dealii::Point<2>(ring_x, ring_y);
-    if (i == 0) {
-      vertices[1+i*3] = dealii::Point<2>(ring_x, 0);
-      vertices[2+i*3] = dealii::Point<2>(ring_x/std::sqrt(2.0),
-                                         ring_x/std::sqrt(2.0));
-    }
+    // if (i == 0) {
+    //   vertices[1+i*3] = dealii::Point<2>(ring_x, 0);
+    //   vertices[2+i*3] = dealii::Point<2>(ring_x/std::sqrt(2.0),
+    //                                      ring_x/std::sqrt(2.0));
+    // }
     cells[1+i*2].vertices[0] = 2 + i * 3;
     cells[1+i*2].vertices[1] = 3 + i * 3;
     cells[1+i*2].vertices[2] = 2 + (i + 1) * 3;
@@ -143,9 +144,10 @@ void mesh_eighth_pincell_ul(dealii::Triangulation<2> &tria,
   // (1 + sqrt(0.5)) r0 = r1
   // r0 = r1 / (1 + sqrt(0.5))
   // double r0 = radii[0] / (1 + std::sqrt(0.5));
-  double a = dealii::numbers::PI_4 / 2;
-  double r0 = std::sqrt(dealii::numbers::PI * std::sin(a) * std::cos(a)
-                        / 3.0) * radii[0];
+  // double r0 = radii[0] / std::sqrt(3.0);
+  double a = dealii::numbers::PI_4 / 4;
+  double r0 = std::sqrt(dealii::numbers::PI /
+                        (1.5 * 32.0 * std::sin(a) * std::cos(a))) * radii[0];
   radii.insert(radii.begin(), r0);
   materials.insert(materials.begin(), materials[0]);
   std::vector<dealii::Point<2>> vertices(3*radii.size()+4);
@@ -163,11 +165,11 @@ void mesh_eighth_pincell_ul(dealii::Triangulation<2> &tria,
     vertices[1+i*3] = dealii::Point<2>(diag, diag);
     vertices[2+i*3] = dealii::Point<2>(0, radii[i]);
     vertices[3+i*3] = dealii::Point<2>(ring_x, ring_y);
-    if (i == 0) {
-      vertices[1+i*3] = dealii::Point<2>(ring_y/std::sqrt(2.0),
-                                         ring_y/std::sqrt(2.0));
-      vertices[2+i*3] = dealii::Point<2>(0, ring_y);
-    }
+    // if (i == 0) {
+    //   vertices[1+i*3] = dealii::Point<2>(ring_y/std::sqrt(2.0),
+    //                                      ring_y/std::sqrt(2.0));
+    //   vertices[2+i*3] = dealii::Point<2>(0, ring_y);
+    // }
     cells[1+i*2].vertices[0] = 2 + i * 3;
     cells[1+i*2].vertices[1] = 3 + i * 3;
     cells[1+i*2].vertices[2] = 2 + (i + 1) * 3;
@@ -209,7 +211,7 @@ void mesh_pincell(dealii::Triangulation<2> &tria,
   const dealii::Point<2> center(pitch/2, pitch/2);
   std::vector<dealii::Triangulation<2>> quadrants(4);
   for (int i = 0; i < 4; ++i) {
-    mesh_quarter_pincell(quadrants[i], radii, pitch, materials);
+    mesh_symmetric_quarter_pincell(quadrants[i], radii, pitch, materials);
     dealii::GridTools::rotate(i*dealii::numbers::PI_2, quadrants[i]);
     dealii::GridTools::shift(center, quadrants[i]);
   }
