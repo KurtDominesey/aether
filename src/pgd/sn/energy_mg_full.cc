@@ -134,11 +134,18 @@ void EnergyMgFull::get_inner_products(
     std::vector<InnerProducts> &inner_products_x,
     std::vector<double> &inner_products_b,
     const int m_row, const int m_col_start) {
+  dealii::Vector<double> mode_row = modes[m_row];
+  for (int g = 0; g < mode_row.size(); ++g) {
+    int g_rev = mode_row.size() - 1 - g;
+    double width = mgxs.group_structure[g+1] - mgxs.group_structure[g];
+    AssertThrow(width > 0, dealii::ExcDivideByZero());
+    mode_row[g_rev] /= width;
+  }
   AssertDimension(sources.size(), inner_products_b.size());
   for (int i = 0; i < sources.size(); ++i) {
     inner_products_b[i] = 0;
     for (int g = 0; g < modes.back().size(); ++g) {
-      inner_products_b[i] += modes[m_row][g] * sources[i][g];
+      inner_products_b[i] += mode_row[g] * sources[i][g];
     }
     std::cout << "e ip b " << inner_products_b[i] << std::endl;
   }
@@ -146,14 +153,14 @@ void EnergyMgFull::get_inner_products(
   for (int m = m_col_start; m < modes.size(); ++m) {
     inner_products_x[m] = 0;
     for (int g = 0; g < modes.back().size(); ++g) {
-      inner_products_x[m].streaming += modes[m_row][g] * modes[m][g];
+      inner_products_x[m].streaming += mode_row[g] * modes[m][g];
       for (int j = 0; j < mgxs.total[g].size(); ++j) {
         inner_products_x[m].collision[j] += 
-            modes[m_row][g] * mgxs.total[g][j] * modes[m][g];
+            mode_row[g] * mgxs.total[g][j] * modes[m][g];
         for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp) {
           for (int ell = 0; ell < 1; ++ell) {
             inner_products_x[m].scattering[j][ell] +=
-                modes[m_row][g] 
+                mode_row[g] 
                 * mgxs.scatter[g][gp][j]
                 * modes[m][gp];
           }
