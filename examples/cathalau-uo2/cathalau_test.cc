@@ -29,14 +29,13 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
     const int num_groups = std::stoi(num_groups_str);
     const std::string filename = 
         "/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/" 
-        + materials[2] + "/" + "mgxs-" + group_structure + ".h5";
-    mgxs = std::make_shared<Mgxs>(num_groups, materials.size(), 1);
-    read_mgxs(*mgxs, filename, "294K", materials);
+        + materials[2] + "/" + "mgxs-" + group_structure + "-a.h5";
+    mgxs = std::make_unique<Mgxs>(num_groups, materials.size(), 1);
+    read_mgxs(*mgxs, filename, "294K", materials, true);
     quadrature = QPglc<qdim_>(4, 4);
     AssertDimension(regions.size(), radii.size()+1);
     mesh_symmetric_quarter_pincell(mesh, radii, pitch, regions);
     set_all_boundaries_reflecting(mesh);
-    mesh.refine_global(0);
   }
 };
 

@@ -4,6 +4,7 @@
 #include "example_test.h"
 
 #include "base/lapack_full_matrix.cc"
+#include "sn/fixed_source_problem.cc"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -40,9 +41,10 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     }
   }
 
+  template <class TransportType>
   void RunFullOrder(dealii::BlockVector<double> &flux,
                     const dealii::BlockVector<double> &source,
-                    const FixedSourceProblem<dim, qdim> &problem,
+                    const FixedSourceProblem<dim, qdim, TransportType> &problem,
                     const int max_iters, const double tol) {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
@@ -90,6 +92,10 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     dealii::Vector<double> diff_l2(diff.size());
     for (int g = 0; g < num_groups; ++g) {
       reference_g = reference.block(g);
+      int g_rev = num_groups - 1 - g;
+      double width =
+          mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+      AssertThrow(width > 0, dealii::ExcInvalidState());
       for (int m = 0; m < l2_errors.size(); ++m) {
         if (m > 0)
           modal[g].add(modes_energy[m-1][g], modes_spaceangle[m-1]);
@@ -97,7 +103,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           diff = modal[g].block(n);
           diff -= reference_g.block(n);
           transport.collide(diff_l2, diff);
-          l2_errors[m] += quadrature.weight(n) * (diff * diff_l2);
+          l2_errors[m] += quadrature.weight(n) * (diff * diff_l2) / width;
         }
       }
     }
@@ -129,6 +135,10 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     for (int g = 0; g < num_groups; ++g) {
       reference_g_d = reference.block(g);
       d2m.vmult(reference_g_m, reference_g_d);
+      int g_rev = num_groups - 1 - g;
+      double width =
+          mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+      AssertThrow(width > 0, dealii::ExcInvalidState());
       for (int m = 0; m < l2_errors.size(); ++m) {
         if (m > 0) {
           mode.equ(modes_energy[m-1][g], modes_spaceangle[m-1]);
@@ -137,7 +147,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         diff = modal[g].block(0);
         diff -= reference_g_m.block(0);
         transport.collide(diff_l2, diff);
-        l2_errors[m] += diff * diff_l2;
+        l2_errors[m] += (diff * diff_l2) / width;
       }
     }
     for (int m = 0; m < l2_errors.size(); ++m) {
@@ -158,7 +168,15 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     const int num_groups = mgxs->total.size();
     dealii::Vector<double> mode_l2(modes_spaceangle[0].block(0).size());
     for (int m = 0; m < l2_norms.size() - 1; ++m) {
-      double l2_energy = modes_energy[m].l2_norm();
+      dealii::Vector<double> summands_energy(modes_energy[m]);
+      for (int g = 0; g < summands_energy.size(); ++g) {
+        int g_rev = num_groups - 1 - g;
+        double width = 
+            mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+        AssertThrow(width > 0, dealii::ExcInvalidState());
+        summands_energy[g] /= std::sqrt(width);
+      }
+      double l2_energy = summands_energy.l2_norm();
       double l2_spaceangle = 0;
       for (int n = 0; n < quadrature.size(); ++n) {
         transport.collide(mode_l2, modes_spaceangle[m].block(n));
@@ -204,6 +222,10 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       // for (int sweep = 0; sweep < 100; ++sweep)
       // problem.sweep_source(swept, residual);
       for (int g = 0; g < num_groups; ++g) {
+        int g_rev = num_groups - 1 - g;
+        double width =
+            mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+        AssertThrow(width > 0, dealii::ExcInvalidState());
         if (!do_stream) {
           residual_g = residual.block(g);
         } else {
@@ -216,11 +238,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           if (!do_stream) {
             transport.collide(residual_l2, residual_g.block(n));
             l2_residuals[m] += (residual_g.block(n) * residual_l2) 
-                              * quadrature.weight(n);
+                              * quadrature.weight(n) / width;
           } else {
             transport.collide(swept_l2, swept_g.block(n));
             l2_residuals[m] += (swept_g.block(n) * swept_l2) 
-                              * quadrature.weight(n);
+                              * quadrature.weight(n) / width;
           }
         }
       }
@@ -288,11 +310,15 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         quadrature.size() * dof_handler.n_dofs());
     for (int m = 0; m < l2_residuals.size(); ++m) {
       for (int g = 0; g < num_groups; ++g) {
+        int g_rev = num_groups - 1 - g;
+        double width =
+            mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+        AssertThrow(width > 0, dealii::ExcInvalidState());
         residual_g = residual.block(g);
         for (int n = 0; n < quadrature.size(); ++n) {
           transport.collide(residual_l2, residual_g.block(n));
           l2_residuals[m] += (residual_g.block(n) * residual_l2)
-                             * quadrature.weight(n);
+                             * quadrature.weight(n) / width;
         }
       }
       l2_residuals[m] = std::sqrt(l2_residuals[m]);
@@ -313,26 +339,67 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
 
   void ComputeSvd(std::vector<dealii::BlockVector<double>> &svecs_spaceangle,
                   std::vector<dealii::Vector<double>> &svecs_energy,
-                  const dealii::BlockVector<double> &flux) {
+                  const dealii::BlockVector<double> &flux,
+                  const Transport<dim, qdim> &transport) {
     AssertDimension(svecs_spaceangle.size(), 0);
     AssertDimension(svecs_energy.size(), 0);
     const int num_groups = flux.n_blocks();
     const int num_qdofs = flux.block(0).size();
     dealii::LAPACKFullMatrix_<double> flux_matrix(num_groups, num_qdofs);
-    for (int g = 0; g < num_groups; ++g)
-      for (int i = 0; i < num_qdofs; ++i)
-        flux_matrix(g, i) = flux.block(g)[i];
+    std::vector<dealii::FullMatrix<double>> masses_cho(
+        dof_handler.get_triangulation().n_active_cells());
+    for (int c = 0; c < masses_cho.size(); ++c)
+      masses_cho[c].cholesky(transport.cell_matrices[c].mass);
+    for (int g = 0; g < num_groups; ++g) {
+      int g_rev = num_groups - 1 - g;
+      double width = mgxs->group_structure[g_rev+1] 
+                     - mgxs->group_structure[g_rev];
+      for (int n = 0; n < quadrature.size(); ++n) {
+        for (int c = 0; c < masses_cho.size(); ++c) {
+          int nc = n * dof_handler.n_dofs() 
+                   + c * dof_handler.get_fe().n_dofs_per_cell();
+          dealii::FullMatrix<double> &mass_cho = masses_cho[c];
+          for (int i = 0; i < mass_cho.m(); ++i) {
+            for (int j = 0; j < mass_cho.n(); ++j) {
+              flux_matrix(g, nc+i) += mass_cho[i][j] * flux.block(g)[nc+j]
+                                      * std::sqrt(quadrature.weight(n))
+                                      / std::sqrt(width);
+            }
+          }
+        }
+      }
+    }
+    // invert masses cholesky
+    for (auto &mass_cho : masses_cho)
+      mass_cho.gauss_jordan();
+    // compute svd and post-process
     flux_matrix.compute_svd();
     const int num_svecs = std::min(num_groups, num_qdofs);
     AssertDimension(num_qdofs, quadrature.size() * dof_handler.n_dofs());
     svecs_spaceangle.resize(num_svecs, 
         dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
-    svecs_energy.resize(num_svecs, dealii::Vector<double>(num_groups));  
+    svecs_energy.resize(num_svecs, dealii::Vector<double>(num_groups));
     for (int s = 0; s < num_svecs; ++s) {
-      for (int i = 0; i < num_qdofs; ++i)
-        svecs_spaceangle[s][i] = flux_matrix.get_svd_vt()(s, i);
-      for (int g = 0; g < num_groups; ++g)
-        svecs_energy[s][g] = flux_matrix.get_svd_u()(g, s);
+      for (int n = 0; n < quadrature.size(); ++n) {
+        for (int c = 0; c < masses_cho.size(); ++c) {
+          int nc = n * dof_handler.n_dofs() 
+                   + c * dof_handler.get_fe().n_dofs_per_cell();
+          dealii::FullMatrix<double> mass_cho_inv = masses_cho[c];
+          for (int i = 0; i < mass_cho_inv.m(); ++i) {
+            for (int j = 0; j < mass_cho_inv.n(); ++j) {
+              svecs_spaceangle[s][nc+i] += mass_cho_inv[i][j] 
+                                           * flux_matrix.get_svd_vt()(s, nc+j)
+                                           / std::sqrt(quadrature.weight(n));
+            }
+          }
+        }
+      }
+      for (int g = 0; g < num_groups; ++g) {
+        int g_rev = num_groups - 1 - g;
+        double width = mgxs->group_structure[g_rev+1] 
+                      - mgxs->group_structure[g_rev];
+        svecs_energy[s][g] = flux_matrix.get_svd_u()(g, s) * std::sqrt(width);
+      }
       svecs_energy[s] *= flux_matrix.singular_value(s);
     }
   }
@@ -370,7 +437,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     // Compute svd of full order
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
-    ComputeSvd(svecs_spaceangle, svecs_energy, flux_full);
+    ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
+               problem_full.transport);
     const int num_svecs = svecs_spaceangle.size();
     // Run pgd model
     Mgxs mgxs_one(1, num_materials, 1);
@@ -423,9 +491,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
                table, "norm");
     if (num_groups < 800) {
+    std::cout << "residuals\n";
     GetL2Residuals(l2_residuals, fixed_source_p.caches, energy_mg.modes, 
                    source_full, problem.transport, problem.m2d, problem_full,
                    false, table, "residual");
+    std::cout << "residuals streamed\n";
     GetL2Residuals(l2_residuals_streamed, fixed_source_p.caches, 
                    energy_mg.modes, source_full, problem.transport, problem.m2d,
                    problem_full, true, table, "residual_streamed");
@@ -438,5 +508,18 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     this->WriteConvergenceTable(table);
   }
 };
+
+// template <int dim, int qdim>
+template void CompareTest<2, 2>::RunFullOrder(
+    dealii::BlockVector<double> &flux,
+    const dealii::BlockVector<double> &source,
+    const FixedSourceProblem<2, 2, pgd::sn::Transport<2, 2>> &problem,
+    const int max_iters, const double tol);
+// template <int dim, int qdim>
+template void CompareTest<2, 2>::RunFullOrder(
+    dealii::BlockVector<double> &flux,
+    const dealii::BlockVector<double> &source,
+    const FixedSourceProblem<2, 2, Transport<2, 2>> &problem,
+    const int max_iters, const double tol);
 
 #endif  // AETHER_EXAMPLES_COMPARE_TEST_H_

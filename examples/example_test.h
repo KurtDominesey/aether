@@ -42,17 +42,27 @@ class ExampleTest : public ::testing::Test {
   dealii::Triangulation<dim> mesh;
   dealii::DoFHandler<dim> dof_handler;
   QAngle<qdim> quadrature;
-  std::shared_ptr<Mgxs> mgxs;
+  std::unique_ptr<Mgxs> mgxs;
 
   std::string GetTestName() {
     const ::testing::TestInfo* const test_info =
         ::testing::UnitTest::GetInstance()->current_test_info();
+    std::string param = "";
     std::string name = test_info->name();
     auto this_with_param = 
       dynamic_cast<::testing::WithParamInterface<std::string>*>(this);
     if (this_with_param != nullptr)
-      name = std::regex_replace(name, std::regex("/[0-9]+"), 
-                                "/" + this_with_param->GetParam());
+      param = this_with_param->GetParam();
+    else {  // TODO: generalize this
+      auto this_with_params =
+          dynamic_cast<::testing::WithParamInterface<
+            std::tuple<std::string, std::string>>*>(this);
+      if (this_with_params != nullptr)
+        param = std::get<0>(this_with_params->GetParam())
+                + "/" + std::get<1>(this_with_params->GetParam());
+    }
+    if (!param.empty())
+      name = std::regex_replace(name, std::regex("/[0-9]+"), "/" + param);
     std::string case_name = test_info->test_case_name();
     case_name += name;
     case_name = std::regex_replace(case_name, std::regex("/"), "_");

@@ -5,10 +5,12 @@ namespace cathalau {
 
 class CathalauCompareTest : public CathalauTest, 
                             public CompareTest<dim_, qdim_>,
-                            public ::testing::WithParamInterface<std::string> {
+                            public ::testing::WithParamInterface<
+                                std::tuple<std::string, std::string>> {
  protected:
   void SetUp() override {
-    group_structure = this->GetParam();
+    materials[2] = std::get<0>(this->GetParam());
+    group_structure = std::get<1>(this->GetParam());
     CathalauTest::SetUp();
     this->mesh.refine_global(1);
     dealii::FE_DGQ<dim_> fe(1);
@@ -17,18 +19,22 @@ class CathalauCompareTest : public CathalauTest,
 };
 
 TEST_P(CathalauCompareTest, Progressive) {
-  this->Compare(30, 50, 1e-6, 1000, 1e-6, false);
+  this->Compare(50, 50, 1e-8, 1000, 1e-8, false);
 }
 
 TEST_P(CathalauCompareTest, WithUpdate) {
-  this->Compare(30, 50, 1e-6, 1000, 1e-6, true);
+  this->Compare(50, 50, 1e-8, 1000, 1e-8, true);
 }
 
-INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest, 
-    ::testing::Values("CASMO-8", "CASMO-16", "CASMO-25", "CASMO-40", "CASMO-70", 
-                      "XMAS-172", "SHEM-361"
+INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest,
+    ::testing::Combine(
+    ::testing::Values("uo2", "mox43"),
+    ::testing::Values(//"CASMO-8", "CASMO-16", "CASMO-25", "CASMO-40", 
+                      "CASMO-70", "XMAS-172", "SHEM-361"
                       // ,"CCFE-709", "UKAEA-1102"
-                      ));
+                      )
+    )
+);
 
 // INSTANTIATE_TEST_CASE_P(CasmoStructure, CathalauCompareTest, 
 //     ::testing::Values("CASMO-8", "CASMO-16", "CASMO-25", "CASMO-40", "CASMO-70")

@@ -59,7 +59,8 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     // Compute svd
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
-    this->ComputeSvd(svecs_spaceangle, svecs_energy, flux_full);
+    this->ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
+                     problem_full.transport);
     const int num_svecs = svecs_spaceangle.size();
     // Run infinite medium
     AssertDimension(sources_energy.size(), 1);
@@ -93,6 +94,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     // this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
     //              do_update);
     // pgd main loop
+    dealii::Vector<double> spectrum_one;
     std::vector<dealii::BlockVector<double>> modes_spaceangle;
     std::vector<Mgxs> mgxs_coarses;
     dealii::BlockVector<double> _;
@@ -108,6 +110,8 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
         // if (m > 0)
         nonlinear_gs.update();
       }
+      if (m == 0)
+        spectrum_one = energy_mg.modes.front();
       // post-process
       modes_spaceangle.emplace_back(quadrature.size(), dof_handler.n_dofs());
       modes_spaceangle.back() = fixed_source_p.caches.back().mode.block(0);
@@ -127,13 +131,17 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     }
     for (int g = 0; g < num_groups; ++g) {
       table_spectrum.add_value("inf", spectrum[g]);
+      table_spectrum.add_value("mode1u", energy_mg.modes.front()[g]);
+      table_spectrum.add_value("mode1p", spectrum_one[g]);
     }
-    table_spectrum.set_scientific("inf", true);
-    table_spectrum.set_precision("inf", 16);
+    for (const std::string key : {"inf", "mode1u", "mode1p"}) {
+      table_spectrum.set_scientific(key, true);
+      table_spectrum.set_precision(key, 16);
+    }
     this->WriteConvergenceTable(table_spectrum, "_spectrum");
     // Post-process
     // std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
-    //     dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
+    //     dealii::BlockVector<double>(quadr.ature.size(), dof_handler.n_dofs()));
     // for (int m = 0; m < num_modes; ++m)
     //   modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
     dealii::ConvergenceTable table;

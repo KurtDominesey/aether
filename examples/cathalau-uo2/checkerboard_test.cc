@@ -5,6 +5,7 @@
 
 #include "cathalau_test.cc"
 #include "../coarse_test.h"
+#include "../compare_test.h"
 
 namespace cathalau {
 
@@ -29,12 +30,12 @@ class CheckerboardTest : public CathalauTest,
     Mgxs mgxs_uo2(num_groups, materials_uo2.size(), num_legendre);
     Mgxs mgxs_mox(num_groups, materials_mox.size(), num_legendre);
     const std::string dir = "/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/";
-    const std::string suffix = "/mgxs-" + group_structure + ".h5";
-    read_mgxs(mgxs_uo2, dir+"uo2"+suffix, "294K", materials_uo2);
-    read_mgxs(mgxs_mox, dir+"mox43"+suffix, "294K", materials_mox);
+    const std::string suffix = "/mgxs-" + group_structure + "-a.h5";
+    read_mgxs(mgxs_uo2, dir+"uo2"+suffix, "294K", materials_uo2, true);
+    read_mgxs(mgxs_mox, dir+"mox43"+suffix, "294K", materials_mox, true);
     materials.insert(
         materials.end(), materials_mox.begin(), materials_mox.end());
-    mgxs = std::make_shared<Mgxs>(num_groups, materials.size(), num_legendre);
+    mgxs = std::make_unique<Mgxs>(num_groups, materials.size(), num_legendre);
     for (int g = 0; g < num_groups; ++g) {
       for (int j = 0; j < materials_uo2.size(); ++j) {
         mgxs->total[g][j] = mgxs_uo2.total[g][j];
@@ -50,6 +51,8 @@ class CheckerboardTest : public CathalauTest,
           mgxs->scatter[g][gp][jj] = mgxs_mox.scatter[g][gp][j];
       }
     }
+    for (int g = 0; g < mgxs->group_structure.size(); ++g)
+      mgxs->group_structure[g] = mgxs_uo2.group_structure[g];
     quadrature = QPglc<qdim_>(4, 4);
     AssertDimension(regions.size(), radii.size()+1);
     const int mani_id_trans = 1;
@@ -103,12 +106,12 @@ class CheckerboardTest : public CathalauTest,
     std::cout << "Combine mgxs's\n";
     // Mgxs mgxs_uo2(num_groups_coarse, materials_uo2.size(), num_legendre);
     // Mgxs mgxs_mox(num_groups_coarse, materials_mox.size(), num_legendre);
-    // const std::string base = "Fuel_CathalauCoarseTestUniformFissionSource_";
-    const std::string suffix = "_mgxs_gold.h5";
+    const std::string base = "Fuel_CathalauCoarseTestUniformFissionSource_";
+    const std::string suffix = "_mgxs-gold.h5";
     // read_mgxs(mgxs_uo2, base+"uo2"+suffix, "294K", materials_uo2);
     // read_mgxs(mgxs_mox, base+"mox43"+suffix, "294K", materials_mox);
-    const Mgxs mgxs_uo2 = read_mgxs("uo2"+suffix, "294K", materials_uo2);
-    const Mgxs mgxs_mox = read_mgxs("mox43"+suffix, "294K", materials_mox);
+    const Mgxs mgxs_uo2 = read_mgxs(base+"uo2"+suffix, "294K", materials_uo2);
+    const Mgxs mgxs_mox = read_mgxs(base+"mox43"+suffix, "294K", materials_mox);
     Mgxs mgxs_coarse(num_groups_coarse, materials.size(), num_legendre);
     bool nonzero = false;
     for (int g = 0; g < num_groups_coarse; ++g) {
@@ -142,53 +145,62 @@ class CheckerboardTest : public CathalauTest,
     std::cout << CoarseTest<dim_, qdim_>::source_coarse.size() << std::endl;
     std::vector<std::vector<dealii::BlockVector<double>>>
         boundary_conditions_coarse(num_groups_coarse);
-    FixedSourceProblem<dim_, qdim_> problem_coarse(
+    using TransportType = pgd::sn::Transport<dim_, qdim_>;
+    FixedSourceProblem<dim_, qdim_, TransportType> problem_coarse(
           dof_handler, quadrature, mgxs_coarse, boundary_conditions_coarse);
     this->RunFullOrder(flux_coarse, CoarseTest<dim_, qdim_>::source_coarse, problem_coarse,
                        max_iters_fullorder, tol_fullorder);
     // Post-process
     std::cout << "Post-process\n";
-    pgd::sn::Transport<dim_, qdim_> transport(dof_handler, quadrature);
-    DiscreteToMoment<qdim_> d2m(quadrature);
+    TransportType &transport = problem_coarse.transport;
+    std::cout << "d2m\n";
+    // DiscreteToMoment<qdim_> d2m(quadrature);
+    DiscreteToMoment<qdim_> &d2m = problem_coarse.d2m;
     std::vector<double> l2_errors_coarse_sep_d_rel;
     std::vector<double> l2_errors_coarse_sep_m_rel;
     std::vector<double> l2_errors_coarse_sep_d_abs;
     std::vector<double> l2_errors_coarse_sep_m_abs;
+    std::cout << "coarse_sep_d_abs\n";
     GetL2ErrorsCoarseDiscrete(l2_errors_coarse_sep_d_abs, flux_coarse, 
                               flux_coarsened, transport, false, table, 
                               "coarse_sep_d_abs");
+    std::cout << "coarse_sep_m_abs\n";
     GetL2ErrorsCoarseMoments(l2_errors_coarse_sep_m_abs, flux_coarse, 
                              flux_coarsened, transport, d2m, false, table, 
                              "coarse_sep_m_abs");
+    std::cout << "coarse_sep_d_rel\n";
     GetL2ErrorsCoarseDiscrete(l2_errors_coarse_sep_d_rel, flux_coarse, 
                               flux_coarsened, transport, true, table, 
                               "coarse_sep_d_rel");
+    std::cout << "coarse_sep_m_rel\n";
     GetL2ErrorsCoarseMoments(l2_errors_coarse_sep_m_rel, flux_coarse, 
                              flux_coarsened, transport, d2m, true, table,
                              "coarse_sep_m_rel");
-    for (int g = 0; g < num_groups_coarse; ++g) {
-      table.add_value("flux_coarse_sep", flux_coarse.block(g).l2_norm());
-      // table.add_value("flux_coarsened_2", flux_coarsened.block(g).l2_norm());
-      // table.add_value("source_coarse_2", source_coarse.block(g).l2_norm());
-    }
-    for (std::string key : 
-        {"flux_coarse_sep"/*, "flux_coarsened_2", "source_coarse_2"*/}) {
-      table.set_scientific(key, true);
-      table.set_precision(key, 16);
-    }
+    // for (int g = 0; g < num_groups_coarse; ++g) {
+    //   table.add_value("flux_coarse_sep", flux_coarse.block(g).l2_norm());
+    //   // table.add_value("flux_coarsened_2", flux_coarsened.block(g).l2_norm());
+    //   // table.add_value("source_coarse_2", source_coarse.block(g).l2_norm());
+    // }
+    // for (std::string key : 
+    //     {"flux_coarse_sep"/*, "flux_coarsened_2", "source_coarse_2"*/}) {
+    //   table.set_scientific(key, true);
+    //   table.set_precision(key, 16);
+    // }
+    std::cout << "printing table to file\n";
     this->WriteConvergenceTable(table);
+    std::cout << "printed\n";
   }
 };
 
 TEST_F(CheckerboardTest, UniformFissionSource) {
   // SHEM-361 to CASMO-70
   const std::vector<int> g_maxes = {
-      8, 11, 13, 17, 22, 25, 29, 32, 36, 39, 42, 48, 52, 55, 58, 60, 64, 67, 71,
-      85, 112, 133, 152, 170, 200, 222, 275, 279, 287, 294, 296, 300, 305, 309,
-      311, 313, 314, 316, 317, 318, 320, 321, 322, 323, 324, 326, 329, 332, 333,
-      335, 336, 337, 338, 339, 340, 342, 344, 346, 347, 348, 349, 350, 351, 352,
-      353, 354, 356, 357, 358, 360, 361};
-  this->CompareCoarse(1, 50, 1e-6, true, 1000, 1e-6, g_maxes, this->materials);
+      9, 12, 14, 18, 23, 26, 30, 33, 37, 40, 43, 49, 53, 56, 59, 61, 65, 68,
+      72, 86, 113, 134, 153, 171, 201, 223, 276, 280, 288, 295, 297, 301, 306,
+      310, 312, 314, 315, 317, 318, 319, 321, 322, 323, 324, 325, 327, 330,
+      333, 334, 336, 337, 338, 339, 340, 341, 343, 345, 347, 348, 349, 350,
+      351, 352, 353, 354, 355, 357, 358, 359, 361};
+  this->CompareCoarse(50, 50, 1e-8, true, 1000, 1e-8, g_maxes, this->materials);
 }
 
 }
