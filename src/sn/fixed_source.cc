@@ -7,8 +7,8 @@ FixedSource<dim, qdim>::FixedSource(
     std::vector<WithinGroup<dim, qdim>> &within_groups,
     std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
     std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
-    MomentToDiscrete<qdim> &m2d, 
-    DiscreteToMoment<qdim> &d2m)
+    MomentToDiscrete<dim, qdim> &m2d, 
+    DiscreteToMoment<dim, qdim> &d2m)
     : within_groups(within_groups),
       downscattering(downscattering),
       upscattering(upscattering),

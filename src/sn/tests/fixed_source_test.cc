@@ -33,7 +33,7 @@ class FixedSourceAbstractTest : public ::testing::Test {
   static const int qdim = 1;
   dealii::Triangulation<1> mesh;
   dealii::DoFHandler<dim> dof_handler;
-  dealii::Quadrature<qdim> quadrature;
+  QAngle<dim, qdim> quadrature;
   std::vector<std::vector<dealii::BlockVector<double>>> boundary_conditions;
 };
 
@@ -64,8 +64,8 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicPureScattering) {
   const int num_groups = 2;
   const int num_ords = this->quadrature.size();
   const int num_dofs = this->dof_handler.n_dofs();
-  MomentToDiscrete<qdim> m2d(this->quadrature);
-  DiscreteToMoment<qdim> d2m(this->quadrature);
+  MomentToDiscrete<dim, qdim> m2d(this->quadrature);
+  DiscreteToMoment<dim, qdim> d2m(this->quadrature);
   std::vector<WithinGroup<dim, qdim>> within_groups;
   std::vector<std::vector<ScatteringBlock<dim>>> downscattering(num_groups);
   std::vector<std::vector<ScatteringBlock<dim>>> upscattering(num_groups);
@@ -125,8 +125,8 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
   const int num_groups = 2;
   const int num_ords = this->quadrature.size();
   const int num_dofs = this->dof_handler.n_dofs();
-  MomentToDiscrete<qdim> m2d(this->quadrature);
-  DiscreteToMoment<qdim> d2m(this->quadrature);
+  MomentToDiscrete<dim, qdim> m2d(this->quadrature);
+  DiscreteToMoment<dim, qdim> d2m(this->quadrature);
   std::vector<WithinGroup<dim, qdim>> within_groups;
   std::vector<std::vector<ScatteringBlock<dim>>> downscattering(num_groups);
   std::vector<std::vector<ScatteringBlock<dim>>> upscattering(num_groups);
@@ -182,8 +182,8 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicInfiniteMedium) {
   const int num_groups = 2;
   const int num_ords = this->quadrature.size();
   const int num_dofs = this->dof_handler.n_dofs();
-  MomentToDiscrete<qdim> m2d(this->quadrature);
-  DiscreteToMoment<qdim> d2m(this->quadrature);
+  MomentToDiscrete<dim, qdim> m2d(this->quadrature);
+  DiscreteToMoment<dim, qdim> d2m(this->quadrature);
   std::vector<WithinGroup<dim, qdim>> within_groups;
   std::vector<std::vector<ScatteringBlock<dim>>> downscattering(num_groups);
   std::vector<std::vector<ScatteringBlock<dim>>> upscattering(num_groups);

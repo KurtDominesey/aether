@@ -98,7 +98,7 @@ class FixedSourcePTest : public ::testing::Test {
 
   const double length = 2;
   dealii::Triangulation<dim> mesh;
-  dealii::Quadrature<qdim> quadrature;
+  QAngle<dim, qdim> quadrature;
   dealii::DoFHandler<dim> dof_handler;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> flux;

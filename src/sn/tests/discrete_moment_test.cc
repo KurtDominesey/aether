@@ -9,11 +9,13 @@ namespace aether::sn {
 namespace {
 
 TEST(DiscreteMomentTest, IsotropicD2M) {
+  const int dim = 2;
   const int qdim = 2;
   int num_ords_qdim = 4;
   int num_ords = std::pow(num_ords_qdim, qdim);
-  dealii::QGauss<qdim> quadrature(num_ords_qdim);
-  DiscreteToMoment<qdim> d2m(quadrature);
+  dealii::QGauss<qdim> q_gauss(num_ords_qdim);
+  QAngle<dim, qdim> quadrature(q_gauss);
+  DiscreteToMoment<dim, qdim> d2m(quadrature);
   int num_dofs = 16;
   dealii::BlockVector<double> discrete(num_ords, num_dofs);
   dealii::BlockVector<double> zeroth(1, num_dofs);
@@ -26,11 +28,13 @@ TEST(DiscreteMomentTest, IsotropicD2M) {
 }
 
 TEST(DiscreteMomentTest, IsotropicM2D) {
+  const int dim = 2;
   const int qdim = 2;
   int num_ords_qdim = 4;
   int num_ords = std::pow(num_ords_qdim, qdim);
-  dealii::QGauss<qdim> quadrature(num_ords_qdim);
-  MomentToDiscrete<qdim> m2d(quadrature);
+  dealii::QGauss<qdim> q_gauss(num_ords_qdim);
+  QAngle<dim, qdim> quadrature(q_gauss);
+  MomentToDiscrete<dim, qdim> m2d(quadrature);
   int num_dofs = 16;
   dealii::BlockVector<double> zeroth(1, num_dofs);
   dealii::BlockVector<double> discrete(num_ords, num_dofs);

@@ -32,8 +32,8 @@ class FixedSourceGS {
       const std::vector<WithinGroup<dim, qdim>> &within_groups,
       const std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
       const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
-      const MomentToDiscrete<qdim> &m2d,
-      const DiscreteToMoment<qdim> &d2m,
+      const MomentToDiscrete<dim, qdim> &m2d,
+      const DiscreteToMoment<dim, qdim> &d2m,
       SolverType &solver);
 
   FixedSourceGS(const FixedSource<dim, qdim> &fixed_source, SolverType &solver);
@@ -64,9 +64,9 @@ class FixedSourceGS {
   //! Upscattering (upper triangle) operators.
   const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering;
   //! Moment to discrete operator.
-  const MomentToDiscrete<qdim> &m2d;
+  const MomentToDiscrete<dim, qdim> &m2d;
   //! Discrete to moment operator.
-  const DiscreteToMoment<qdim> &d2m;
+  const DiscreteToMoment<dim, qdim> &d2m;
   //! Solver to invert the within group operators.
   SolverType &solver;
 };

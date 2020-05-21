@@ -9,6 +9,7 @@
 #include "sn/discrete_to_moment.h"
 #include "sn/moment_to_discrete.h"
 #include "sn/fixed_source.h"
+#include "sn/quadrature.h"
 
 namespace aether::sn {
 
@@ -18,7 +19,7 @@ template <int dim, int qdim = dim == 1 ? 1 : 2,
 class FixedSourceProblem {
  public:
   FixedSourceProblem(const dealii::DoFHandler<dim> &dof_handler,
-                     const dealii::Quadrature<qdim> &quadrature, 
+                     const QAngle<dim, qdim> &quadrature, 
                      const Mgxs &mgxs,
                      const std::vector<std::vector<dealii::BlockVector<double>>>
                          &boundary_conditions);
@@ -26,8 +27,8 @@ class FixedSourceProblem {
                     const dealii::BlockVector<double> &src) const;
   FixedSource<dim, qdim> fixed_source;
   TransportType transport;
-  DiscreteToMoment<qdim> d2m;
-  MomentToDiscrete<qdim> m2d;
+  DiscreteToMoment<dim, qdim> d2m;
+  MomentToDiscrete<dim, qdim> m2d;
 
  protected:
   Scattering<dim> scattering;
@@ -40,7 +41,7 @@ template <int dim, int qdim, class TransportType, class TransportBlockType>
 FixedSourceProblem<dim, qdim, TransportType, TransportBlockType>::
     FixedSourceProblem(
         const dealii::DoFHandler<dim> &dof_handler,
-        const dealii::Quadrature<qdim> &quadrature, const Mgxs &mgxs,
+        const QAngle<dim, qdim> &quadrature, const Mgxs &mgxs,
         const std::vector<std::vector<dealii::BlockVector<double>>>
             &boundary_conditions)
     : transport(dof_handler, quadrature),

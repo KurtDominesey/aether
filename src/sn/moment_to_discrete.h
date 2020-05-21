@@ -4,12 +4,14 @@
 #include <deal.II/base/quadrature.h>
 #include <deal.II/lac/block_vector.h>
 
+#include "sn/quadrature.h"
+
 namespace aether::sn {
 
-template <int qdim>
+template <int dim, int qdim = dim == 1 ? 1 : 2>
 class MomentToDiscrete {
  public:
-  MomentToDiscrete(const dealii::Quadrature<qdim> &quadrature);
+  MomentToDiscrete(const QAngle<dim, qdim> &quadrature);
   void vmult(dealii::Vector<double> &dst, 
              const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst, 
@@ -20,7 +22,7 @@ class MomentToDiscrete {
                  const dealii::BlockVector<double> &src) const;
 
  protected:
-  const dealii::Quadrature<qdim> &quadrature;
+  const QAngle<dim, qdim> &quadrature;
 };
 
 }  // namespace aether::sn

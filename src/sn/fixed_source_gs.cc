@@ -7,8 +7,8 @@ FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
       const std::vector<WithinGroup<dim, qdim>> &within_groups,
       const std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
       const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
-      const MomentToDiscrete<qdim> &m2d,
-      const DiscreteToMoment<qdim> &d2m,
+      const MomentToDiscrete<dim, qdim> &m2d,
+      const DiscreteToMoment<dim, qdim> &d2m,
       SolverType &solver)
       : within_groups(within_groups),
         downscattering(downscattering),

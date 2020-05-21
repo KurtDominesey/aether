@@ -20,8 +20,8 @@ class FixedSource {
   FixedSource(std::vector<WithinGroup<dim, qdim>> &within_groups,
               std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
               std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
-              MomentToDiscrete<qdim> &m2d,
-              DiscreteToMoment<qdim> &d2m);
+              MomentToDiscrete<dim, qdim> &m2d,
+              DiscreteToMoment<dim, qdim> &d2m);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   
@@ -29,8 +29,8 @@ class FixedSource {
   const std::vector<WithinGroup<dim, qdim>> &within_groups;
   const std::vector<std::vector<ScatteringBlock<dim>>> &downscattering;
   const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering;
-  const MomentToDiscrete<qdim> &m2d;
-  const DiscreteToMoment<qdim> &d2m;
+  const MomentToDiscrete<dim, qdim> &m2d;
+  const DiscreteToMoment<dim, qdim> &d2m;
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
   template <class SolverType, int dimm, int qdimm>
   friend class FixedSourceGS;

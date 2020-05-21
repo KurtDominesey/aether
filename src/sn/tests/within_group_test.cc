@@ -39,7 +39,7 @@ class WithinGroupTest : public ::testing::Test {
 
   dealii::Triangulation<dim> mesh;
   dealii::DoFHandler<dim> dof_handler;
-  dealii::Quadrature<qdim> quadrature;
+  QAngle<dim, qdim> quadrature;
   std::vector<dealii::BlockVector<double>> boundary_conditions;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> uncollided;
@@ -69,8 +69,8 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
                                             this->boundary_conditions);
   Scattering<dim> scattering(this->dof_handler);
   ScatteringBlock<dim> scattering_block(scattering, cross_sections_scattering);
-  MomentToDiscrete<qdim> m2d(this->quadrature);
-  DiscreteToMoment<qdim> d2m(this->quadrature);
+  MomentToDiscrete<dim, qdim> m2d(this->quadrature);
+  DiscreteToMoment<dim, qdim> d2m(this->quadrature);
   WithinGroup<dim, qdim> within_group(
       transport_block, m2d, scattering_block, d2m);
   this->source = 0;
@@ -114,8 +114,8 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScatteringReflected) {
                                             this->boundary_conditions);
   Scattering<dim> scattering(this->dof_handler);
   ScatteringBlock<dim> scattering_block(scattering, cross_sections_scattering);
-  MomentToDiscrete<qdim> m2d(this->quadrature);
-  DiscreteToMoment<qdim> d2m(this->quadrature);
+  MomentToDiscrete<dim, qdim> m2d(this->quadrature);
+  DiscreteToMoment<dim, qdim> d2m(this->quadrature);
   WithinGroup<dim, qdim> within_group(
       transport_block, m2d, scattering_block, d2m);
   within_group.transport.vmult(this->uncollided, this->source, false);
@@ -159,8 +159,8 @@ TYPED_TEST(WithinGroupTest, IsotropicInfiniteMedium) {
                                             this->boundary_conditions);
   Scattering<dim> scattering(this->dof_handler);
   ScatteringBlock<dim> scattering_block(scattering, cross_sections_scattering);
-  MomentToDiscrete<qdim> m2d(this->quadrature);
-  DiscreteToMoment<qdim> d2m(this->quadrature);
+  MomentToDiscrete<dim, qdim> m2d(this->quadrature);
+  DiscreteToMoment<dim, qdim> d2m(this->quadrature);
   WithinGroup<dim, qdim> within_group(
       transport_block, m2d, scattering_block, d2m);
   within_group.transport.vmult(this->uncollided, this->source, false);

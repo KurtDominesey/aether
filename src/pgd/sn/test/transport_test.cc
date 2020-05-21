@@ -31,7 +31,7 @@ class PgdTransport1DTest : public ::testing::TestWithParam<int> {
   }
 
   dealii::Triangulation<dim> mesh;
-  dealii::Quadrature<qdim> quadrature;
+  aether::sn::QAngle<dim, qdim> quadrature;
   dealii::DoFHandler<dim> dof_handler;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> flux;

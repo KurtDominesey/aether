@@ -4,18 +4,18 @@ namespace aether::sn {
 
 template <int dim, int qdim>
 WithinGroup<dim, qdim>::WithinGroup(const TransportBlock<dim, qdim> &transport,
-                                    const MomentToDiscrete<qdim> &m2d,
+                                    const MomentToDiscrete<dim, qdim> &m2d,
                                     const ScatteringBlock<dim> &scattering,
-                                    const DiscreteToMoment<qdim> &d2m)
+                                    const DiscreteToMoment<dim, qdim> &d2m)
     : transport(transport), m2d(m2d), 
       scattering(scattering), d2m(d2m) {}
 
 template <int dim, int qdim>
 WithinGroup<dim, qdim>::WithinGroup(
     const std::shared_ptr<TransportBlock<dim, qdim>> &transport_shared,
-    const MomentToDiscrete<qdim> &m2d, 
+    const MomentToDiscrete<dim, qdim> &m2d, 
     const std::shared_ptr<ScatteringBlock<dim>> &scattering_shared,
-    const DiscreteToMoment<qdim> &d2m)
+    const DiscreteToMoment<dim, qdim> &d2m)
     : transport(*transport_shared.get()), 
       m2d(m2d), 
       scattering(*scattering_shared.get()), 
