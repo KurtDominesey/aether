@@ -53,26 +53,31 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     // TransportType transport = problem_full.transport.transport;
     CompareTest<dim, qdim>::RunFullOrder(flux_full, source_full, problem_full, 
                        max_iters_fullorder, tol_fullorder);
-    dealii::BlockVector<double> flux_full_iso(num_groups, dof_handler.n_dofs());
-    for (int g = 0; g < num_groups; ++g)
-      problem_full.d2m.vmult(flux_full_iso.block(g), flux_full.block(g));
-    // Mgxs mgxs_coarse = collapse_mgxs(
-    //       flux_full_iso, dof_handler, problem_full.transport, *mgxs, g_maxes);
+    dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
+    dealii::BlockVector<double> flux_full_l1(num_groups, 2*dof_handler.n_dofs());
+    for (int g = 0; g < num_groups; ++g) {
+      problem_full.d2m.vmult(flux_full_l0.block(g), flux_full.block(g));
+      problem_full.d2m.discrete_to_legendre(flux_full_l1.block(g), 
+                                            flux_full.block(g));
+    }
     std::cout << "collapsing spectra\n";
-    std::vector<dealii::Vector<double>> spectra;
-    collapse_spectra(spectra, flux_full_iso, dof_handler, 
+    std::vector<dealii::BlockVector<double>> spectra;
+    collapse_spectra(spectra, flux_full_l0, dof_handler, 
                      problem_full.transport);
     Mgxs mgxs_coarse = collapse_mgxs(spectra, *mgxs, g_maxes);
     const std::string test_name = this->GetTestName();
     const std::string filename = test_name + "_mgxs.h5";
     write_mgxs(mgxs_coarse, filename, "294K", materials);
+    Mgxs mgxs_coarse_ip = collapse_mgxs(
+        flux_full_l1, dof_handler, problem_full.transport, *mgxs, g_maxes,
+        INCONSISTENT_P);
+    write_mgxs(mgxs_coarse_ip, test_name+"_ip_mgxs.h5", "294K", materials);
     std::cout << "MGXS TO FILE " << filename << std::endl;
     // Get coarsened quantities
     const int num_groups_coarse = g_maxes.size();
-    dealii::BlockVector<double> flux_coarse(
-        num_groups_coarse, quadrature.size() * dof_handler.n_dofs());
-    source_coarse.reinit(flux_coarse.get_block_indices());
-    flux_coarsened.reinit(flux_coarse.get_block_indices());
+    flux_coarsened.reinit(
+        num_groups_coarse, quadrature.size()*dof_handler.n_dofs());
+    source_coarse.reinit(flux_coarsened.get_block_indices());
     for (int g_coarse = 0; g_coarse < num_groups_coarse; ++g_coarse) {
       int g_min = g_coarse == 0 ? 0 : g_maxes[g_coarse-1];
       int g_max = g_maxes[g_coarse];
@@ -83,7 +88,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     }
     // ERASE FULL-ORDER FINE-GROUP FLUX TO SAVE MEMORY
     flux_full.reinit(0);
-    flux_full_iso.reinit(0);
+    flux_full_l0.reinit(0);
+    flux_full_l1.reinit(0);
     // Run pgd model
     Mgxs mgxs_one(1, num_materials, 1);
     Mgxs mgxs_pseudo(1, num_materials, 1);
@@ -108,6 +114,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     const int incr = 10;
     std::vector<dealii::BlockVector<double>> modes_spaceangle;
     std::vector<Mgxs> mgxs_coarses;
+    std::vector<Mgxs> mgxs_coarses_ip;
     dealii::BlockVector<double> _;
     for (int m = 0; m < num_modes; ++m) {
       nonlinear_gs.enrich();
@@ -123,16 +130,22 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       // post-process
       modes_spaceangle.emplace_back(quadrature.size(), dof_handler.n_dofs());
       modes_spaceangle.back() = fixed_source_p.caches.back().mode.block(0);
-      if (m+1 == m_coarses[mgxs_coarses.size()])
+      if (m+1 == m_coarses[mgxs_coarses.size()]) {
         mgxs_coarses.push_back(
             GetMgxsCoarse(modes_spaceangle, energy_mg.modes, 
-                          problem_full.transport, problem.d2m, *mgxs, g_maxes));
+                          problem_full.transport, problem.d2m, *mgxs, g_maxes, 
+                          0, CONSISTENT_P));
+        mgxs_coarses_ip.push_back(
+            GetMgxsCoarse(modes_spaceangle, energy_mg.modes,
+                          problem_full.transport, problem.d2m, *mgxs, g_maxes,
+                          1, INCONSISTENT_P));
+      }
     }
     modes_spaceangle.clear();
     std::cout << "done running pgd\n";
     std::vector<dealii::BlockVector<double>> fluxes_coarsened_pgd;
     dealii::BlockVector<double> flux_coarsened_pgd(
-        flux_coarse.get_block_indices());
+        flux_coarsened.get_block_indices());
     for (int m = 0; m < num_modes; ++m) {
       for (int g_coarse = 0; g_coarse < num_groups_coarse; ++g_coarse) {
         int g_min = g_coarse == 0 ? 0 : g_maxes[g_coarse-1];
@@ -149,14 +162,30 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         boundary_conditions_coarse(num_groups_coarse);
     FixedSourceProblem<dim, qdim> problem_coarse(
           dof_handler, quadrature, mgxs_coarse, boundary_conditions_coarse);
-    this->RunFullOrder(flux_coarse, source_coarse, problem_coarse,
+    dealii::BlockVector<double> flux_coarse_cp(
+        flux_coarsened.get_block_indices());
+    this->RunFullOrder(flux_coarse_cp, source_coarse, problem_coarse,
                        max_iters_fullorder, tol_fullorder);
-    std::vector<dealii::BlockVector<double>> flux_coarses(mgxs_coarses.size(),
-        flux_coarse.get_block_indices());
+    // Run coarse group, inconsistent P
+    FixedSourceProblem<dim, qdim> problem_coarse_ip(
+          dof_handler, quadrature, mgxs_coarse_ip, boundary_conditions_coarse);
+    dealii::BlockVector<double> flux_coarse_ip(
+        flux_coarse_cp.get_block_indices());
+    this->RunFullOrder(flux_coarse_ip, source_coarse, problem_coarse_ip, 
+                       max_iters_fullorder, tol_fullorder);
+    // Run coarse group with PGD cross-sections
+    std::vector<dealii::BlockVector<double>> flux_coarses_cp(mgxs_coarses.size(),
+        flux_coarse_cp.get_block_indices());
+    std::vector<dealii::BlockVector<double>> flux_coarses_ip(flux_coarses_cp);
     for (int i = 0; i < mgxs_coarses.size(); ++i) {
       FixedSourceProblem<dim, qdim> problem_coarse_m(
           dof_handler, quadrature, mgxs_coarses[i], boundary_conditions_coarse);
-      this->RunFullOrder(flux_coarses[i], source_coarse, problem_coarse_m,
+      this->RunFullOrder(flux_coarses_cp[i], source_coarse, problem_coarse_m,
+                         max_iters_fullorder, tol_fullorder);
+      FixedSourceProblem<dim, qdim> problem_coarse_ip_m(
+          dof_handler, quadrature, mgxs_coarses_ip[i], 
+          boundary_conditions_coarse);
+      this->RunFullOrder(flux_coarses_ip[i], source_coarse, problem_coarse_ip_m,
                          max_iters_fullorder, tol_fullorder);
     }
     // Post process
@@ -166,41 +195,49 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     std::cout << "init'd transport\n";
     DiscreteToMoment<qdim> &d2m = problem_full.d2m;
     std::cout << "init'd d2m\n";
-    std::vector<double> l2_errors_coarse_d_rel;
-    std::vector<double> l2_errors_coarse_m_rel;
-    std::vector<double> l2_errors_coarse_d_abs;
-    std::vector<double> l2_errors_coarse_m_abs;
-    GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs, flux_coarse, 
-                              flux_coarsened, transport, false, table, 
-                              "coarse_d_abs");
-    GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs, flux_coarse, 
-                             flux_coarsened, transport, d2m, false, table, 
-                             "coarse_m_abs");
-    GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
-                              flux_coarsened, transport, true, table, 
-                              "coarse_d_rel");
-    GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel, flux_coarse, 
-                             flux_coarsened, transport, d2m, true, table,
-                             "coarse_m_rel");
-    for (int i = 0; i < mgxs_coarses.size(); ++i) {
-      std::vector<double> l2_errors_coarse_d_rel_mi;
-      std::vector<double> l2_errors_coarse_m_rel_mi;
-      std::vector<double> l2_errors_coarse_d_abs_mi;
-      std::vector<double> l2_errors_coarse_m_abs_mi;
-      // std::string m = "_m" + std::to_string((i + 1) * incr);
-      std::string m = "_m" + std::to_string(m_coarses[i]);
-      GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs_mi, flux_coarses[i], 
+    std::vector<std::string> labels = {"cp", "ip"};
+    for (int c = 0; c < labels.size(); ++c) {
+      dealii::BlockVector<double> &flux_coarse = 
+          !c ? flux_coarse_cp : flux_coarse_ip;
+      std::vector<dealii::BlockVector<double>> &flux_coarses =
+          !c ? flux_coarses_cp : flux_coarses_ip;
+      std::string label = "_" + labels[c];
+      std::vector<double> l2_errors_coarse_d_rel;
+      std::vector<double> l2_errors_coarse_m_rel;
+      std::vector<double> l2_errors_coarse_d_abs;
+      std::vector<double> l2_errors_coarse_m_abs;
+      GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs, flux_coarse, 
                                 flux_coarsened, transport, false, table, 
-                                "coarse_d_abs"+m);
-      GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs_mi, flux_coarses[i], 
-                               flux_coarsened, transport, d2m, false, table, 
-                               "coarse_m_abs"+m);
-      GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel_mi, flux_coarses[i], 
+                                "coarse_d_abs_"+label);
+      GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs, flux_coarse, 
+                              flux_coarsened, transport, d2m, false, table, 
+                              "coarse_m_abs_"+label);
+      GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
                                 flux_coarsened, transport, true, table, 
-                                "coarse_d_rel"+m);
-      GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel_mi, flux_coarses[i], 
+                                "coarse_d_rel_"+label);
+      GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel, flux_coarse, 
                                flux_coarsened, transport, d2m, true, table,
-                               "coarse_m_rel"+m);
+                               "coarse_m_rel_"+label);
+      for (int i = 0; i < mgxs_coarses.size(); ++i) {
+        std::vector<double> l2_errors_coarse_d_rel_mi;
+        std::vector<double> l2_errors_coarse_m_rel_mi;
+        std::vector<double> l2_errors_coarse_d_abs_mi;
+        std::vector<double> l2_errors_coarse_m_abs_mi;
+        // std::string m = "_m" + std::to_string((i + 1) * incr);
+        std::string labelm = label+ "_m" + std::to_string(m_coarses[i]);
+        GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs_mi, flux_coarses[i], 
+                                  flux_coarsened, transport, false, table, 
+                                  "coarse_d_abs"+labelm);
+        GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs_mi, flux_coarses[i], 
+                                 flux_coarsened, transport, d2m, false, table, 
+                                 "coarse_m_abs"+labelm);
+        GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel_mi, flux_coarses[i], 
+                                  flux_coarsened, transport, true, table, 
+                                  "coarse_d_rel"+labelm);
+        GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel_mi, flux_coarses[i], 
+                                 flux_coarsened, transport, d2m, true, table,
+                                 "coarse_m_rel"+labelm);
+      }
     }
     for (int i = 0; i < fluxes_coarsened_pgd.size(); ++i) {
       std::vector<double> l2_errors_pgd_d_rel;
@@ -222,7 +259,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                                "pgd_m_rel"+m);
     }
     for (int g = 0; g < num_groups_coarse; ++g) {
-      table.add_value("flux_coarse", flux_coarse.block(g).l2_norm());
+      table.add_value("flux_coarse", flux_coarse_cp.block(g).l2_norm());
       table.add_value("flux_coarsened", flux_coarsened.block(g).l2_norm());
       // table.add_value("source_coarse", source_coarse.block(g).l2_norm());
     }
@@ -307,20 +344,23 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       const sn::Transport<dim, qdim> &transport,
       const sn::DiscreteToMoment<qdim> &d2m,
       const Mgxs &mgxs_fine,
-      const std::vector<int> &g_maxes) {
+      const std::vector<int> &g_maxes,
+      const int order,
+      const TransportCorrection correction) {
     const int num_modes = modes_spaceangle.size();
     const int num_groups = mgxs_fine.total.size();
-    dealii::BlockVector<double> flux_m(num_groups, dof_handler.n_dofs());
-    dealii::Vector<double> mode_m(dof_handler.n_dofs());
-    dealii::Vector<double> mode_spaceangle(
-        quadrature.size() * dof_handler.n_dofs());
+    dealii::BlockVector<double> flux_l(
+        num_groups, (order+1) * dof_handler.n_dofs());
+    dealii::BlockVector<double> mode_lb(order+1, dof_handler.n_dofs());
+    dealii::Vector<double> mode_l((order+1) * dof_handler.n_dofs());
     for (int m = 0; m < num_modes; ++m) {
-      mode_spaceangle = modes_spaceangle[m];
-      d2m.vmult(mode_m, mode_spaceangle);
+      d2m.discrete_to_legendre(mode_lb, modes_spaceangle[m]);
+      mode_l = mode_lb;
       for (int g = 0; g < num_groups; ++g)
-        flux_m.block(g).add(modes_energy[m][g], mode_m);
+        flux_l.block(g).add(modes_energy[m][g], mode_l);
     }
-    return collapse_mgxs(flux_m, dof_handler, transport, mgxs_fine, g_maxes);
+    return collapse_mgxs(flux_l, dof_handler, transport, mgxs_fine, g_maxes,
+                         correction);
   }
 };
 

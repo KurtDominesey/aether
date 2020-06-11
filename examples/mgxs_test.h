@@ -33,6 +33,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     std::vector<std::vector<dealii::BlockVector<double>>> 
         boundary_conditions(num_groups);
     // Run full order
+    std::cout << "run full order\n";
     dealii::BlockVector<double> flux_full(
         num_groups, quadrature.size()*dof_handler.n_dofs());
     dealii::BlockVector<double> source_full(flux_full.get_block_indices());
@@ -44,25 +45,47 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
         dof_handler, quadrature, *mgxs, boundary_conditions);
     this->RunFullOrder(flux_full, source_full, problem_full, 
                        max_iters_fullorder, tol_fullorder);
-    dealii::BlockVector<double> flux_full_iso(num_groups, dof_handler.n_dofs());
-    for (int g = 0; g < num_groups; ++g)
-      problem_full.d2m.vmult(flux_full_iso.block(g), flux_full.block(g));
-    // Mgxs mgxs_coarse = collapse_mgxs(
-    //       flux_full_iso, dof_handler, problem_full.transport, *mgxs, g_maxes);
+    // flux_full = 1;
+    dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
+    dealii::BlockVector<double> flux_full_l1(num_groups, 2*dof_handler.n_dofs());
+    for (int g = 0; g < num_groups; ++g) {
+      problem_full.d2m.vmult(flux_full_l0.block(g), flux_full.block(g));
+      std::cout << "discrete to legendre g=" << g << std::endl;
+      problem_full.d2m.discrete_to_legendre(flux_full_l1.block(g), 
+                                            flux_full.block(g));
+    }
     std::cout << "collapsing spectra\n";
-    std::vector<dealii::Vector<double>> spectra;
-    collapse_spectra(spectra, flux_full_iso, dof_handler, 
+    std::vector<dealii::BlockVector<double>> spectra;
+    collapse_spectra(spectra, flux_full_l0, dof_handler, 
                      problem_full.transport);
     std::cout << "collapsing mgxs\n";
+    std::cout << spectra.size() << ", " << num_materials << std::endl
+              << spectra[0].n_blocks() << ", " << spectra[0].block(0).size()
+              << std::endl;
     Mgxs mgxs_coarse = collapse_mgxs(spectra, *mgxs, g_maxes);
-    std::cout << "collapsed mgxs\n";
+    std::cout << "collapsed mgxs CP\n";
+    Mgxs mgxs_coarse_ip = collapse_mgxs(
+        flux_full_l1, dof_handler, problem_full.transport, *mgxs, g_maxes,
+        INCONSISTENT_P);
+    std::cout << "collapsed mgxs IP\n";
+    // std::cout << flux_full_L0.l2_norm() << " "
+    //           << flux_full_L1.l2_norm() << " "
+    //           << flux_full_L1.block(0).l2_norm() << " "
+    //           << flux_full_L1.block(1).l2_norm() << std::endl;
+    // std::cout << mgxs_coarse_ip.total[26][2] << std::endl;
+    // const std::string test_name = this->GetTestName();
+    // const std::string filename = test_name + "_mgxs.h5";
+    // write_mgxs(mgxs_coarse, filename, "294K", materials);
+    // std::cout << "MGXS TO FILE " << filename << std::endl;
     // Compute svd
+    std::cout << "compute svd\n";
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
-    this->ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
-                     problem_full.transport);
+    // this->ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
+    //                  problem_full.transport);
     const int num_svecs = svecs_spaceangle.size();
     // Run infinite medium
+    std::cout << "run infinite medium\n";
     AssertDimension(sources_energy.size(), 1);
     dealii::Vector<double> spectrum(num_groups);
     RunInfiniteMedium(spectrum, sources_energy[2], *mgxs, volumes);
@@ -75,6 +98,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       std::cout << spectrum[g] << " ";
     std::cout << "\n";
     // Run pgd model
+    std::cout << "run pgd model\n";
     Mgxs mgxs_one(1, num_materials, 1);
     Mgxs mgxs_pseudo(1, num_materials, 1);
     for (int j = 0; j < num_materials; ++j) {
@@ -97,6 +121,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     dealii::Vector<double> spectrum_one;
     std::vector<dealii::BlockVector<double>> modes_spaceangle;
     std::vector<Mgxs> mgxs_coarses;
+    std::vector<Mgxs> mgxs_coarses_ip;
     dealii::BlockVector<double> _;
     for (int m = 0; m < num_modes; ++m) {
       nonlinear_gs.enrich();
@@ -117,6 +142,9 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       modes_spaceangle.back() = fixed_source_p.caches.back().mode.block(0);
       GetMgxsCoarses(mgxs_coarses, modes_spaceangle, energy_mg.modes, 
                      problem_full.transport, problem.d2m, *mgxs, g_maxes, m);
+      GetMgxsCoarses(mgxs_coarses_ip, modes_spaceangle, energy_mg.modes,
+                     problem_full.transport, problem.d2m, *mgxs, g_maxes, m,
+                     1, INCONSISTENT_P);
     }
     std::cout << "done running pgd\n";
     // Post-process spectrum
@@ -124,7 +152,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     for (int j = 0; j < num_materials; ++j) {
       std::string key = "j" + std::to_string(j);
       for (int g = 0; g < num_groups; ++g) {
-        table_spectrum.add_value(key, spectra[j][g]);
+        table_spectrum.add_value(key, spectra[j].block(0)[g]);
       }
       table_spectrum.set_scientific(key, true);
       table_spectrum.set_precision(key, 16);
@@ -166,29 +194,39 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       // std::string material = materials[j];
       for (int g_coarse = 0; g_coarse < g_maxes.size(); ++g_coarse) {
         // int gg_coarse = g_maxes.size() - g_coarse;
-        // if (g_coarse < 14 || g_coarse > 26)
-        //   continue;
+        if (g_coarse+1 < 21 || g_coarse+1 > 27)
+          continue;
         std::string key = "j" + std::to_string(j) 
                         + "g" + std::to_string(g_coarse+1);
         table.add_value(key, std::nan("a"));
         table.add_value(key+"inf", std::nan("b"));
-        table.add_value(key+"svd", std::nan("c"));
+        // table.add_value(key+"svd", std::nan("c"));
+        table.add_value(key+"ip", std::nan("d"));
         for (int m = 0; m < num_modes; ++m) {
           double full = mgxs_coarse.total[g_coarse][j];
           double error = (full - mgxs_coarses[m].total[g_coarse][j]) / full;
           table.add_value(key, error);
           double error_inf = (full - mgxs_coarse_inf.total[g_coarse][j]) / full;
           table.add_value(key+"inf", error_inf);
-          double error_svd = 
-              (full - mgxs_coarses_svd[m].total[g_coarse][j]) / full;
-          table.add_value(key+"svd", error_svd);
+          // double error_svd = 
+          //     (full - mgxs_coarses_svd[m].total[g_coarse][j]) / full;
+          // table.add_value(key+"svd", error_svd);
+          double full_ip = mgxs_coarse_ip.total[g_coarse][j];
+          double error_ip = (full_ip - mgxs_coarses_ip[m].total[g_coarse][j]) 
+                            / full_ip;
+          std::cout << full << ", " 
+                    << full_ip << ", " 
+                    << mgxs_coarses_ip[m].total[g_coarse][j] << std::endl;
+          table.add_value(key+"ip", error_ip);
         }
         table.set_scientific(key, true);
         table.set_precision(key, 16);
         table.set_scientific(key+"inf", true);
         table.set_precision(key+"inf", 16);
-        table.set_scientific(key+"svd", true);
-        table.set_precision(key+"svd", 16);
+        // table.set_scientific(key+"svd", true);
+        // table.set_precision(key+"svd", 16);
+        table.set_scientific(key+"ip", true);
+        table.set_precision(key+"ip", 16);
       }
     }
     this->WriteConvergenceTable(table);
@@ -234,23 +272,43 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       const sn::DiscreteToMoment<qdim> &d2m,
       const Mgxs &mgxs_fine,
       const std::vector<int> &g_maxes,
-      const int m_start = 0) {
+      const int m_start = 0,
+      const int order = 0,
+      const TransportCorrection correction = CONSISTENT_P) {
     // AssertDimension(mgxs_coarses.size(), 0);
     const int num_modes = modes_spaceangle.size();
     const int num_groups = mgxs_fine.total.size();
-    dealii::BlockVector<double> flux_m(num_groups, dof_handler.n_dofs());
-    dealii::Vector<double> mode_m(dof_handler.n_dofs());
-    dealii::Vector<double> mode_spaceangle(
-        quadrature.size() * dof_handler.n_dofs());
+    // const int num_moments = std::pow(order+1, 2);
+    dealii::BlockVector<double> flux_l(num_groups, 
+                                       (order+1) * dof_handler.n_dofs());
+    // dealii::Vector<double> mode_m(num_moments * dof_handler.n_dofs());
+    // dealii::BlockVector<double> mode_mb(num_moments, dof_handler.n_dofs());
+    dealii::Vector<double> mode_l((order+1) * dof_handler.n_dofs());
+    dealii::BlockVector<double> mode_lb(order+1, dof_handler.n_dofs());
+    // dealii::Vector<double> mode_spaceangle(
+    //     quadrature.size() * dof_handler.n_dofs());
     for (int m = 0; m < num_modes; ++m) {
-      mode_spaceangle = modes_spaceangle[m];
-      d2m.vmult(mode_m, mode_spaceangle);
+      // // mode_spaceangle = modes_spaceangle[m];
+      // mode_mb = 0;
+      // d2m.vmult(mode_mb, modes_spaceangle[m]);
+      // // mode_mb = mode_m;
+      // mode_lb = 0;
+      // for (int ell = 0, lm = 0; ell <= order; ++ell) {
+      //   for (int m = -ell; m <= ell; ++m, ++lm) {
+      //     if (dim == 2 && (m + ell) % 2)
+      //       continue;
+      //     std::cout << "lm " << lm << std::endl;
+      //     mode_lb.block(ell) += mode_mb.block(lm);
+      //   }
+      // }
+      d2m.discrete_to_legendre(mode_lb, modes_spaceangle[m]);
+      mode_l = mode_lb;
       for (int g = 0; g < num_groups; ++g)
-        flux_m.block(g).add(modes_energy[m][g], mode_m);
+        flux_l.block(g).add(modes_energy[m][g], mode_l);
       std::cout << "m=" << m << std::endl;
       if (m >= m_start) {
         Mgxs mgxs_coarse = collapse_mgxs(
-            flux_m, dof_handler, transport, mgxs_fine, g_maxes);
+            flux_l, dof_handler, transport, mgxs_fine, g_maxes, correction);
         mgxs_coarses.push_back(mgxs_coarse);
       }
     }
