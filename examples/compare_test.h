@@ -59,14 +59,20 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
   }
 
   void RunPgd(pgd::sn::NonlinearGS &nonlinear_gs, const int num_modes,
-              const int max_iters, const double tol, const bool do_update) {
+              const int max_iters, const double tol, const bool do_update,
+              std::vector<int> &unconverged, std::vector<double> &residuals) {
     dealii::BlockVector<double> _;
     for (int m = 0; m < num_modes; ++m) {
       nonlinear_gs.enrich();
+      double residual = 0;
       for (int k = 0; k < max_iters; ++k) {
-        double residual = nonlinear_gs.step(_, _);
+        residual = nonlinear_gs.step(_, _);
         if (residual < tol)
           break;
+      }
+      if (residual >= tol) {
+        unconverged.push_back(m);
+        residuals.push_back(residual);
       }
       if (do_update) {
         nonlinear_gs.finalize();
@@ -457,9 +463,18 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     std::vector<pgd::sn::LinearInterface*> linear_ops = 
         {&fixed_source_p, &energy_mg};
     pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
+    std::vector<int> unconverged;
+    std::vector<double> residuals;
     RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-           do_update);
+           do_update, unconverged, residuals);
     std::cout << "done running pgd\n";
+    std::ofstream unconverged_txt;
+    unconverged_txt.open(this->GetTestName()+"_unconverged.txt", 
+                         std::ios::trunc);
+    for (int u = 0; u < unconverged.size(); ++u)
+      unconverged_txt << unconverged[u] << " " << residuals[u] << std::endl;
+    unconverged_txt.close();
+    std::cout << "wrote unconverged\n";
     std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
         dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
     for (int m = 0; m < num_modes; ++m)
