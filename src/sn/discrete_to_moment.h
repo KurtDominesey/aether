@@ -21,6 +21,12 @@ class DiscreteToMoment {
                  const dealii::Vector<double> &src) const;
   void vmult_add(dealii::BlockVector<double> &dst, 
                  const dealii::BlockVector<double> &src) const;
+  int n_block_rows(int order) const;
+  int n_block_cols() const;
+  void discrete_to_legendre(dealii::Vector<double> &dst,
+                            const dealii::Vector<double> &src) const;
+  void discrete_to_legendre(dealii::BlockVector<double> &dst,
+                            const dealii::BlockVector<double> &src) const;
 
  protected:
   const QAngle<dim, qdim> &quadrature;

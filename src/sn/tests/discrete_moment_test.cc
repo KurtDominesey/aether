@@ -2,11 +2,50 @@
 
 #include "sn/discrete_to_moment.cc"
 #include "sn/moment_to_discrete.cc"
+#include "sn/quadrature_lib.h"
 #include "gtest/gtest.h"
 
 namespace aether::sn {
 
 namespace {
+
+template <typename T>
+class DiscreteToMomentDimTest : public ::testing::Test {
+ protected:
+  static const int dim = T::value;
+  void SetUp() override {
+    quadrature = QPglc<dim>(4, 4);
+    d2m = std::make_unique<DiscreteToMoment<dim>>(quadrature);
+  }
+  QAngle<dim> quadrature;
+  std::unique_ptr<DiscreteToMoment<dim>> d2m;
+};
+
+using Dims =
+    ::testing::Types< std::integral_constant<int, 1>,
+                      std::integral_constant<int, 2>,
+                      std::integral_constant<int, 3> >;
+TYPED_TEST_CASE(DiscreteToMomentDimTest, Dims);
+
+TYPED_TEST(DiscreteToMomentDimTest, IsotropicD2M) {
+  const int order = 1;
+  const int num_dofs = 16;
+  const int num_moments = this->d2m->n_block_rows(order);
+  dealii::BlockVector<double> discrete(this->quadrature.size(), num_dofs);
+  dealii::BlockVector<double> moments(num_moments, num_dofs);
+  discrete = dealii::numbers::PI;
+  moments = std::nan("a");
+  this->d2m->vmult(moments, discrete);
+  double tol = 1e-14;
+  for (int i = 0; i < num_dofs; ++i) {
+    // scalar flux (moment 0) should equal isotropic discrete flux
+    for (int n = 0; n < this->quadrature.size(); ++n)
+      EXPECT_NEAR(discrete.block(n)[i], moments.block(0)[i], tol);
+    // anisotropic moments (>0) should be zero
+    for (int lm = 1; lm < num_moments; ++lm)
+      EXPECT_NEAR(0, moments.block(lm)[i], tol);
+  }
+}
 
 TEST(DiscreteMomentTest, IsotropicD2M) {
   const int dim = 2;
