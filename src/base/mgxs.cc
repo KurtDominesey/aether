@@ -127,17 +127,20 @@ void write_mgxs(
 }
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
-void collapse_spectra(std::vector<dealii::Vector<double>> &spectra,
+void collapse_spectra(std::vector<dealii::BlockVector<double>> &spectra,
                       const dealii::BlockVector<double> &flux,
                       const dealii::DoFHandler<dim> &dof_handler,
                       const sn::Transport<dim, qdim> &transport) {
-  Assert(spectra.empty(), dealii::ExcInvalidState());
+  AssertThrow(spectra.empty(), dealii::ExcInvalidState());
+  AssertThrow(flux.block(0).size() % dof_handler.n_dofs() == 0,
+      dealii::ExcNotMultiple(flux.block(0).size(), dof_handler.n_dofs()));
   const int num_groups = flux.n_blocks();
-  spectra.resize(1, dealii::Vector<double>(num_groups));
+  const int order = (flux.block(0).size() / dof_handler.n_dofs()) - 1;
+  spectra.resize(1, dealii::BlockVector<double>(order+1, num_groups));
   std::vector<dealii::types::global_dof_index> dof_indices(
       dof_handler.get_fe().dofs_per_cell);
   for (int g = 0; g < num_groups; ++g) {
-    dealii::BlockVector<double> flux_g(1, dof_handler.n_dofs());
+    dealii::BlockVector<double> flux_g(order+1, dof_handler.n_dofs());
     flux_g = flux.block(g);
     int c = 0;
     for (auto cell = dof_handler.begin_active(); cell != dof_handler.end(); 
@@ -148,11 +151,14 @@ void collapse_spectra(std::vector<dealii::Vector<double>> &spectra,
       cell->get_dof_indices(dof_indices);
       const int material = cell->material_id();
       if (material+1 > spectra.size())
-        spectra.resize(material+1, dealii::Vector<double>(num_groups));
+        spectra.resize(material+1, 
+                       dealii::BlockVector<double>(order+1, num_groups));
       const dealii::FullMatrix<double> &mass = transport.cell_matrices[c].mass;
-      for (int i = 0; i < mass.n(); ++i)
-        for (int j = 0; j < mass.m(); ++j)
-          spectra[material][g] += mass[i][j] * flux_g.block(0)[dof_indices[j]];
+      for (int ell = 0; ell <= order; ++ell)
+        for (int i = 0; i < mass.n(); ++i)
+          for (int j = 0; j < mass.m(); ++j)
+            spectra[material].block(ell)[g] += 
+                mass[i][j] * flux_g.block(ell)[dof_indices[j]];
     }
   }
 }
@@ -162,73 +168,127 @@ Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
                    const dealii::DoFHandler<dim> &dof_handler,
                    const sn::Transport<dim, qdim> &transport,
                    const Mgxs &mgxs,
-                   const std::vector<int> &g_maxes) {
-  std::vector<dealii::Vector<double>> spectra;
+                   const std::vector<int> &g_maxes,
+                   const TransportCorrection correction) {
+  std::vector<dealii::BlockVector<double>> spectra;
+  std::cout << "collapse spectra\n";
   collapse_spectra(spectra, flux, dof_handler, transport);
   AssertDimension(spectra.size(), mgxs.total.size());
   AssertDimension(spectra[0].size(), mgxs.total[0].size());
-  return collapse_mgxs(spectra, mgxs, g_maxes);
+  std::cout << "collapse mgxs\n";
+  return collapse_mgxs(spectra, mgxs, g_maxes, correction);
 }
 
 Mgxs collapse_mgxs(const dealii::Vector<double> &spectrum,
-                   const Mgxs &mgxs, const std::vector<int> &g_maxes) {
+                   const Mgxs &mgxs, const std::vector<int> &g_maxes,
+                   const TransportCorrection correction) {
   const int num_materials = mgxs.total[0].size();
-  std::vector<dealii::Vector<double>> spectra(num_materials, spectrum);
+  dealii::BlockVector<double> spectrum_b(1, spectrum.size());
+  spectrum_b = spectrum;
+  std::vector<dealii::BlockVector<double>> spectra(num_materials, spectrum_b);
   return collapse_mgxs(spectra, mgxs, g_maxes);
 }
 
-Mgxs collapse_mgxs(const std::vector<dealii::Vector<double>> &spectra,
-                   const Mgxs &mgxs, const std::vector<int> &g_maxes) {
+Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
+                   const Mgxs &mgxs, const std::vector<int> &g_maxes,
+                   const TransportCorrection correction) {
+  const int order = spectra[0].n_blocks() - 1;
+  const int order_coarse = order - (correction == CONSISTENT_P ? 0 : 1);
   const int num_materials = mgxs.total[0].size();
   const int num_groups_coarse = g_maxes.size();
-  Mgxs mgxs_coarse(num_groups_coarse, num_materials, 1);
+  Mgxs mgxs_coarse(num_groups_coarse, num_materials, order_coarse+1);
+  const int length = num_materials * (order + 1);
   for (int g_coarse = 0; g_coarse < num_groups_coarse; ++g_coarse) {
     int g_min = g_coarse == 0 ? 0 : g_maxes[g_coarse-1];
     int g_max = g_maxes[g_coarse];
-    std::vector<double> collision(num_materials);
-    std::vector<double> denominator(num_materials);
+    std::vector<double> denominator(length);
+    std::vector<double> collision(length);
     std::vector<std::vector<double>> scattering(num_groups_coarse,
-        std::vector<double>(num_materials));
+        std::vector<double>(length));
     for (int g = g_min; g < g_max; ++g) {
       for (int j = 0; j < num_materials; ++j) {
-        collision[j] += mgxs.total[g][j] * spectra[j][g];
-        denominator[j] += spectra[j][g];
-        // For convenience, the usual meanings of g and g' (gp) are reversed
-        // That is to say, neutrons scatter from g to g'
-        for (int gp_coarse = 0; gp_coarse < num_groups_coarse; ++gp_coarse) {
-          int gp_min = gp_coarse == 0 ? 0 : g_maxes[gp_coarse-1];
-          int gp_max = g_maxes[gp_coarse];
-          for (int gp = gp_min; gp < gp_max; ++gp) {
-            scattering[gp_coarse][j] += mgxs.scatter[gp][g][j] * spectra[j][g];
+        for (int ell = 0; ell <= order; ++ell) {
+          int jl = j + ell * num_materials;
+          collision[jl] += mgxs.total[g][j] * spectra[j].block(ell)[g];
+          denominator[jl] += spectra[j].block(ell)[g];
+          if (correction == INCONSISTENT_P && ell == order)
+            continue;  // don't need L+1 scattering moments, only collision
+          // For convenience, the usual meanings of g and g' (gp) are reversed
+          // That is to say, neutrons scatter from g to g'
+          for (int gp_coarse = 0; gp_coarse < num_groups_coarse; ++gp_coarse) {
+            int gp_min = gp_coarse == 0 ? 0 : g_maxes[gp_coarse-1];
+            int gp_max = g_maxes[gp_coarse];
+            for (int gp = gp_min; gp < gp_max; ++gp) {
+              scattering[gp_coarse][jl] += mgxs.scatter[gp][g][jl] 
+                                           * spectra[j].block(ell)[g];
+            }
           }
         }
       }
     }
     for (int j = 0; j < num_materials; ++j) {
-      mgxs_coarse.total[g_coarse][j] = collision[j] / denominator[j];
-      for (int gp_coarse = 0; gp_coarse < num_groups_coarse; ++gp_coarse) {
-        mgxs_coarse.scatter[gp_coarse][g_coarse][j] = 
-            scattering[gp_coarse][j] / denominator[j];
+      switch (correction) {
+        case CONSISTENT_P:
+          mgxs_coarse.total[g_coarse][j] = collision[j] / denominator[j]; 
+          break;
+        case INCONSISTENT_P: {
+          int jll = j + order * num_materials;
+        std::cout << "g=" << g_coarse << " ell=" << order << " " 
+                  << denominator[jll] << std::endl;
+          mgxs_coarse.total[g_coarse][j] = collision[jll] / denominator[jll];
+          break;
+        }
+        default:
+          throw dealii::ExcNotImplemented();
+      }
+      for (int ell = 0; ell <= order_coarse; ++ell) {
+        int jl = j + ell * num_materials;
+        // std::cout << "g=" << g_coarse << " ell=" << ell << " " 
+        //           << denominator[jl] << std::endl;
+        for (int gp_coarse = 0; gp_coarse < num_groups_coarse; ++gp_coarse) {
+          mgxs_coarse.scatter[gp_coarse][g_coarse][jl] = 
+              scattering[gp_coarse][jl] / denominator[jl];
+          if (gp_coarse == g_coarse)
+            mgxs_coarse.scatter[gp_coarse][g_coarse][jl] -=
+                collision[jl]/denominator[jl] - mgxs_coarse.total[g_coarse][j];
+        }
       }
     }
   }
   return mgxs_coarse;
 }
 
+
+template void collapse_spectra<1>(std::vector<dealii::BlockVector<double>>&,
+                                  const dealii::BlockVector<double>&,
+                                  const dealii::DoFHandler<1>&,
+                                  const sn::Transport<1, 1>&);
+template void collapse_spectra<2>(std::vector<dealii::BlockVector<double>>&,
+                                  const dealii::BlockVector<double>&,
+                                  const dealii::DoFHandler<2>&,
+                                  const sn::Transport<2, 2>&);
+template void collapse_spectra<3>(std::vector<dealii::BlockVector<double>>&,
+                                  const dealii::BlockVector<double>&,
+                                  const dealii::DoFHandler<3>&,
+                                  const sn::Transport<3, 2>&);
+
 template Mgxs collapse_mgxs<1>(const dealii::BlockVector<double>&,
                                const dealii::DoFHandler<1>&,
                                const sn::Transport<1, 1>&,
                                const Mgxs&,
-                               const std::vector<int>&);
+                               const std::vector<int>&,
+                               const TransportCorrection);
 template Mgxs collapse_mgxs<2>(const dealii::BlockVector<double>&,
                                const dealii::DoFHandler<2>&,
                                const sn::Transport<2, 2>&,
                                const Mgxs&,
-                               const std::vector<int>&);
+                               const std::vector<int>&,
+                               const TransportCorrection);
 template Mgxs collapse_mgxs<3>(const dealii::BlockVector<double>&,
                                const dealii::DoFHandler<3>&,
                                const sn::Transport<3, 2>&,
                                const Mgxs&,
-                               const std::vector<int>&);
+                               const std::vector<int>&,
+                               const TransportCorrection);
 
 }  // namespace aether

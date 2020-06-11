@@ -46,23 +46,33 @@ void write_mgxs(const Mgxs& mgxs,
                 const std::vector<std::string> &materials);
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
-void collapse_spectra(std::vector<dealii::Vector<double>> &spectra,
+void collapse_spectra(std::vector<dealii::BlockVector<double>> &spectra,
                       const dealii::BlockVector<double> &flux,
                       const dealii::DoFHandler<dim> &dof_handler,
                       const sn::Transport<dim, qdim> &transport);
+
+enum TransportCorrection {
+  CONSISTENT_P,
+  INCONSISTENT_P
+  // DIAGONAL,
+  // BHS
+};
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
                    const dealii::DoFHandler<dim> &dof_handler,
                    const sn::Transport<dim, qdim> &transport,
                    const Mgxs &mgxs,
-                   const std::vector<int> &g_maxes);
+                   const std::vector<int> &g_maxes,
+                   const TransportCorrection correction = CONSISTENT_P);
 
 Mgxs collapse_mgxs(const dealii::Vector<double> &spectrum, 
-                   const Mgxs &mgxs, const std::vector<int> &g_maxes);
+                   const Mgxs &mgxs, const std::vector<int> &g_maxes,
+                   const TransportCorrection correction = CONSISTENT_P);
 
-Mgxs collapse_mgxs(const std::vector<dealii::Vector<double>> &spectra,
-                   const Mgxs &mgxs, const std::vector<int> &g_maxes);
+Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
+                   const Mgxs &mgxs, const std::vector<int> &g_maxes,
+                   const TransportCorrection correction = CONSISTENT_P);
 
 }
 
