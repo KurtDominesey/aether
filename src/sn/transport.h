@@ -20,16 +20,6 @@ namespace aether::sn {
 template <int dim, int qdim> class Transport;
 }
 
-namespace aether {
-struct Mgxs;
-template <int dim, int qdim>
-Mgxs collapse_mgxs(const dealii::BlockVector<double>&,
-                   const dealii::DoFHandler<dim>&,
-                   const sn::Transport<dim, qdim>&,
-                   const Mgxs&,
-                   const std::vector<int>&);
-}
-
 namespace aether::sn {
 
 template <int dim>
@@ -185,11 +175,6 @@ class Transport {
   std::vector<std::vector<int>> octants_to_global;
 
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
-  friend Mgxs collapse_mgxs<dim, qdim>(const dealii::BlockVector<double>&,
-                                       const dealii::DoFHandler<dim>&,
-                                       const sn::Transport<dim, qdim>&,
-                                       const Mgxs&,
-                                       const std::vector<int>&);
 };
 
 }  // namespace aether::sn
