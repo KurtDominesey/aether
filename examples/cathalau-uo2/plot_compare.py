@@ -1,27 +1,97 @@
+import collections
+import math
 import sys
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
+def right_yticks():
+    ax = plt.gca()
+    # ax.minorticks_on()
+    # ax2 = plt.gca().secondary_yaxis('right')
+    ax2 = plt.gca().twinx()
+    plt.yscale('log')
+    plt.ylim(ax.get_ylim())
+    # ax2.yscale('log')
+    locmaj = ax.yaxis.get_major_locator()
+    numdecs = math.log10(locmaj()[-1]/locmaj()[0])
+    ax2.yaxis.set_major_locator(matplotlib.ticker.LogLocator())
+    ax2.yaxis.get_major_locator().set_params(numdecs=numdecs, numticks=numdecs)
+    # print(locmaj())
+    # print(ax2.yaxis.get_major_locator()())
+    # locmin = ax.yaxis.get_minor_locator()
+    subs = np.arange(1, 10)
+    # locmin.set_params(subs=subs, numdecs=numdecs, numticks=len(subs)*numdecs)
+    ax2.yaxis.set_minor_locator(matplotlib.ticker.LogLocator())
+    ax2.yaxis.get_minor_locator().set_params(subs=subs, numdecs=numdecs,
+                                             numticks=len(subs)*numdecs)
+    # print(locmin())
+    ax2.tick_params(axis='y', which='both', direction='in', right=True)
+    # ax2.set(yticks=ax.get_yticks())
+    # ax2.set_yticks(ax.get_yticks())
+    # print(ax2.get_yticks())
+    plt.grid(visible=False)
+    plt.setp(ax2.get_yticklabels(), visible=False)
+
 def plot_compare(filename, savename, **kwargs):
+    print(filename)
     table = np.genfromtxt(filename, names=True)
     enrichments = list(range(table.shape[0]))
-    for name in table.dtype.names:
+    labels = collections.OrderedDict([
+        ('residual_swept', 'Residual, swept'),
+        ('residual_streamed', 'Residual, streamed'),
+        ('residual', 'Residual'),
+        ('norm', 'Mode $M-1$'),
+        ('error_svd_m', 'Error $\\phi$, SVD'),
+        ('error_svd_d', 'Error $\\psi$, SVD'),
+        ('error_m', 'Error $\\phi$, PGD'),
+        ('error_d', 'Error $\\psi$, PGD')])
+    # for name in table.dtype.names:
+    for name in labels.keys():
+        if name not in table.dtype.names:
+            continue
+        kwargs_line = kwargs
         # if name != 'error_d':
         # if ('error' not in name 
         #         and 'norm' not in name
         #         and 'residual_streamed' not in name
         #         ):
         #     continue
-        if 'error' not in name:
-            continue
+        # if 'error' not in name:
+        #     continue
+        kwargs_line['label'] = labels.get(name, name.replace('_', '\\_'))
+        kwargs_line['ls'] = '-'
+        kwargs_line['marker'] = 'o'
+        kwargs_line['alpha'] = 0.8
+        kwargs_line['markersize'] = 2.75
+        kwargs_line['markevery'] = 2
+        if 'error' in name:
+            kwargs_line['color'] = 'C0'
+        if 'residual' in name:
+            kwargs_line['color'] = 'C1'
+            if 'streamed' in name:
+                # kwargs_line['ls'] = '--'
+                kwargs_line['marker'] = 'D'
+                kwargs_line['alpha'] = 0.5
+            if 'swept' in name:
+                # kwargs_line['ls'] = ':'
+                kwargs_line['marker'] = 's'
+                kwargs_line['alpha'] = 0.5
+        if 'norm' in name:
+            kwargs_line['color'] = 'C2'
+        if 'svd' in name:
+            kwargs_line['color'] = 'C3'
+        if '_m' in name:
+            # kwargs_line['ls'] = '--'
+            kwargs_line['marker'] = 'D'
+            kwargs_line['alpha'] = 0.5
+            # continue
         # if name != 'error_d' and name != 'error_svd_d':
         #     continue
         # if name[-1] == 'm':
         #     kwargs['color'] = plt.gca().lines[-1].get_color()
         #     kwargs['ls'] = '--'
-        kwargs['label'] = name
-        marker = '.' #'o'
         xdata = enrichments
         ydata = table[name] / table['error_d'][0]
         ydata = np.abs(ydata)
@@ -29,27 +99,49 @@ def plot_compare(filename, savename, **kwargs):
             ydata = ydata[1:]
             xdata = xdata[:-1]
         # ydata /= ydata[0]
-        plt.plot(xdata, ydata, marker=marker, **kwargs)
+        plt.plot(xdata, ydata, **kwargs_line)
+        if 'error' in name:
+            print(name, ' & '.join('%.2e' % y for y in ydata[10::10]))
     # plt.xticks(refinements)
-    plt.legend(loc='best')
+    # plt.legend(loc='best')
     plt.yscale('log')
-    plt.title('L2 Convergence')
-    plt.ylabel('L2 Error')
-    plt.xlabel('Modes')
+    # plt.title('L2 Convergence')
+    # plt.ylabel('$L2$ Error')
+    # plt.xlabel('Modes $M$')
+    plt.tight_layout(pad=0.2)
+    locmaj = plt.gca().yaxis.get_major_locator()
+    locs = locmaj()
+    numdecs = math.log10(locs[-1] / locs[0])
+    locmaj.set_params(numdecs=numdecs, numticks=numdecs)
+    locmin = plt.gca().yaxis.get_minor_locator()
+    locmin.set_params(subs=np.arange(1, 10), numdecs=numdecs, numticks=9*numdecs)
     plt.savefig(savename)
     # plt.close()
 
-def main(ext):
-    name_base = 'GroupStructure_CathalauCompareTest{algorithm}_{param}'
+def main(fuel, ext):
+    name_base = 'GroupStructure_CathalauCompareTest{algorithm}_{fuel}_{param}'
     algorithms = ('Progressive', 'WithUpdate') #('Progressive', 'WithUpdate')
     # params = range(9)
-    params = ['CASMO-'+str(num) for num in (8, 16, 25, 40, 70)]
+    params = ['CASMO-'+str(num) for num in (70,)]
     params += ['XMAS-172', 'SHEM-361'] # 'CCFE-709', 'UKAEA-1102']
+    nrows = len(params)
+    ncols = len(algorithms)
+    ij = 0
     for i, param in enumerate(params):
-        for algorithm in algorithms:
-            name = name_base.format(algorithm=algorithm, param=param)
+        for j, algorithm in enumerate(algorithms):
+            ij += 1
+            if ij == 1:
+                axij = plt.subplot(nrows, ncols, ij)
+                axj0 = axij
+                axij0 = axij
+            elif j == 0:
+                axij = plt.subplot(nrows, ncols, ij)
+                axj0 = axij
+            else:
+                axij = plt.subplot(nrows, ncols, ij, sharey=axj0)
+            name = name_base.format(algorithm=algorithm, param=param, fuel=fuel)
             ls = '--' if algorithm == 'WithUpdate' else None
-            # ls = None
+            ls = None
             label = param if algorithm == 'Progressive' else None
             # label = param
             # color = plt.gca().lines[-1].get_color() if algorithm == 'WithUpdate' \
@@ -58,9 +150,47 @@ def main(ext):
             color = None
             plt.gca().set_prop_cycle(None)
             plot_compare(name+'.txt', name+'.'+ext, 
-                         ls=ls, label=label, color=color)
-        plt.close()
+                         label=label, color=color)
+            # plt.gca().yaxis.get_ticklocs(minor=True)
+            # plt.gca().minorticks_on()
+            plt.gca().tick_params(axis='y', which='both', left=True)
+            if j > 0:
+                plt.setp(axij.get_yticklabels(), visible=False)
+            else:
+                pass
+            if j == ncols - 1:
+                axij.yaxis.set_label_position('right')
+                plt.ylabel(param)
+            if i < nrows - 1:
+                plt.setp(axij.get_xticklabels(), visible=False)
+                plt.gca().xaxis.set_ticklabels([])
+            else:
+                pass
+            if i == 0:
+                fancy = {'Progressive': 'Progressive', 
+                         'WithUpdate': 'With Update'}
+                plt.title(fancy[algorithm])
+            # plt.close()
+            handles, desc = plt.gca().get_legend_handles_labels()
+            if j == ncols - 1:
+                pass
+                right_yticks()
+                plt.setp(axij.get_yticklabels(), visible=False)
+    plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=0.5, 
+                     rect=(0.03, 0.025, 1, 0.925))
+    ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
+    ax0.set_xticks([])
+    ax0.set_yticks([])
+    ax0.set_xlabel('Modes $M$', labelpad=20)
+    ax0.set_ylabel('$L2$ Error', labelpad=32.5)
+    legend = ax0.legend(reversed(handles), reversed(desc), loc='upper center', 
+                        ncol=math.ceil(len(handles)/2),
+                        bbox_to_anchor=(0.49, 1.14))
+    # plt.tight_layout(pad=0.02)
+    plt.savefig('compare_{fuel}.pdf'.format(fuel=fuel))
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    plt.style.use('thesis.mplstyle')
+    matplotlib.rc('figure', figsize=(6.5, 6.375))
+    main(*sys.argv[1:])
     # plot_compare(*sys.argv[1:])
