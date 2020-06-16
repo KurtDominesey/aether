@@ -296,7 +296,14 @@ void FixedSourceP<dim, qdim>::get_inner_products(
 
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::normalize() {
-  caches.back().mode /= caches.back().mode.l2_norm();
+  const Transport<dim, qdim> &transport =
+      dynamic_cast<const Transport<dim, qdim>&>(
+          fixed_source.within_groups[0].transport.transport);
+  dealii::Vector<double> &mode = caches.back().mode.block(0);
+  // dealii::Vector<double> mode_l2(mode);
+  // transport.collide(mode_l2, mode);
+  // mode /= std::sqrt(mode * mode_l2);
+  mode /= transport.norm(mode);
   // throw dealii::ExcNotImplemented();
 }
 

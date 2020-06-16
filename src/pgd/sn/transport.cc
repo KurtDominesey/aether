@@ -179,6 +179,31 @@ void Transport<dim, qdim>::collide(dealii::BlockVector<double> &dst,
   }
 }
 
+template <int dim, int qdim>
+double Transport<dim, qdim>::inner_product(
+    const dealii::Vector<double> &left, 
+    const dealii::Vector<double> &right) const {
+  dealii::BlockVector<double> left_b(this->quadrature.size(),
+                                     this->dof_handler.n_dofs());
+  dealii::BlockVector<double> right_b(this->quadrature.size(),
+                                      this->dof_handler.n_dofs());
+  left_b = left;
+  right_b = right;
+  return inner_product(left_b, right_b);
+}
+
+template <int dim, int qdim>
+double Transport<dim, qdim>::inner_product(
+    const dealii::BlockVector<double> &left, 
+    const dealii::BlockVector<double> &right) const {
+  dealii::BlockVector<double> right_l2(right);
+  collide(right_l2, right);
+  double sq = 0;
+  for (int n = 0; n < this->quadrature.size(); ++n)
+    sq += this->quadrature.weight(n) * (left.block(n) * right_l2.block(n));
+  return std::sqrt(sq);
+}
+
 template class Transport<1>;
 template class Transport<2>;
 template class Transport<3>;

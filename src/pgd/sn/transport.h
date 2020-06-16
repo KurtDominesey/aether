@@ -22,7 +22,19 @@ class Transport : public aether::sn::Transport<dim, qdim> {
                const dealii::Vector<double> &src) const;
   void collide(dealii::BlockVector<double> &dst,
                const dealii::BlockVector<double> &src) const;
+  double inner_product(const dealii::Vector<double> &left,
+                       const dealii::Vector<double> &right) const;
+  double inner_product(const dealii::BlockVector<double> &left,
+                       const dealii::BlockVector<double> &right) const;
+  template <typename VectorType>
+  double norm(const VectorType &v) const;
 };
+
+template <int dim, int qdim>
+template <typename VectorType>
+double Transport<dim, qdim>::norm(const VectorType &v) const {
+  return inner_product(v, v);
+}
 
 }  // namespace aether::pgd::sn
 
