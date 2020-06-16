@@ -60,7 +60,7 @@ double EnergyMgFull::get_residual(
 double EnergyMgFull::enrich(const double factor) {
   modes.emplace_back(mgxs.total.size());
   return 0;
-  }
+}
 
 void EnergyMgFull::normalize() {
   // modes.back() /= modes.back().l2_norm();
@@ -130,7 +130,8 @@ void EnergyMgFull::get_inner_products(
   dealii::Vector<double> mode_row = modes[m_row];
   for (int g = 0; g < mode_row.size(); ++g) {
     int g_rev = mode_row.size() - 1 - g;
-    double width = mgxs.group_structure[g+1] - mgxs.group_structure[g];
+    // double width = mgxs.group_structure[g+1] - mgxs.group_structure[g];
+    double width = std::log(mgxs.group_structure[g+1]/mgxs.group_structure[g]);
     AssertThrow(width > 0, dealii::ExcDivideByZero());
     mode_row[g_rev] /= width;
   }
@@ -214,8 +215,8 @@ void EnergyMgFull::update(
     dealii::SolverControl control(1000, source_u.l2_norm()*1e-4);
     dealii::SolverGMRES<dealii::Vector<double>> solver(control);
     try {
-    solver.solve(matrix_u, solution_u, source_u, 
-                 dealii::PreconditionIdentity());
+      solver.solve(matrix_u, solution_u, source_u, 
+                  dealii::PreconditionIdentity());
     } catch (dealii::SolverControl::NoConvergence &failure) {
       std::cout << "failure in updating energy\n";
       failure.print_info(std::cout);

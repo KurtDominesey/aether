@@ -68,14 +68,14 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       std::cout << "mode " << m << std::endl;
       for (int k = 0; k < max_iters; ++k) {
         try {
-        residual = nonlinear_gs.step(_, _);
+          residual = nonlinear_gs.step(_, _);
           std::cout << "picard " << k << " : " << residual << std::endl;
-        if (residual < tol)
-          break;
+          if (residual < tol)
+            break;
         } catch (dealii::SolverControl::NoConvergence &failure) {
           failure.print_info(std::cout);
           break;
-      }
+        }
       }
       if (residual >= tol) {
         unconverged.push_back(m);
@@ -107,7 +107,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       reference_g = reference.block(g);
       int g_rev = num_groups - 1 - g;
       double width =
-          mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+          // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+          std::log(mgxs->group_structure[g_rev+1]/mgxs->group_structure[g_rev]);
       AssertThrow(width > 0, dealii::ExcInvalidState());
       for (int m = 0; m < l2_errors.size(); ++m) {
         if (m > 0)
@@ -150,7 +151,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       d2m.vmult(reference_g_m, reference_g_d);
       int g_rev = num_groups - 1 - g;
       double width =
-          mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+          // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+          std::log(mgxs->group_structure[g_rev+1]/mgxs->group_structure[g_rev]);
       AssertThrow(width > 0, dealii::ExcInvalidState());
       for (int m = 0; m < l2_errors.size(); ++m) {
         if (m > 0) {
@@ -185,7 +187,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int g = 0; g < summands_energy.size(); ++g) {
         int g_rev = num_groups - 1 - g;
         double width = 
-            mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+            // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+            std::log(mgxs->group_structure[g_rev+1]
+                     /mgxs->group_structure[g_rev]);
         AssertThrow(width > 0, dealii::ExcInvalidState());
         summands_energy[g] /= std::sqrt(width);
       }
@@ -237,7 +241,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int g = 0; g < num_groups; ++g) {
         int g_rev = num_groups - 1 - g;
         double width =
-            mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+            // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+            std::log(mgxs->group_structure[g_rev+1]
+                     /mgxs->group_structure[g_rev]);
         AssertThrow(width > 0, dealii::ExcInvalidState());
         if (!do_stream) {
           residual_g = residual.block(g);
@@ -325,7 +331,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int g = 0; g < num_groups; ++g) {
         int g_rev = num_groups - 1 - g;
         double width =
-            mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+            // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
+            std::log(mgxs->group_structure[g_rev+1]
+                     /mgxs->group_structure[g_rev]);
         AssertThrow(width > 0, dealii::ExcInvalidState());
         residual_g = residual.block(g);
         for (int n = 0; n < quadrature.size(); ++n) {
@@ -363,10 +371,14 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         dof_handler.get_triangulation().n_active_cells());
     for (int c = 0; c < masses_cho.size(); ++c)
       masses_cho[c].cholesky(transport.cell_matrices[c].mass);
+    double lowest = 1e-5;
     for (int g = 0; g < num_groups; ++g) {
       int g_rev = num_groups - 1 - g;
-      double width = mgxs->group_structure[g_rev+1] 
-                     - mgxs->group_structure[g_rev];
+      double lower = mgxs->group_structure[g_rev] > 0 ?
+                     mgxs->group_structure[g_rev] : lowest;
+      double width = //mgxs->group_structure[g_rev+1]
+                     //- mgxs->group_structure[g_rev];
+          std::log(mgxs->group_structure[g_rev+1]/lower);
       for (int n = 0; n < quadrature.size(); ++n) {
         for (int c = 0; c < masses_cho.size(); ++c) {
           int nc = n * dof_handler.n_dofs() 
@@ -409,8 +421,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       }
       for (int g = 0; g < num_groups; ++g) {
         int g_rev = num_groups - 1 - g;
-        double width = mgxs->group_structure[g_rev+1] 
-                      - mgxs->group_structure[g_rev];
+        double lower = mgxs->group_structure[g_rev] > 0 ? 
+                       mgxs->group_structure[g_rev] : lowest;
+        double width = //mgxs->group_structure[g_rev+1] 
+                      //- mgxs->group_structure[g_rev];
+            std::log(mgxs->group_structure[g_rev+1]/lower);
         svecs_energy[s][g] = flux_matrix.get_svd_u()(g, s) * std::sqrt(width);
       }
       svecs_energy[s] *= flux_matrix.singular_value(s);
