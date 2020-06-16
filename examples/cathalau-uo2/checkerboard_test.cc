@@ -30,7 +30,7 @@ class CheckerboardTest : public CathalauTest,
     Mgxs mgxs_uo2(num_groups, materials_uo2.size(), num_legendre);
     Mgxs mgxs_mox(num_groups, materials_mox.size(), num_legendre);
     const std::string dir = "/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/";
-    const std::string suffix = "/mgxs-" + group_structure + "-a.h5";
+    const std::string suffix = "/mgxs-" + group_structure + ".h5";
     read_mgxs(mgxs_uo2, dir+"uo2"+suffix, "294K", materials_uo2, true);
     read_mgxs(mgxs_mox, dir+"mox43"+suffix, "294K", materials_mox, true);
     materials.insert(
