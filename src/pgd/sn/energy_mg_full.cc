@@ -211,7 +211,7 @@ void EnergyMgFull::update(
         solution_u[mm+g] = modes[m][g];
       }
     }
-    dealii::SolverControl control(5000, 1e-6*source_u.l2_norm());
+    dealii::SolverControl control(1000, source_u.l2_norm()*1e-4);
     dealii::SolverGMRES<dealii::Vector<double>> solver(control);
     try {
     solver.solve(matrix_u, solution_u, source_u, 
