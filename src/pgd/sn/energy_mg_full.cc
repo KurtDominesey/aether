@@ -213,8 +213,13 @@ void EnergyMgFull::update(
     }
     dealii::SolverControl control(5000, 1e-6*source_u.l2_norm());
     dealii::SolverGMRES<dealii::Vector<double>> solver(control);
+    try {
     solver.solve(matrix_u, solution_u, source_u, 
                  dealii::PreconditionIdentity());
+    } catch (dealii::SolverControl::NoConvergence &failure) {
+      std::cout << "failure in updating energy\n";
+      failure.print_info(std::cout);
+    }
   } else {
     matrix_u.gauss_jordan();
     matrix_u.vmult(solution_u, source_u);

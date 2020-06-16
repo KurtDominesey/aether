@@ -125,8 +125,16 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     dealii::BlockVector<double> _;
     for (int m = 0; m < num_modes; ++m) {
       nonlinear_gs.enrich();
+      std::cout << "mode " << m << std::endl;
       for (int k = 0; k < max_iters_nonlinear; ++k) {
-        double residual = nonlinear_gs.step(_, _);
+        double residual = std::numeric_limits<double>::infinity();
+        try {
+          residual = nonlinear_gs.step(_, _);
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+          break;
+        }
+        std::cout << "picard " << k << ": " << residual << std::endl;
         if (residual < tol_nonlinear)
           break;
       }

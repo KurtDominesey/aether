@@ -65,10 +65,17 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     for (int m = 0; m < num_modes; ++m) {
       nonlinear_gs.enrich();
       double residual = 0;
+      std::cout << "mode " << m << std::endl;
       for (int k = 0; k < max_iters; ++k) {
+        try {
         residual = nonlinear_gs.step(_, _);
+          std::cout << "picard " << k << " : " << residual << std::endl;
         if (residual < tol)
           break;
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+          break;
+      }
       }
       if (residual >= tol) {
         unconverged.push_back(m);
