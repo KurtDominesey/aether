@@ -271,7 +271,7 @@ double FixedSourceP<dim, qdim>::enrich(const double factor) {
                       1,
                       transport.dof_handler.n_dofs());
   caches.back().mode = 1;
-  return caches.back().mode.l2_norm();
+  return 0;
 }
 
 template <int dim, int qdim>

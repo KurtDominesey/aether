@@ -105,7 +105,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
     pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
     std::vector<pgd::sn::LinearInterface*> linear_ops = 
-        {&fixed_source_p, &energy_mg};
+        {&energy_mg, &fixed_source_p};
     pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
     // run pgd
     // this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
