@@ -48,13 +48,13 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                     const int max_iters, const double tol) {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
-    // dealii::ReductionControl control_wg(500, 1e-6, 1e-4);
-    // dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
-    // FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim, qdim>
-    //     preconditioner(problem.fixed_source, solver_wg);
-    dealii::PreconditionIdentity preconditioner;
+    dealii::ReductionControl control_wg(500, 1e-6, 1e-4);
+    dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+    FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim, qdim>
+        preconditioner(problem.fixed_source, solver_wg);
+    // dealii::PreconditionIdentity preconditioner;
     dealii::SolverControl control(max_iters, tol);
-    dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+    dealii::SolverGMRES<dealii::BlockVector<double>> solver(control);
     solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
   }
 
