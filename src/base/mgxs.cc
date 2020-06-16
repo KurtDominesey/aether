@@ -171,11 +171,11 @@ Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
                    const std::vector<int> &g_maxes,
                    const TransportCorrection correction) {
   std::vector<dealii::BlockVector<double>> spectra;
-  std::cout << "collapse spectra\n";
+  // std::cout << "collapse spectra\n";
   collapse_spectra(spectra, flux, dof_handler, transport);
   AssertDimension(spectra.size(), mgxs.total.size());
   AssertDimension(spectra[0].size(), mgxs.total[0].size());
-  std::cout << "collapse mgxs\n";
+  // std::cout << "collapse mgxs\n";
   return collapse_mgxs(spectra, mgxs, g_maxes, correction);
 }
 
@@ -233,8 +233,8 @@ Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
           break;
         case INCONSISTENT_P: {
           int jll = j + order * num_materials;
-        std::cout << "g=" << g_coarse << " ell=" << order << " " 
-                  << denominator[jll] << std::endl;
+        // std::cout << "g=" << g_coarse << " ell=" << order << " " 
+        //           << denominator[jll] << std::endl;
           mgxs_coarse.total[g_coarse][j] = collision[jll] / denominator[jll];
           break;
         }

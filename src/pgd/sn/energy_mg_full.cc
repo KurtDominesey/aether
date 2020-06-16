@@ -30,8 +30,8 @@ void EnergyMgFull::step(dealii::BlockVector<double>&,
   set_matrix(coefficients_x.back());
   coefficients_x.pop_back();
   set_source(coefficients_b, coefficients_x);
-  matrix.print(std::cout);
-  source.print(std::cout);
+  // matrix.print(std::cout);
+  // source.print(std::cout);
   matrix.gauss_jordan();
   dealii::Vector<double> solution(modes.back());
   matrix.vmult(solution, source);
@@ -39,7 +39,7 @@ void EnergyMgFull::step(dealii::BlockVector<double>&,
   // matrix.vmult(solution, modes.back());
   // source -= solution;
   // modes.back() += source;
-  modes.back().print(std::cout);
+  // modes.back().print(std::cout);
 }
 
 double EnergyMgFull::get_residual(
@@ -81,6 +81,7 @@ void EnergyMgFull::normalize() {
 
 void EnergyMgFull::set_matrix(InnerProducts coefficients_x) {
   matrix = 0;
+  // std::cout << coefficients_x.streaming << std::endl;
   for (int g = 0; g < mgxs.total.size(); ++g) {
     matrix[g][g] += coefficients_x.streaming;
     for (int j = 0; j < mgxs.total[g].size(); ++j) {
@@ -147,7 +148,7 @@ void EnergyMgFull::get_inner_products(
     for (int g = 0; g < modes.back().size(); ++g) {
       inner_products_b[i] += mode_row[g] * sources[i][g];
     }
-    std::cout << "e ip b " << inner_products_b[i] << std::endl;
+    // std::cout << "e ip b " << inner_products_b[i] << std::endl;
   }
   AssertDimension(modes.size(), inner_products_x.size());
   for (int m = m_col_start; m < modes.size(); ++m) {
@@ -167,10 +168,10 @@ void EnergyMgFull::get_inner_products(
         }
       }
     }
-    std::cout << "e ip x " << inner_products_x[m].streaming << std::endl;
+    // std::cout << "e ip x " << inner_products_x[m].streaming << std::endl;
     for (int j = 0; j < inner_products_x[m].collision.size(); ++j) {
-      std::cout << "e ip x " << inner_products_x[m].collision[j] << std::endl;
-      std::cout << "e ip x " << inner_products_x[m].scattering[j][0] << std::endl;
+      // std::cout << "e ip x " << inner_products_x[m].collision[j] << std::endl;
+      // std::cout << "e ip x " << inner_products_x[m].scattering[j][0] << std::endl;
     }
   }
 }

@@ -90,10 +90,10 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
       }
     }
   }
-  std::cout << "ip x " << inner_products[0].streaming << std::endl;
+  // std::cout << "ip x " << inner_products[0].streaming << std::endl;
   for (int j = 0; j < inner_products[0].collision.size(); ++j) {
-    std::cout << "ip x " << inner_products[0].collision[0] << std::endl;
-    std::cout << "ip x " << inner_products[0].scattering[0][0] << std::endl;
+    // std::cout << "ip x " << inner_products[0].collision[0] << std::endl;
+    // std::cout << "ip x " << inner_products[0].scattering[0][0] << std::endl;
   }
 }
 
@@ -116,7 +116,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
         inner_products[i] += transport.quadrature.weight(n) 
                              * (mode_g.block(n) * collided_g.block(n));
     }
-    std::cout << "ip b " << inner_products[i] << std::endl;
+    // std::cout << "ip b " << inner_products[i] << std::endl;
   }
 }
 

@@ -214,9 +214,9 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
           double full_ip = mgxs_coarse_ip.total[g_coarse][j];
           double error_ip = (full_ip - mgxs_coarses_ip[m].total[g_coarse][j]) 
                             / full_ip;
-          std::cout << full << ", " 
-                    << full_ip << ", " 
-                    << mgxs_coarses_ip[m].total[g_coarse][j] << std::endl;
+          // std::cout << full << ", " 
+          //           << full_ip << ", " 
+          //           << mgxs_coarses_ip[m].total[g_coarse][j] << std::endl;
           table.add_value(key+"ip", error_ip);
         }
         table.set_scientific(key, true);
@@ -305,7 +305,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       mode_l = mode_lb;
       for (int g = 0; g < num_groups; ++g)
         flux_l.block(g).add(modes_energy[m][g], mode_l);
-      std::cout << "m=" << m << std::endl;
+      // std::cout << "m=" << m << std::endl;
       if (m >= m_start) {
         Mgxs mgxs_coarse = collapse_mgxs(
             flux_l, dof_handler, transport, mgxs_fine, g_maxes, correction);

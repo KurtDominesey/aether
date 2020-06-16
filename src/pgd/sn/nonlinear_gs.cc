@@ -63,7 +63,7 @@ void NonlinearGS::set_inner_products() {
 
 void NonlinearGS::finalize() {
   const int num_modes = inner_products_x[0].size();
-  std::cout << "num_modes " << num_modes << std::endl;
+  // std::cout << "num_modes " << num_modes << std::endl;
   for (int i = 0; i < linear_ops.size(); ++i) {
     inner_products_all_x[i].push_back(inner_products_x[i]);
     inner_products_all_b[i].push_back(inner_products_b[i]);
@@ -71,7 +71,7 @@ void NonlinearGS::finalize() {
     AssertDimension(inner_products_all_b[i].size(), num_modes);
     for (int m_row = 0; m_row < num_modes - 1; ++m_row) {
       inner_products_all_x[i][m_row].push_back(inner_products_one);
-      std::cout << inner_products_all_x[i][m_row].size() << std::endl;
+      // std::cout << inner_products_all_x[i][m_row].size() << std::endl;
       AssertDimension(inner_products_all_x[i][m_row].size(), num_modes);
       linear_ops[i]->get_inner_products(
           inner_products_all_x[i][m_row], inner_products_all_b[i][m_row],
