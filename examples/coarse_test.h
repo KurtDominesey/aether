@@ -213,16 +213,16 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       std::vector<double> l2_errors_coarse_m_abs;
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs, flux_coarse, 
                                 flux_coarsened, transport, false, table, 
-                                "coarse_d_abs_"+label);
+                                "coarse_d_abs"+label);
       GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs, flux_coarse, 
                               flux_coarsened, transport, d2m, false, table, 
-                              "coarse_m_abs_"+label);
+                              "coarse_m_abs"+label);
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
                                 flux_coarsened, transport, true, table, 
-                                "coarse_d_rel_"+label);
+                                "coarse_d_rel"+label);
       GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel, flux_coarse, 
                                flux_coarsened, transport, d2m, true, table,
-                               "coarse_m_rel_"+label);
+                               "coarse_m_rel"+label);
       for (int i = 0; i < mgxs_coarses.size(); ++i) {
         std::vector<double> l2_errors_coarse_d_rel_mi;
         std::vector<double> l2_errors_coarse_m_rel_mi;
