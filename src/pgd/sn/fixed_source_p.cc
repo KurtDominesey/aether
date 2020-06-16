@@ -227,7 +227,7 @@ void FixedSourceP<dim, qdim>::step(
   // uncollided -= solution;
   // caches.back().mode += uncollided;
   dealii::SolverControl solver_control(3000, 1e-8);
-  dealii::SolverRichardson<dealii::BlockVector<double>> solver(solver_control);
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver(solver_control);
   solver.solve(fixed_source, solution, uncollided, 
                dealii::PreconditionIdentity());
   caches.back().mode.sadd(1 - omega, omega, solution);
