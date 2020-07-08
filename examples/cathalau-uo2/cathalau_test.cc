@@ -1,3 +1,6 @@
+#ifndef AETHER_EXAMPLES_CATHALAU_CATHALAU_TEST_H_
+#define AETHER_EXAMPLES_CATHALAU_CATHALAU_TEST_H_
+
 #include "../example_test.h"
 
 namespace cathalau {
@@ -37,6 +40,18 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
     mesh_symmetric_quarter_pincell(mesh, radii, pitch, regions);
     set_all_boundaries_reflecting(mesh);
   }
+
+  void SetVolumes() {
+    std::vector<double> volumes(materials.size());
+    std::vector<double> areas(radii.size());  // ring areas
+    for (int r = 0; r < radii.size(); ++r)
+      areas[r]= dealii::numbers::PI * std::pow(radii[r], 2);
+    volumes[regions.back()] = std::pow(2*pitch, 2) - areas.back();
+    for (int r = 0; r < radii.size(); ++r)
+      volumes[regions[r]] += areas[r] - (r == 0 ? 0 : areas[r-1]);
+  }
 };
 
 }  // namespace cathalau
+
+#endif  // AETHER_EXAMPLES_CATHALAU_CATHALAU_TEST_H_
