@@ -52,9 +52,10 @@ class TransportBlock {
    */
   int n_block_rows() const;
 
- protected:
   //! The transport operator.
   const Transport<dim> &transport;
+
+ protected:
   //! The total material cross-sections.
   const std::vector<double> &cross_sections;
   //! The values of \f$\psi_\text{inc}\f$ by boundary id.

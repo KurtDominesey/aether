@@ -140,6 +140,10 @@ class Transport {
 
   //! Cached cell matrices
   std::vector<CellMatrices<dim>> cell_matrices;
+  //! DoF handler for the finite elelments.
+  const dealii::DoFHandler<dim> &dof_handler;
+  //! Angular quadrature.
+  const dealii::Quadrature<qdim> &quadrature;
 
  protected:
   void assemble_cell_matrices();
@@ -159,10 +163,6 @@ class Transport {
                     const std::vector<dealii::BlockVector<double>>
                         &boundary_conditions) const;
 
-  //! DoF handler for the finite elelments.
-  const dealii::DoFHandler<dim> &dof_handler;
-  //! Angular quadrature.
-  const dealii::Quadrature<qdim> &quadrature;
   //! Discrete ordinates (sweep directions).
   std::vector<Ordinate> ordinates;
   //! Representative direction per unique octant of unit sphere.
