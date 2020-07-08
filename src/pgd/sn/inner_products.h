@@ -34,7 +34,12 @@ struct InnerProducts {
     scattering *= other.scattering;
     return *this;
   }
+  double eval() const {
+    return streaming + collision.sum() + scattering.sum().sum();
+  }
 };
+
+InnerProducts operator*(const InnerProducts &a, const InnerProducts&b);
 
 }  // namespace aether::pgd::sn
 
