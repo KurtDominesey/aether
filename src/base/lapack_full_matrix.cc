@@ -1575,10 +1575,13 @@ LAPACKFullMatrix_<number>::reciprocal_condition_number() const
 
 template <typename number>
 void
-LAPACKFullMatrix_<number>::compute_svd()
+LAPACKFullMatrix_<number>::compute_svd(const char job)
 {
   Assert(state == matrix, ExcState(state));
   state = LAPACKSupport::unusable;
+
+  Assert(job == LAPACKSupport::A || job == 'S', 
+         dealii::ExcNotImplemented());
 
   const types::blas_int mm = this->m();
   const types::blas_int nn = this->n();
@@ -1586,8 +1589,21 @@ LAPACKFullMatrix_<number>::compute_svd()
   std::fill(wr.begin(), wr.end(), 0.);
   ipiv.resize(8 * mm);
 
-  svd_u  = std_cxx14::make_unique<LAPACKFullMatrix_<number>>(mm, mm);
-  svd_vt = std_cxx14::make_unique<LAPACKFullMatrix_<number>>(nn, nn);
+  switch (job) {
+    case LAPACKSupport::A: {
+      svd_u  = std_cxx14::make_unique<LAPACKFullMatrix_<number>>(mm, mm);
+      svd_vt = std_cxx14::make_unique<LAPACKFullMatrix_<number>>(nn, nn);
+      break;
+    }
+    case 'S': {
+      std::size_t min = std::min(this->m(), this->n());
+      svd_u  = std_cxx14::make_unique<LAPACKFullMatrix_<number>>(mm, min);
+      svd_vt = std_cxx14::make_unique<LAPACKFullMatrix_<number>>(min, nn);
+      break;
+    }
+    default:
+      Assert(false, dealii::ExcNotImplemented());
+  }
   types::blas_int info = 0;
 
   // First determine optimal workspace size
@@ -1608,7 +1624,7 @@ LAPACKFullMatrix_<number>::compute_svd()
   // make sure that the first entry in the work array is clear, in case the
   // routine does not completely overwrite the memory:
   work[0] = number();
-  internal::LAPACKFullMatrix_Implementation::gesdd_helper(LAPACKSupport::A,
+  internal::LAPACKFullMatrix_Implementation::gesdd_helper(job,
                                                          mm,
                                                          nn,
                                                          this->values,
@@ -1628,7 +1644,7 @@ LAPACKFullMatrix_<number>::compute_svd()
 
   work.resize(lwork);
   // Do the actual SVD.
-  internal::LAPACKFullMatrix_Implementation::gesdd_helper(LAPACKSupport::A,
+  internal::LAPACKFullMatrix_Implementation::gesdd_helper(job,
                                                          mm,
                                                          nn,
                                                          this->values,

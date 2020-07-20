@@ -829,7 +829,7 @@ public:
    * accessed by get_svd_vt(), while U is accessed with get_svd_u().
    */
   void
-  compute_svd();
+  compute_svd(const char job=LAPACKSupport::A);
 
   /**
    * Compute the inverse of the matrix by singular value decomposition.
