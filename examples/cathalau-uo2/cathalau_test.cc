@@ -50,6 +50,24 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
     for (int r = 0; r < radii.size(); ++r)
       volumes[regions[r]] += areas[r] - (r == 0 ? 0 : areas[r-1]);
   }
+
+  void PrintMesh() {
+    dealii::GridOutFlags::Svg svg;
+    svg.coloring = dealii::GridOutFlags::Svg::Coloring::material_id;
+    svg.margin = false;
+    svg.label_cell_index = false;
+    svg.label_level_number = false;
+    svg.label_level_subdomain_id = false;
+    svg.label_material_id = false;
+    svg.label_subdomain_id = false;
+    svg.draw_colorbar = false;
+    svg.draw_legend = false;
+    dealii::GridOut grid_out;
+    grid_out.set_flags(svg);
+    std::string filename = "mesh_"+this->GetTestName()+".svg";
+    std::ofstream file(filename);
+    grid_out.write_svg(mesh, file);
+  }
 };
 
 }  // namespace cathalau
