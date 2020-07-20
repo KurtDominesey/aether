@@ -170,10 +170,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           l2_error_sq *= std::pow(solutions_energy[0][g], 2);
           double l2_error = std::sqrt(l2_error_sq);
           l2_errors_n[cycle][g][n] = l2_error;
-          std::string gn_key = "g"+std::to_string(g) + "n"+std::to_string(n);
-          convergence_table.add_value(gn_key, l2_error);
-          convergence_table.set_scientific(gn_key, true);
-          convergence_table.set_precision(gn_key, 16);
           double summand = l2_error_sq * quadrature.weight(n);
           l2_errors_g[cycle][g] += summand;
           l2_errors[cycle] += summand;
@@ -184,10 +180,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           }
         }
         l2_errors_g[cycle][g] = std::sqrt(l2_errors_g[cycle][g]);
-        std::string g_key = "g" + std::to_string(g);
-        convergence_table.add_value(g_key, l2_errors_g[cycle][g]);
-        convergence_table.set_scientific(g_key, true);
-        convergence_table.set_precision(g_key, 16);
       }
       l2_errors[cycle] = std::sqrt(l2_errors[cycle]);
       convergence_table.add_value("total", l2_errors[cycle]);
@@ -293,10 +285,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           l2_error_sq *= std::pow(solutions_energy[0][g], 2);
           double l2_error = std::sqrt(l2_error_sq);
           l2_errors_n[cycle][g][n] = l2_error;
-          std::string gn_key = "g"+std::to_string(g) + "n"+std::to_string(n);
-          convergence_table.add_value(gn_key, l2_error);
-          convergence_table.set_scientific(gn_key, true);
-          convergence_table.set_precision(gn_key, 16);
           double summand = l2_error_sq * quadrature.weight(n);
           l2_errors_g[cycle][g] += summand;
           l2_errors[cycle] += summand;
@@ -307,10 +295,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           }
         }
         l2_errors_g[cycle][g] = std::sqrt(l2_errors_g[cycle][g]);
-        std::string g_key = "g" + std::to_string(g);
-        convergence_table.add_value(g_key, l2_errors_g[cycle][g]);
-        convergence_table.set_scientific(g_key, true);
-        convergence_table.set_precision(g_key, 16);
       }
       l2_errors[cycle] = std::sqrt(l2_errors[cycle]);
       convergence_table.add_value("total", l2_errors[cycle]);
