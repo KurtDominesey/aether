@@ -1,6 +1,10 @@
 #ifndef AETHER_EXAMPLES_COMPARE_TEST_H_
 #define AETHER_EXAMPLES_COMPARE_TEST_H_
 
+#include <hdf5.h>
+
+#include <deal.II/base/hdf5.h>
+
 #include "example_test.h"
 
 #include "base/lapack_full_matrix.cc"
@@ -441,7 +445,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                const double tol_nonlinear,
                const int max_iters_fullorder,
                const double tol_fullorder,
-               const bool do_update) {
+               const bool do_update,
+               const bool precomputed_full=false,
+               const bool precomputed_pgd=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -464,8 +470,19 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
             sources_energy[j][g], sources_spaceangle[j].block(0));
     FixedSourceProblem<dim, qdim> problem_full(
         dof_handler, quadrature, *mgxs, boundary_conditions);
-    RunFullOrder(flux_full, source_full, problem_full, 
-                 max_iters_fullorder, tol_fullorder);
+    const std::string filename = this->GetTestName() + ".h5";
+    namespace HDF5 = dealii::HDF5;
+    if (precomputed_full) {
+      HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+      flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+    } else {
+      RunFullOrder(flux_full, source_full, problem_full, 
+                   max_iters_fullorder, tol_fullorder);
+      dealii::Vector<double> flux_full_v(flux_full.size());
+      flux_full_v = flux_full;
+      HDF5::File file(filename, HDF5::File::FileAccessMode::create);
+      file.write_dataset("flux_full", flux_full_v);
+    }
     // Compute svd of full order
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
@@ -486,21 +503,46 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     pgd::sn::FixedSourceP fixed_source_p(
         problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
     pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
-    std::vector<pgd::sn::LinearInterface*> linear_ops = 
-        {&energy_mg, &fixed_source_p};
-    pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
-    std::vector<int> unconverged;
-    std::vector<double> residuals;
-    RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-           do_update, unconverged, residuals);
-    std::cout << "done running pgd\n";
-    std::ofstream unconverged_txt;
-    unconverged_txt.open(this->GetTestName()+"_unconverged.txt", 
-                         std::ios::trunc);
-    for (int u = 0; u < unconverged.size(); ++u)
-      unconverged_txt << unconverged[u] << " " << residuals[u] << std::endl;
-    unconverged_txt.close();
-    std::cout << "wrote unconverged\n";
+    if (precomputed_pgd) {
+      // read from file
+      HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+      for (int m = 0; m < num_modes; ++m) {
+        const std::string mm = std::to_string(m);
+        fixed_source_p.enrich(0);
+        fixed_source_p.caches.back().mode = file.open_dataset(
+            "modes_spaceangle"+mm).read<dealii::Vector<double>>();
+        fixed_source_p.set_cache(fixed_source_p.caches.back());
+        energy_mg.modes.push_back(file.open_dataset(
+            "modes_energy"+mm).read<dealii::Vector<double>>());
+      }
+    } else {
+      // run pgd
+      std::vector<pgd::sn::LinearInterface*> linear_ops = 
+          {&energy_mg, &fixed_source_p};
+      pgd::sn::NonlinearGS nonlinear_gs(
+          linear_ops, num_materials, 1, num_sources);
+      std::vector<int> unconverged;
+      std::vector<double> residuals;
+      std::cout << "run pgd\n";
+      RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
+            do_update, unconverged, residuals);
+      std::cout << "done running pgd\n";
+      std::ofstream unconverged_txt;
+      unconverged_txt.open(this->GetTestName()+"_unconverged.txt", 
+                          std::ios::trunc);
+      for (int u = 0; u < unconverged.size(); ++u)
+        unconverged_txt << unconverged[u] << " " << residuals[u] << std::endl;
+      unconverged_txt.close();
+      std::cout << "wrote unconverged\n";
+      // write to file
+      HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+      for (int m = 0; m < num_modes; ++m) {
+        const std::string mm = std::to_string(m);
+        file.write_dataset(
+            "modes_spaceangle"+mm, fixed_source_p.caches[m].mode.block(0));
+        file.write_dataset("modes_energy"+mm, energy_mg.modes[m]);
+      }
+    }
     std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
         dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
     for (int m = 0; m < num_modes; ++m)
