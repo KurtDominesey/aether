@@ -483,6 +483,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       HDF5::File file(filename, HDF5::File::FileAccessMode::create);
       file.write_dataset("flux_full", flux_full_v);
     }
+    this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
     // Compute svd of full order
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
