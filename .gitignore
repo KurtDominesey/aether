@@ -17,3 +17,5 @@ callgrind.out.*
 *.txt
 !CMakeLists.txt
 *.h5
+*.pyc
+*.pgf
