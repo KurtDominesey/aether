@@ -85,6 +85,12 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         INCONSISTENT_P);
     write_mgxs(mgxs_coarse_ip, test_name+"_ip_mgxs.h5", "294K", materials);
     std::cout << "MGXS TO FILE " << filename << std::endl;
+    // Compute svd of full order
+    std::vector<dealii::BlockVector<double>> svecs_spaceangle;
+    std::vector<dealii::Vector<double>> svecs_energy;
+    this->ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
+                     problem_full.transport);
+    const int num_svecs = svecs_spaceangle.size();
     // Get coarsened quantities
     const int num_groups_coarse = g_maxes.size();
     flux_coarsened.reinit(
@@ -161,18 +167,27 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     modes_spaceangle.clear();
     std::cout << "done running pgd\n";
     std::vector<dealii::BlockVector<double>> fluxes_coarsened_pgd;
+    std::vector<dealii::BlockVector<double>> fluxes_coarsened_svd;
     dealii::BlockVector<double> flux_coarsened_pgd(
         flux_coarsened.get_block_indices());
+    dealii::BlockVector<double> flux_coarsened_svd(flux_coarsened_pgd);
     for (int m = 0; m < num_modes; ++m) {
+      dealii::Vector<double> svec_spaceangle(svecs_spaceangle[m].size());
+      svec_spaceangle = svecs_spaceangle[m];
       for (int g_coarse = 0; g_coarse < num_groups_coarse; ++g_coarse) {
         int g_min = g_coarse == 0 ? 0 : g_maxes[g_coarse-1];
         int g_max = g_maxes[g_coarse];
-        for (int g = g_min; g < g_max; ++g)
+        for (int g = g_min; g < g_max; ++g) {
           flux_coarsened_pgd.block(g_coarse).add(
               energy_mg.modes[m][g], fixed_source_p.caches[m].mode.block(0));
+          flux_coarsened_svd.block(g_coarse).add(
+              svecs_energy[m][g], svec_spaceangle);
+        }
       }
-      if ((m+1) % incr == 0)
+      if ((m+1) % incr == 0) {
         fluxes_coarsened_pgd.push_back(flux_coarsened_pgd);
+        fluxes_coarsened_svd.push_back(flux_coarsened_svd);
+      }
     }
     // Run coarse group
     std::vector<std::vector<dealii::BlockVector<double>>>
@@ -256,24 +271,28 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                                  "coarse_m_rel"+labelm);
       }
     }
-    for (int i = 0; i < fluxes_coarsened_pgd.size(); ++i) {
-      std::vector<double> l2_errors_pgd_d_rel;
-      std::vector<double> l2_errors_pgd_m_rel;
-      std::vector<double> l2_errors_pgd_d_abs;
-      std::vector<double> l2_errors_pgd_m_abs;
-      std::string m = "_m" + std::to_string((i + 1) * incr);
-      GetL2ErrorsCoarseDiscrete(l2_errors_pgd_d_abs, fluxes_coarsened_pgd[i], 
-                                flux_coarsened, transport, false, table,
-                                "pgd_d_abs"+m);
-      GetL2ErrorsCoarseMoments(l2_errors_pgd_m_abs, fluxes_coarsened_pgd[i], 
-                               flux_coarsened, transport, d2m, false, table,
-                               "pgd_m_abs"+m);
-      GetL2ErrorsCoarseDiscrete(l2_errors_pgd_d_rel, fluxes_coarsened_pgd[i], 
-                                flux_coarsened, transport, true, table, 
-                                "pgd_d_rel"+m);
-      GetL2ErrorsCoarseMoments(l2_errors_pgd_m_rel, fluxes_coarsened_pgd[i], 
-                               flux_coarsened, transport, d2m, true, table, 
-                               "pgd_m_rel"+m);
+    for (int d = 0; d < 2; ++d) {
+      std::vector<dealii::BlockVector<double>> &fluxes_coarsened = 
+          d ? fluxes_coarsened_svd : fluxes_coarsened_pgd;
+      const std::string decomp = d ? "svd" : "pgd";                 
+      for (int i = 0; i < fluxes_coarsened.size(); ++i) {
+        std::vector<double> l2_errors_decomp_d_rel;
+        std::vector<double> l2_errors_decomp_m_rel;
+        std::vector<double> l2_errors_decomp_d_abs;
+        std::vector<double> l2_errors_decomp_m_abs;
+        std::string m = "_m" + std::to_string((i + 1) * incr);
+        GetL2ErrorsCoarseDiscrete(l2_errors_decomp_d_abs, fluxes_coarsened[i], 
+                                  flux_coarsened, transport, false, table,
+                                  decomp+"_d_abs"+m);
+        GetL2ErrorsCoarseMoments(l2_errors_decomp_m_abs, fluxes_coarsened[i], 
+                                flux_coarsened, transport, d2m, false, table,
+                                decomp+"_m_abs"+m);
+        GetL2ErrorsCoarseDiscrete(l2_errors_decomp_d_rel, fluxes_coarsened[i], 
+                                  flux_coarsened, transport, true, table, 
+                                  decomp+"_d_rel"+m);
+        GetL2ErrorsCoarseMoments(l2_errors_decomp_m_rel, fluxes_coarsened[i], 
+                                flux_coarsened, transport, d2m, true, table, 
+                                decomp+"_m_rel"+m);
     }
     for (int g = 0; g < num_groups_coarse; ++g) {
       table.add_value("flux_coarse", flux_coarse_cp.block(g).l2_norm());
