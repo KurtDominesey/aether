@@ -65,6 +65,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       HDF5::File file(filename_h5, HDF5::File::FileAccessMode::create);
       file.write_dataset("flux_full", flux_full_v);
     }
+    this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
     dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
     dealii::BlockVector<double> flux_full_l1(num_groups, 2*dof_handler.n_dofs());
     for (int g = 0; g < num_groups; ++g) {
@@ -93,6 +94,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     const int num_svecs = svecs_spaceangle.size();
     // Get coarsened quantities
     const int num_groups_coarse = g_maxes.size();
+    std::vector<double> group_structure_coarse(num_groups_coarse+1);
+    group_structure_coarse[0] = mgxs->group_structure[0];
     flux_coarsened.reinit(
         num_groups_coarse, quadrature.size()*dof_handler.n_dofs());
     source_coarse.reinit(flux_coarsened.get_block_indices());
@@ -103,7 +106,10 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         source_coarse.block(g_coarse) += source_full.block(g);
         flux_coarsened.block(g_coarse) += flux_full.block(g);
       }
+      group_structure_coarse[g_coarse+1] = mgxs->group_structure[g_max];
     }
+    this->PlotFlux(flux_coarsened, problem_full.d2m, group_structure_coarse, 
+                   "full_coarsened");
     // ERASE FULL-ORDER FINE-GROUP FLUX TO SAVE MEMORY
     flux_full.reinit(0);
     flux_full_l0.reinit(0);
@@ -250,6 +256,12 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel, flux_coarse, 
                                flux_coarsened, transport, d2m, true, table,
                                "coarse_m_rel"+label);
+      this->PlotFlux(flux_coarse, problem_full.d2m, 
+                      group_structure_coarse, "coarse"+label);
+      this->PlotDiffAngular(flux_coarse, flux_coarsened, problem_full.d2m,
+                            "diff_angular_coarse"+label);
+      this->PlotDiffScalar(flux_coarse, flux_coarsened, problem_full.d2m,
+                           "diff_scalar_coarse"+label);
       for (int i = 0; i < mgxs_coarses.size(); ++i) {
         std::vector<double> l2_errors_coarse_d_rel_mi;
         std::vector<double> l2_errors_coarse_m_rel_mi;
@@ -293,6 +305,12 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         GetL2ErrorsCoarseMoments(l2_errors_decomp_m_rel, fluxes_coarsened[i], 
                                 flux_coarsened, transport, d2m, true, table, 
                                 decomp+"_m_rel"+m);
+        this->PlotFlux(fluxes_coarsened[i], problem_full.d2m, 
+                       group_structure_coarse, decomp+"_coarsened"+m);
+        this->PlotDiffAngular(fluxes_coarsened[i], flux_coarsened, 
+            problem_full.d2m, decomp+"_diff_angular_coarsened"+m);
+        this->PlotDiffScalar(fluxes_coarsened[i], flux_coarsened, 
+            problem_full.d2m, decomp+"_diff_scalar_coarsened"+m);
       }
     }
     for (int g = 0; g < num_groups_coarse; ++g) {
