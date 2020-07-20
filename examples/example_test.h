@@ -44,18 +44,18 @@ class ExampleTest : public ::testing::Test {
   QAngle<qdim> quadrature;
   std::unique_ptr<Mgxs> mgxs;
 
-  std::string GetTestName() {
+  std::string GetTestName() const {
     const ::testing::TestInfo* const test_info =
         ::testing::UnitTest::GetInstance()->current_test_info();
     std::string param = "";
     std::string name = test_info->name();
     auto this_with_param = 
-      dynamic_cast<::testing::WithParamInterface<std::string>*>(this);
+      dynamic_cast<const ::testing::WithParamInterface<std::string>*>(this);
     if (this_with_param != nullptr)
       param = this_with_param->GetParam();
     else {  // TODO: generalize this
       auto this_with_params =
-          dynamic_cast<::testing::WithParamInterface<
+          dynamic_cast<const ::testing::WithParamInterface<
             std::tuple<std::string, std::string>>*>(this);
       if (this_with_params != nullptr)
         param = std::get<0>(this_with_params->GetParam())
