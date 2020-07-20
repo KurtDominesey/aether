@@ -22,6 +22,7 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
   std::vector<double> coefficients_b(inner_products_b[0].size());
   std::vector<dealii::Vector<double>> steps(linear_ops.size());
   std::vector<double> norms(linear_ops.size());
+  /*
   double r0 = get_residual();
   const int num_modes = inner_products_x[0].size();
   const int num_sources = inner_products_b[0].size();
@@ -37,6 +38,7 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
   std::vector<std::vector<InnerProducts>> ip_x_ones_mode(inner_products_x);
   std::vector<InnerProducts> ip_x_ones_step(ip_x_step_step);
   std::vector<std::vector<double>> ip_b_ones(inner_products_b);
+  */
   for (int i = 0; i < linear_ops.size(); ++i) {
     set_coefficients(i, coefficients_x, coefficients_b);
     linear_ops[i]->step(steps[i], b, coefficients_x, coefficients_b);
@@ -57,306 +59,305 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
     // linear_ops[i]->get_inner_products_b(
     //     ip_b_mode[i], steps[i]);
 
-    linear_ops[i]->get_inner_products_x(
-        ip_x_step_mode[i], steps[i]);
-    linear_ops[i]->get_inner_products_x(
-        ip_x_mode_step[i], steps[i]);
-    linear_ops[i]->get_inner_products_x(
-        ip_x_step_step[i], steps[i], steps[i]);
-    linear_ops[i]->get_inner_products_b(
-        ip_b_step[i], steps[i]);
+    // linear_ops[i]->get_inner_products_x(
+    //     ip_x_step_mode[i], steps[i]);
+    // linear_ops[i]->get_inner_products_x(
+    //     ip_x_mode_step[i], steps[i]);
+    // linear_ops[i]->get_inner_products_x(
+    //     ip_x_step_step[i], steps[i], steps[i]);
+    // linear_ops[i]->get_inner_products_b(
+    //     ip_b_step[i], steps[i]);
 
-    dealii::Vector<double> ones(steps[i]);
-    ones = 1;
-    linear_ops[i]->get_inner_products_x(
-        ip_x_ones_mode[i], ones);
-    linear_ops[i]->get_inner_products_x(
-        ip_x_ones_step[i], ones, steps[i]);
-    linear_ops[i]->get_inner_products_b(
-        ip_b_ones[i], ones);
+    // dealii::Vector<double> ones(steps[i]);
+    // ones = 1;
+    // linear_ops[i]->get_inner_products_x(
+    //     ip_x_ones_mode[i], ones);
+    // linear_ops[i]->get_inner_products_x(
+    //     ip_x_ones_step[i], ones, steps[i]);
+    // linear_ops[i]->get_inner_products_b(
+    //     ip_b_ones[i], ones);
 
     linear_ops[i]->take_step(1.0, steps[i]);
-    // if (!should_lag)
     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
   }
-  // full-order residual line search?
-  // residual line search?
-  double lambda = 1;
-  for (int i = 0; i < linear_ops.size(); ++i) {
-    linear_ops[i]->take_step(-1, steps[i]);
-    linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-  }
-  // lambda = line_search(steps);  // this is different from what follows!
-  std::vector<double> c6(7);
-  linear_ops[0]->line_search(
-      c6, steps[0],
-      ip_x_mode_step[1], ip_x_step_step[1],
-      ip_x_mode_mode[1], ip_x_step_mode[1],
-      ip_b_mode[1], ip_b_step[1]);
-  // linear_ops[1]->line_search(
-  //     c6, steps[1],
-  //     ip_x_mode_step[0], ip_x_step_step[0],
-  //     ip_x_mode_mode[0], ip_x_step_mode[0],
-  //     ip_b_mode[0], ip_b_step[0]);
-  // lambda = lambda > 0.05 ? lambda : 1;
-  for (int i = 0; i < linear_ops.size(); ++i) {
-    linear_ops[i]->take_step(+1, steps[i]);
-    linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-  }
-  {
-    auto res = [](std::vector<double> c, std::complex<double> a) {
-      std::complex<double> r = c[0];
-      for (int i = 1; i < c.size(); ++i)
-        r += c[i] * std::pow(a, i);
-      return r;
-    };
-    std::vector<double> dc(c6.size()-1);
-    for (int i = 0; i < dc.size(); ++i)
-      dc[i] = (i+1) * c6[i+1];
-    std::vector<double> ddc(dc.size()-1);
-    for (int i = 0; i < ddc.size(); ++i)
-      ddc[i] = (i+1) * dc[i+1];
-    std::vector<std::complex<double>> z(dc.size());
-    for (int i = 0; i < z.size(); ++i)
-      z[i] = std::pow(std::complex<double>(0.4, 0.9), i);
-    auto p = std::bind(res, dc, std::placeholders::_1);
-    auto pp = std::bind(res, ddc, std::placeholders::_1);
-    auto aberth = [p, pp](std::vector<std::complex<double>> &z) {
-      std::complex<double> w;
-      for (int n = 0; n < 50; ++n) {
-        for (int i = 0; i < z.size(); ++i) {
-          std::complex<double> ratio = p(z[i]) / pp(z[i]);
-          std::complex<double> sum = 0;
-          for (int j = 0; j < z.size(); ++j)
-            if (i != j)
-              sum += 1. / (z[i] - z[j]);
-          w = ratio / (1. - ratio * sum);
-          if (std::isfinite(std::abs(w)))
-            z[i] -= w;
-        }
-      }
-    };
-    aberth(z);
-    double res_lambda = std::numeric_limits<double>::infinity(); //std::abs(res(c, lambda));
-    for (int i = 0; i < z.size(); ++i) {
-      // std::cout << z[i] << " ";
-      if (z[i].imag() < 1e-16) {  // && std::abs(z[i].real()) > 5e-2
-        // if (std::abs(z[i].real()) < 1e-2)
-        //   continue;
-        double res_zi = std::abs(res(c6, z[i].real()));
-        if (res_zi < res_lambda) {
-          lambda = z[i].real();
-          res_lambda = res_zi;
-          std::cout << lambda << " ";
-        }
-      }
-    }
-    std::cout << std::endl;
-  }
-  // L1 line search?
-  std::vector<double> cu(3);
-  for (int b = 0; b < num_sources; ++b)
-    cu[0] += ip_b_ones[0][b] * ip_b_ones[1][b];
-  for (int m = 0; m < num_modes; ++m)
-    cu[0] -= (ip_x_ones_mode[0][m] * ip_x_ones_mode[1][m]).eval();
-  cu[1] -= (ip_x_ones_step[0] * ip_x_ones_mode[1][num_modes-1]).eval()
-           + (ip_x_ones_mode[0][num_modes-1] * ip_x_ones_step[1]).eval();
-  cu[2] -= (ip_x_ones_step[0] * ip_x_ones_step[1]).eval();
-  // std::cout << "L1 " << cu[0] << std::endl;
-  // line search
-  std::vector<double> c(linear_ops.size()*2+1);
-  AssertThrow(linear_ops.size() == 2, dealii::ExcNotImplemented());
-  std::vector<double> f_mode_mode(num_sources, 1);
-  std::vector<double> f_step_mode(num_sources, 1);
-  std::vector<double> f_mode_step(num_sources, 1);
-  std::vector<double> f_step_step(num_sources, 1);
-  std::vector<double> a_mode_mode_mode_mode(num_modes, 1);
-  std::vector<double> a_step_mode_mode_mode(num_modes, 1);
-  std::vector<double> a_mode_step_mode_mode(num_modes, 1);
-  std::vector<double> a_step_step_mode_mode(num_modes, 1);
-  for (int b = 0; b < num_sources; ++b) {
-    f_mode_mode[b] = ip_b_mode[0][b] * ip_b_mode[1][b];
-    f_step_mode[b] = ip_b_step[0][b] * ip_b_mode[1][b];
-    f_mode_step[b] = ip_b_mode[0][b] * ip_b_step[1][b];
-    f_step_step[b] = ip_b_step[0][b] * ip_b_step[1][b];
-    c[0] += f_mode_mode[b];
-    c[1] += f_step_mode[b] + f_mode_step[b];
-    c[2] += f_step_step[b];
-  }
-  double f0 = c[0];
-  for (int m = 0; m < num_modes; ++m) {
-    a_mode_mode_mode_mode[m] = (ip_x_mode_mode[0][m] * ip_x_mode_mode[1][m]).eval();
-    a_step_mode_mode_mode[m] = (ip_x_step_mode[0][m] * ip_x_mode_mode[1][m]).eval();
-    a_mode_step_mode_mode[m] = (ip_x_mode_mode[0][m] * ip_x_step_mode[1][m]).eval();
-    a_step_step_mode_mode[m] = (ip_x_step_mode[0][m] * ip_x_step_mode[1][m]).eval();
-    c[0] -= a_mode_mode_mode_mode[m];
-    c[1] -= a_step_mode_mode_mode[m] + a_mode_step_mode_mode[m];
-    c[2] -= a_step_step_mode_mode[m];
-  }
-  double a0 = c[0] - f0;
-  // 1st
-  double a_mode_mode_step_mode = (ip_x_mode_step[0] * ip_x_mode_mode[1][num_modes-1]).eval();
-  double a_mode_mode_mode_step = (ip_x_mode_mode[0][num_modes-1] * ip_x_mode_step[1]).eval();
-  c[1] -= a_mode_mode_step_mode + a_mode_mode_mode_step;
-  // 2nd
-  double a_mode_mode_step_step = (ip_x_mode_step[0] * ip_x_mode_step[1]).eval();
-  double a_step_mode_step_mode = (ip_x_step_step[0] * ip_x_mode_mode[1][num_modes-1]).eval();
-  double a_mode_step_mode_step = (ip_x_mode_mode[0][num_modes-1] * ip_x_step_step[1]).eval();
-  double a_step_mode_mode_step = (ip_x_step_mode[0][num_modes-1] * ip_x_mode_step[1]).eval();
-  double a_mode_step_step_mode = (ip_x_mode_step[0] * ip_x_step_mode[1][num_modes-1]).eval();
-  c[2] -= a_mode_mode_step_step + a_step_mode_step_mode + a_mode_step_mode_step
-          + a_step_mode_mode_step + a_mode_step_step_mode;
-  // 3rd
-  double a_mode_step_step_step = (ip_x_mode_step[0] * ip_x_step_step[1]).eval();
-  double a_step_mode_step_step = (ip_x_step_step[0] * ip_x_mode_step[1]).eval();
-  double a_step_step_mode_step = (ip_x_step_mode[0][num_modes-1] * ip_x_step_step[1]).eval();
-  double a_step_step_step_mode = (ip_x_step_step[0] * ip_x_step_mode[1][num_modes-1]).eval();
-  c[3] -= a_mode_step_step_step + a_step_mode_step_step 
-          + a_step_step_mode_step + a_step_step_step_mode;
-  // 4th
-  double a_step_step_step_step = (ip_x_step_step[0] * ip_x_step_step[1]).eval();
-  c[4] -= a_step_step_step_step;
-  double r00 = c[0] / (c[0]-a_mode_mode_mode_mode[num_modes-1]);
-  r00 = std::abs(r00);
-  r00 = std::sqrt(r00);
-  r0 = r00;
-  // r0 = c[0] / f0;
-  double r1 = (c[4] + c[3] + c[2] + c[1] + c[0]) / (c[0]-a_mode_mode_mode_mode[num_modes-1]);
-  r0 = std::sqrt(std::abs(r1));
-  // std::cout << c[0] << " -> " << (c[4]+c[3]+c[2]+c[1]+c[0]) << std::endl;
-  std::function<double(double)> res = [c](double a) {
-    return c[4]*std::pow(a, 4) + c[3]*std::pow(a, 3) + c[2]*std::pow(a, 2)
-           + c[1] * a + c[0];
-  };
-  // std::cout << res(0) << " -> " << res(1) << std::endl;
-  // root the cubic
-  std::vector<double> dc(c.size()-1);
-  for (int i = 0; i < dc.size(); ++i)
-    dc[i] = (i+1) * c[i+1];
-  double delta0 = std::pow(dc[2], 2) - 3 * dc[3] * dc[1];
-  double delta1 = 2 * std::pow(dc[2], 3) 
-                  - 9 * dc[3] * dc[2] * dc[1] 
-                  + 27 * std::pow(dc[3], 2) * dc[0];
-  double sqrt = std::sqrt(std::pow(delta1, 2) - 4*std::pow(delta0, 3));
-  double cbrt = std::cbrt((delta1+sqrt)/2);
-  std::complex<double> u0(1, 0);
-  std::complex<double> u1(-1./2, +std::cbrt(3)/2);
-  std::complex<double> u2 = u1 * u1; //u2(-1./2, -std::cbrt(3)/2);
-  std::vector<std::complex<double>> u = {u0, u1, u2};
-  std::vector<std::complex<double>> roots(3);
-  for (int i = 0; i < u.size(); ++i) {
-    roots[i] = -(1./(3*dc[3])) * (dc[2] + u[i]*cbrt + delta0/(u[i]*cbrt));
-    // std::cout << roots[i] << " ";
-  }
-  // std::cout << std::endl;
-  for (int i = 0; i < roots.size(); ++i) {
-    // std::cout << res(roots[i].real()) << " ";
-  }
-  // std::cout << std::endl;
-  // root the quartic?
-  double p = (8*c[4]*c[2] - 3*std::pow(c[3], 2)) / (8*std::pow(c[4], 2));
-  double q = (std::pow(c[3], 3) - 4*c[4]*c[3]*c[2] + 8*std::pow(c[4], 2)*c[1])
-             / (8*std::pow(c[4], 3));
-  delta0 = std::pow(c[2], 2) - 3*c[3]*c[1] + 12*c[4]*c[0];
-  delta1 = 2*std::pow(c[2], 3) - 9*c[3]*c[2]*c[1] + 27*std::pow(c[3], 2)*c[0]
-           + 27*c[4]*std::pow(c[1], 2) - 72*c[4]*c[2]*c[0];
-  sqrt = std::sqrt(std::pow(delta1, 2) - 4*std::pow(delta0, 3));
-  std::complex<double> Q = std::cbrt((delta1+sqrt)/2);
-  std::complex<double> s = 0.5 * std::sqrt(-2/3 * p + 1/(3*c[4]) * (Q+delta0/Q));
-  std::vector<std::complex<double>> roots4(4);
-  std::complex<double> pm = 0.5 * std::sqrt(-4.*std::pow(s, 2) - 2*p + q/s);
-  double x0 = -c[3]/(4*c[4]);
-  roots4[0] = x0 - s + pm;
-  roots4[1] = x0 - s - pm;
-  roots4[2] = x0 + s + pm;
-  roots4[3] = x0 + s - pm;
-  for (auto &r : roots4) {
-    // std::cout << r << " ";
-  }
-  // std::cout << std::endl;
-  // take the step
-  // double lambda = roots[0].real();
-  if (should_line_search) {
-    // lambda = std::clamp(lambda, 0.1 , 1.3);
-    // lambda = 0.5;
-    for (int i = 0; i < linear_ops.size(); ++i) {
-      linear_ops[i]->take_step(lambda-1.0, steps[i]);
-      linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-    }
-  }
-  // std::cout << r00 << " " << c[0] << " " << a0 << " " << f0 << std::endl;
-  // a_step_mode_mode_step = (ip_x_step)
-  // a[0b0001] = ip_x[0b00] * ip_x[0b01];
-  /*
-  double r1 = 0;
-  double rh = 0;
-  if (false) {
-    std::vector<dealii::Vector<double>> steps1(linear_ops.size());
-    for (int i = 0; i < linear_ops.size(); ++i) {
-      set_coefficients(i, coefficients_x, coefficients_b);
-      linear_ops[i]->step(steps1[i], b, coefficients_x, coefficients_b);
-      linear_ops[i]->take_step(1.0, steps1[i]);
-      linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-    }
-    for (int i = 0; i < linear_ops.size(); ++i) {
-      linear_ops[i]->take_step(-1.0, steps1[i]);
-      linear_ops[i]->take_step(-0.5, steps[i]);
-      linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-    }
-    std::vector<dealii::Vector<double>> steps_h(linear_ops.size());
-    for (int i = 0; i < linear_ops.size(); ++i) {
-      set_coefficients(i, coefficients_x, coefficients_b);
-      linear_ops[i]->step(steps_h[i], b, coefficients_x, coefficients_b);
-      linear_ops[i]->take_step(1.0, steps_h[i]);
-      linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-    }
-    r0 = 0;
-    for (int i = 0; i < linear_ops.size(); ++i) {
-      linear_ops[i]->take_step(-1.0, steps_h[i]);
-      r0 += std::pow(steps[i].l2_norm()/norms[i], 2);
-      rh += std::pow(steps_h[i].l2_norm()/norms[i], 2);
-      r1 += std::pow(steps1[i].l2_norm()/norms[i], 2);
-    }
-    r0 = std::sqrt(r0);
-    rh = std::sqrt(rh);
-    r1 = std::sqrt(r1);
-  } else {
-    r1 = get_residual();
-    for (int i = 0; i < linear_ops.size(); ++i) {
-      linear_ops[i]->take_step(-0.5, steps[i]);
-      linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-    }
-    rh = get_residual();
-  }
-  double dr1 = (3*r1 - 4*rh + r0) / (1 - 0);
-  double dr0 = (r1 - 4*rh + 3*r0) / (1 - 0); 
-  double relaxation = 1 - (dr1 * (1 - 0)) / (dr1 - dr0);
-  std::cout << "relaxation : " << relaxation << std::endl;
-  relaxation = std::isfinite(relaxation) ? relaxation : 0.5;
-  relaxation = std::clamp(relaxation, 0.2, 0.9);
-  // return r0;
-  // relaxation = 0.5;
-  // relaxation = 1;
-  */
-  /*
-  double relaxation = 0;
-  for (int i = 0; i < linear_ops.size(); ++i) {
-    linear_ops[i]->take_step(-0.5+relaxation, steps[i]);
-    // if (should_normalize)
-    // linear_ops[i]->normalize();
-    linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
-  }
-  */
-  // double scale = 1;
-  // int si = -1;
+  // // full-order residual line search?
+  // // residual line search?
+  // double lambda = 1;
   // for (int i = 0; i < linear_ops.size(); ++i) {
-  //   double norm = linear_ops[i]->normalize();
-  //   if (norm != 0)
-  //     scale *= norm;
-  //   else
-  //     si = i;
+  //   linear_ops[i]->take_step(-1, steps[i]);
+  //   linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
   // }
-  // linear_ops[si]->scale(scale);
+  // // lambda = line_search(steps);  // this is different from what follows!
+  // std::vector<double> c6(7);
+  // linear_ops[0]->line_search(
+  //     c6, steps[0],
+  //     ip_x_mode_step[1], ip_x_step_step[1],
+  //     ip_x_mode_mode[1], ip_x_step_mode[1],
+  //     ip_b_mode[1], ip_b_step[1]);
+  // // linear_ops[1]->line_search(
+  // //     c6, steps[1],
+  // //     ip_x_mode_step[0], ip_x_step_step[0],
+  // //     ip_x_mode_mode[0], ip_x_step_mode[0],
+  // //     ip_b_mode[0], ip_b_step[0]);
+  // // lambda = lambda > 0.05 ? lambda : 1;
+  // for (int i = 0; i < linear_ops.size(); ++i) {
+  //   linear_ops[i]->take_step(+1, steps[i]);
+  //   linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  // }
+  // {
+  //   auto res = [](std::vector<double> c, std::complex<double> a) {
+  //     std::complex<double> r = c[0];
+  //     for (int i = 1; i < c.size(); ++i)
+  //       r += c[i] * std::pow(a, i);
+  //     return r;
+  //   };
+  //   std::vector<double> dc(c6.size()-1);
+  //   for (int i = 0; i < dc.size(); ++i)
+  //     dc[i] = (i+1) * c6[i+1];
+  //   std::vector<double> ddc(dc.size()-1);
+  //   for (int i = 0; i < ddc.size(); ++i)
+  //     ddc[i] = (i+1) * dc[i+1];
+  //   std::vector<std::complex<double>> z(dc.size());
+  //   for (int i = 0; i < z.size(); ++i)
+  //     z[i] = std::pow(std::complex<double>(0.4, 0.9), i);
+  //   auto p = std::bind(res, dc, std::placeholders::_1);
+  //   auto pp = std::bind(res, ddc, std::placeholders::_1);
+  //   auto aberth = [p, pp](std::vector<std::complex<double>> &z) {
+  //     std::complex<double> w;
+  //     for (int n = 0; n < 50; ++n) {
+  //       for (int i = 0; i < z.size(); ++i) {
+  //         std::complex<double> ratio = p(z[i]) / pp(z[i]);
+  //         std::complex<double> sum = 0;
+  //         for (int j = 0; j < z.size(); ++j)
+  //           if (i != j)
+  //             sum += 1. / (z[i] - z[j]);
+  //         w = ratio / (1. - ratio * sum);
+  //         if (std::isfinite(std::abs(w)))
+  //           z[i] -= w;
+  //       }
+  //     }
+  //   };
+  //   aberth(z);
+  //   double res_lambda = std::numeric_limits<double>::infinity(); //std::abs(res(c, lambda));
+  //   for (int i = 0; i < z.size(); ++i) {
+  //     // std::cout << z[i] << " ";
+  //     if (z[i].imag() < 1e-16) {  // && std::abs(z[i].real()) > 5e-2
+  //       // if (std::abs(z[i].real()) < 1e-2)
+  //       //   continue;
+  //       double res_zi = std::abs(res(c6, z[i].real()));
+  //       if (res_zi < res_lambda) {
+  //         lambda = z[i].real();
+  //         res_lambda = res_zi;
+  //         std::cout << lambda << " ";
+  //       }
+  //     }
+  //   }
+  //   std::cout << std::endl;
+  // }
+  // // L1 line search?
+  // std::vector<double> cu(3);
+  // for (int b = 0; b < num_sources; ++b)
+  //   cu[0] += ip_b_ones[0][b] * ip_b_ones[1][b];
+  // for (int m = 0; m < num_modes; ++m)
+  //   cu[0] -= (ip_x_ones_mode[0][m] * ip_x_ones_mode[1][m]).eval();
+  // cu[1] -= (ip_x_ones_step[0] * ip_x_ones_mode[1][num_modes-1]).eval()
+  //          + (ip_x_ones_mode[0][num_modes-1] * ip_x_ones_step[1]).eval();
+  // cu[2] -= (ip_x_ones_step[0] * ip_x_ones_step[1]).eval();
+  // // std::cout << "L1 " << cu[0] << std::endl;
+  // // line search
+  // std::vector<double> c(linear_ops.size()*2+1);
+  // AssertThrow(linear_ops.size() == 2, dealii::ExcNotImplemented());
+  // std::vector<double> f_mode_mode(num_sources, 1);
+  // std::vector<double> f_step_mode(num_sources, 1);
+  // std::vector<double> f_mode_step(num_sources, 1);
+  // std::vector<double> f_step_step(num_sources, 1);
+  // std::vector<double> a_mode_mode_mode_mode(num_modes, 1);
+  // std::vector<double> a_step_mode_mode_mode(num_modes, 1);
+  // std::vector<double> a_mode_step_mode_mode(num_modes, 1);
+  // std::vector<double> a_step_step_mode_mode(num_modes, 1);
+  // for (int b = 0; b < num_sources; ++b) {
+  //   f_mode_mode[b] = ip_b_mode[0][b] * ip_b_mode[1][b];
+  //   f_step_mode[b] = ip_b_step[0][b] * ip_b_mode[1][b];
+  //   f_mode_step[b] = ip_b_mode[0][b] * ip_b_step[1][b];
+  //   f_step_step[b] = ip_b_step[0][b] * ip_b_step[1][b];
+  //   c[0] += f_mode_mode[b];
+  //   c[1] += f_step_mode[b] + f_mode_step[b];
+  //   c[2] += f_step_step[b];
+  // }
+  // double f0 = c[0];
+  // for (int m = 0; m < num_modes; ++m) {
+  //   a_mode_mode_mode_mode[m] = (ip_x_mode_mode[0][m] * ip_x_mode_mode[1][m]).eval();
+  //   a_step_mode_mode_mode[m] = (ip_x_step_mode[0][m] * ip_x_mode_mode[1][m]).eval();
+  //   a_mode_step_mode_mode[m] = (ip_x_mode_mode[0][m] * ip_x_step_mode[1][m]).eval();
+  //   a_step_step_mode_mode[m] = (ip_x_step_mode[0][m] * ip_x_step_mode[1][m]).eval();
+  //   c[0] -= a_mode_mode_mode_mode[m];
+  //   c[1] -= a_step_mode_mode_mode[m] + a_mode_step_mode_mode[m];
+  //   c[2] -= a_step_step_mode_mode[m];
+  // }
+  // double a0 = c[0] - f0;
+  // // 1st
+  // double a_mode_mode_step_mode = (ip_x_mode_step[0] * ip_x_mode_mode[1][num_modes-1]).eval();
+  // double a_mode_mode_mode_step = (ip_x_mode_mode[0][num_modes-1] * ip_x_mode_step[1]).eval();
+  // c[1] -= a_mode_mode_step_mode + a_mode_mode_mode_step;
+  // // 2nd
+  // double a_mode_mode_step_step = (ip_x_mode_step[0] * ip_x_mode_step[1]).eval();
+  // double a_step_mode_step_mode = (ip_x_step_step[0] * ip_x_mode_mode[1][num_modes-1]).eval();
+  // double a_mode_step_mode_step = (ip_x_mode_mode[0][num_modes-1] * ip_x_step_step[1]).eval();
+  // double a_step_mode_mode_step = (ip_x_step_mode[0][num_modes-1] * ip_x_mode_step[1]).eval();
+  // double a_mode_step_step_mode = (ip_x_mode_step[0] * ip_x_step_mode[1][num_modes-1]).eval();
+  // c[2] -= a_mode_mode_step_step + a_step_mode_step_mode + a_mode_step_mode_step
+  //         + a_step_mode_mode_step + a_mode_step_step_mode;
+  // // 3rd
+  // double a_mode_step_step_step = (ip_x_mode_step[0] * ip_x_step_step[1]).eval();
+  // double a_step_mode_step_step = (ip_x_step_step[0] * ip_x_mode_step[1]).eval();
+  // double a_step_step_mode_step = (ip_x_step_mode[0][num_modes-1] * ip_x_step_step[1]).eval();
+  // double a_step_step_step_mode = (ip_x_step_step[0] * ip_x_step_mode[1][num_modes-1]).eval();
+  // c[3] -= a_mode_step_step_step + a_step_mode_step_step 
+  //         + a_step_step_mode_step + a_step_step_step_mode;
+  // // 4th
+  // double a_step_step_step_step = (ip_x_step_step[0] * ip_x_step_step[1]).eval();
+  // c[4] -= a_step_step_step_step;
+  // double r00 = c[0] / (c[0]-a_mode_mode_mode_mode[num_modes-1]);
+  // r00 = std::abs(r00);
+  // r00 = std::sqrt(r00);
+  // r0 = r00;
+  // // r0 = c[0] / f0;
+  // double r1 = (c[4] + c[3] + c[2] + c[1] + c[0]) / (c[0]-a_mode_mode_mode_mode[num_modes-1]);
+  // r0 = std::sqrt(std::abs(r1));
+  // // std::cout << c[0] << " -> " << (c[4]+c[3]+c[2]+c[1]+c[0]) << std::endl;
+  // std::function<double(double)> res = [c](double a) {
+  //   return c[4]*std::pow(a, 4) + c[3]*std::pow(a, 3) + c[2]*std::pow(a, 2)
+  //          + c[1] * a + c[0];
+  // };
+  // // std::cout << res(0) << " -> " << res(1) << std::endl;
+  // // root the cubic
+  // std::vector<double> dc(c.size()-1);
+  // for (int i = 0; i < dc.size(); ++i)
+  //   dc[i] = (i+1) * c[i+1];
+  // double delta0 = std::pow(dc[2], 2) - 3 * dc[3] * dc[1];
+  // double delta1 = 2 * std::pow(dc[2], 3) 
+  //                 - 9 * dc[3] * dc[2] * dc[1] 
+  //                 + 27 * std::pow(dc[3], 2) * dc[0];
+  // double sqrt = std::sqrt(std::pow(delta1, 2) - 4*std::pow(delta0, 3));
+  // double cbrt = std::cbrt((delta1+sqrt)/2);
+  // std::complex<double> u0(1, 0);
+  // std::complex<double> u1(-1./2, +std::cbrt(3)/2);
+  // std::complex<double> u2 = u1 * u1; //u2(-1./2, -std::cbrt(3)/2);
+  // std::vector<std::complex<double>> u = {u0, u1, u2};
+  // std::vector<std::complex<double>> roots(3);
+  // for (int i = 0; i < u.size(); ++i) {
+  //   roots[i] = -(1./(3*dc[3])) * (dc[2] + u[i]*cbrt + delta0/(u[i]*cbrt));
+  //   // std::cout << roots[i] << " ";
+  // }
+  // // std::cout << std::endl;
+  // for (int i = 0; i < roots.size(); ++i) {
+  //   // std::cout << res(roots[i].real()) << " ";
+  // }
+  // // std::cout << std::endl;
+  // // root the quartic?
+  // double p = (8*c[4]*c[2] - 3*std::pow(c[3], 2)) / (8*std::pow(c[4], 2));
+  // double q = (std::pow(c[3], 3) - 4*c[4]*c[3]*c[2] + 8*std::pow(c[4], 2)*c[1])
+  //            / (8*std::pow(c[4], 3));
+  // delta0 = std::pow(c[2], 2) - 3*c[3]*c[1] + 12*c[4]*c[0];
+  // delta1 = 2*std::pow(c[2], 3) - 9*c[3]*c[2]*c[1] + 27*std::pow(c[3], 2)*c[0]
+  //          + 27*c[4]*std::pow(c[1], 2) - 72*c[4]*c[2]*c[0];
+  // sqrt = std::sqrt(std::pow(delta1, 2) - 4*std::pow(delta0, 3));
+  // std::complex<double> Q = std::cbrt((delta1+sqrt)/2);
+  // std::complex<double> s = 0.5 * std::sqrt(-2/3 * p + 1/(3*c[4]) * (Q+delta0/Q));
+  // std::vector<std::complex<double>> roots4(4);
+  // std::complex<double> pm = 0.5 * std::sqrt(-4.*std::pow(s, 2) - 2*p + q/s);
+  // double x0 = -c[3]/(4*c[4]);
+  // roots4[0] = x0 - s + pm;
+  // roots4[1] = x0 - s - pm;
+  // roots4[2] = x0 + s + pm;
+  // roots4[3] = x0 + s - pm;
+  // for (auto &r : roots4) {
+  //   // std::cout << r << " ";
+  // }
+  // // std::cout << std::endl;
+  // // take the step
+  // // double lambda = roots[0].real();
+  // if (should_line_search) {
+  //   // lambda = std::clamp(lambda, 0.1 , 1.3);
+  //   // lambda = 0.5;
+  //   for (int i = 0; i < linear_ops.size(); ++i) {
+  //     linear_ops[i]->take_step(lambda-1.0, steps[i]);
+  //     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  //   }
+  // }
+  // // std::cout << r00 << " " << c[0] << " " << a0 << " " << f0 << std::endl;
+  // // a_step_mode_mode_step = (ip_x_step)
+  // // a[0b0001] = ip_x[0b00] * ip_x[0b01];
+  // /*
+  // double r1 = 0;
+  // double rh = 0;
+  // if (false) {
+  //   std::vector<dealii::Vector<double>> steps1(linear_ops.size());
+  //   for (int i = 0; i < linear_ops.size(); ++i) {
+  //     set_coefficients(i, coefficients_x, coefficients_b);
+  //     linear_ops[i]->step(steps1[i], b, coefficients_x, coefficients_b);
+  //     linear_ops[i]->take_step(1.0, steps1[i]);
+  //     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  //   }
+  //   for (int i = 0; i < linear_ops.size(); ++i) {
+  //     linear_ops[i]->take_step(-1.0, steps1[i]);
+  //     linear_ops[i]->take_step(-0.5, steps[i]);
+  //     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  //   }
+  //   std::vector<dealii::Vector<double>> steps_h(linear_ops.size());
+  //   for (int i = 0; i < linear_ops.size(); ++i) {
+  //     set_coefficients(i, coefficients_x, coefficients_b);
+  //     linear_ops[i]->step(steps_h[i], b, coefficients_x, coefficients_b);
+  //     linear_ops[i]->take_step(1.0, steps_h[i]);
+  //     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  //   }
+  //   r0 = 0;
+  //   for (int i = 0; i < linear_ops.size(); ++i) {
+  //     linear_ops[i]->take_step(-1.0, steps_h[i]);
+  //     r0 += std::pow(steps[i].l2_norm()/norms[i], 2);
+  //     rh += std::pow(steps_h[i].l2_norm()/norms[i], 2);
+  //     r1 += std::pow(steps1[i].l2_norm()/norms[i], 2);
+  //   }
+  //   r0 = std::sqrt(r0);
+  //   rh = std::sqrt(rh);
+  //   r1 = std::sqrt(r1);
+  // } else {
+  //   r1 = get_residual();
+  //   for (int i = 0; i < linear_ops.size(); ++i) {
+  //     linear_ops[i]->take_step(-0.5, steps[i]);
+  //     linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  //   }
+  //   rh = get_residual();
+  // }
+  // double dr1 = (3*r1 - 4*rh + r0) / (1 - 0);
+  // double dr0 = (r1 - 4*rh + 3*r0) / (1 - 0); 
+  // double relaxation = 1 - (dr1 * (1 - 0)) / (dr1 - dr0);
+  // std::cout << "relaxation : " << relaxation << std::endl;
+  // relaxation = std::isfinite(relaxation) ? relaxation : 0.5;
+  // relaxation = std::clamp(relaxation, 0.2, 0.9);
+  // // return r0;
+  // // relaxation = 0.5;
+  // // relaxation = 1;
+  // */
+  // /*
+  // double relaxation = 0;
+  // for (int i = 0; i < linear_ops.size(); ++i) {
+  //   linear_ops[i]->take_step(-0.5+relaxation, steps[i]);
+  //   // if (should_normalize)
+  //   // linear_ops[i]->normalize();
+  //   linear_ops[i]->get_inner_products(inner_products_x[i], inner_products_b[i]);
+  // }
+  // */
+  // // double scale = 1;
+  // // int si = -1;
+  // // for (int i = 0; i < linear_ops.size(); ++i) {
+  // //   double norm = linear_ops[i]->normalize();
+  // //   if (norm != 0)
+  // //     scale *= norm;
+  // //   else
+  // //     si = i;
+  // // }
+  // // linear_ops[si]->scale(scale);
   if (should_normalize) {
     for (int i = 0; i < linear_ops.size(); ++i) {
       norms[i] = linear_ops[i]->normalize();
