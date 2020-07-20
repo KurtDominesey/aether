@@ -488,7 +488,12 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     std::vector<dealii::Vector<double>> svecs_energy;
     ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
                problem_full.transport);
-    const int num_svecs = svecs_spaceangle.size();
+    int num_svecs = svecs_spaceangle.size();
+    if (num_svecs > num_modes) {
+      svecs_spaceangle.resize(num_modes);
+      svecs_energy.resize(num_modes);
+      num_svecs = num_modes;
+    }
     // Run pgd model
     Mgxs mgxs_one(1, num_materials, 1);
     Mgxs mgxs_pseudo(1, num_materials, 1);
