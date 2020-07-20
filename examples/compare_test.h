@@ -366,7 +366,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     AssertDimension(svecs_energy.size(), 0);
     const int num_groups = flux.n_blocks();
     const int num_qdofs = flux.block(0).size();
-    dealii::LAPACKFullMatrix_<double> flux_matrix(num_groups, num_qdofs);
+    std::cout << "initialize flux matrix\n";
+    dealii::LAPACKFullMatrix_<double> flux_matrix(num_qdofs, num_groups);
+    std::cout << "initialized flux matrix\n";
     std::vector<dealii::FullMatrix<double>> masses_cho(
         dof_handler.get_triangulation().n_active_cells());
     for (int c = 0; c < masses_cho.size(); ++c)
@@ -386,7 +388,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           dealii::FullMatrix<double> &mass_cho = masses_cho[c];
           for (int i = 0; i < mass_cho.m(); ++i) {
             for (int j = 0; j < mass_cho.n(); ++j) {
-              flux_matrix(g, nc+i) += mass_cho[i][j] * flux.block(g)[nc+j]
+              flux_matrix(nc+i, g) += mass_cho[i][j] * flux.block(g)[nc+j]
                                       * std::sqrt(quadrature.weight(n))
                                       / std::sqrt(width);
             }
@@ -398,7 +400,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     for (auto &mass_cho : masses_cho)
       mass_cho.gauss_jordan();
     // compute svd and post-process
-    flux_matrix.compute_svd();
+    std::cout << "compute svd\n";
+    flux_matrix.compute_svd('S');
+    std::cout << "computed svd\n";
     const int num_svecs = std::min(num_groups, num_qdofs);
     AssertDimension(num_qdofs, quadrature.size() * dof_handler.n_dofs());
     svecs_spaceangle.resize(num_svecs, 
@@ -413,7 +417,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           for (int i = 0; i < mass_cho_inv.m(); ++i) {
             for (int j = 0; j < mass_cho_inv.n(); ++j) {
               svecs_spaceangle[s][nc+i] += mass_cho_inv[i][j] 
-                                           * flux_matrix.get_svd_vt()(s, nc+j)
+                                           * flux_matrix.get_svd_u()(nc+j, s)
                                            / std::sqrt(quadrature.weight(n));
             }
           }
@@ -426,7 +430,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         double width = //mgxs->group_structure[g_rev+1] 
                       //- mgxs->group_structure[g_rev];
             std::log(mgxs->group_structure[g_rev+1]/lower);
-        svecs_energy[s][g] = flux_matrix.get_svd_u()(g, s) * std::sqrt(width);
+        svecs_energy[s][g] = flux_matrix.get_svd_vt()(s, g) * std::sqrt(width);
       }
       svecs_energy[s] *= flux_matrix.singular_value(s);
     }
