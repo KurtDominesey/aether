@@ -21,7 +21,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const int max_iters_fullorder,
                      const double tol_fullorder,
                      const std::vector<int> &g_maxes,
-                     const std::vector<std::string> &materials) {
+                     const std::vector<std::string> &materials,
+                     const bool precomputed=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // for (int g = 0; g < num_groups; ++g) {
@@ -51,8 +52,19 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     FixedSourceProblem<dim, qdim> problem_full(
         dof_handler, quadrature, *mgxs, boundary_conditions);
     // TransportType transport = problem_full.transport.transport;
-    CompareTest<dim, qdim>::RunFullOrder(flux_full, source_full, problem_full, 
-                       max_iters_fullorder, tol_fullorder);
+    const std::string filename_h5 = this->GetTestName() + ".h5";
+    namespace HDF5 = dealii::HDF5;
+    if (precomputed) {
+      HDF5::File file(filename_h5, HDF5::File::FileAccessMode::open);
+      flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+    } else {
+      CompareTest<dim, qdim>::RunFullOrder(flux_full, source_full, problem_full, 
+                                           max_iters_fullorder, tol_fullorder);
+      dealii::Vector<double> flux_full_v(flux_full.size());
+      flux_full_v = flux_full;
+      HDF5::File file(filename_h5, HDF5::File::FileAccessMode::create);
+      file.write_dataset("flux_full", flux_full_v);
+    }
     dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
     dealii::BlockVector<double> flux_full_l1(num_groups, 2*dof_handler.n_dofs());
     for (int g = 0; g < num_groups; ++g) {
