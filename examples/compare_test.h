@@ -285,14 +285,14 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           }
           cell->get_dof_indices(dof_indices);
           const int j = cell->material_id();
+          dealii::FullMatrix<double> mass = transport.cell_matrices[c].mass;
+          mass.gauss_jordan();
           for (int n = 0; n < quadrature.size(); ++n) {
             for (int i = 0; i < dof_indices.size(); ++i) {
               const dealii::types::global_dof_index ni =
                   n * dof_handler.n_dofs() + dof_indices[i];
               streamed_k[i] = caches[m].streamed.block(0)[ni];
             }
-            dealii::FullMatrix<double> mass = transport.cell_matrices[c].mass;
-            mass.gauss_jordan();
             mass.vmult(mass_inv_streamed_k, streamed_k);
             for (int i = 0; i < dof_indices.size(); ++i) {
               const dealii::types::global_dof_index ni =
