@@ -1,6 +1,8 @@
 #ifndef AETHER_EXAMPLES_CATHALAU_CATHALAU_TEST_H_
 #define AETHER_EXAMPLES_CATHALAU_CATHALAU_TEST_H_
 
+#include <deal.II/grid/grid_out.h>
+
 #include "../example_test.h"
 
 namespace cathalau {
@@ -18,6 +20,7 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
   std::vector<std::string> materials = {"void", "water", "uo2", "zr", "al"};
   const std::vector<double> radii = {0.4095, 0.4180, 0.4750, 0.4850, 0.5400};
   const std::vector<int> regions = {2, 0, 3, 0, 4, 1};
+  std::vector<int> max_levels = {2, 4, 4, 2, 2};
 
   void SetUp() override {
     // std::string group_structure;

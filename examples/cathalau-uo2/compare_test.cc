@@ -12,7 +12,9 @@ class CathalauCompareTest : public CathalauTest,
     materials[2] = std::get<0>(this->GetParam());
     group_structure = std::get<1>(this->GetParam());
     CathalauTest::SetUp();
-    this->mesh.refine_global(1);
+    refine_azimuthal(this->mesh, 2);
+    refine_radial(this->mesh, 2, this->max_levels);
+    this->PrintMesh();
     dealii::FE_DGQ<dim_> fe(1);
     this->dof_handler.initialize(mesh, fe);
   }  

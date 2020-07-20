@@ -11,7 +11,9 @@ class CathalauCoarseTest : public CathalauTest,
     materials[2] = this->GetParam();
     group_structure = "SHEM-361";
     CathalauTest::SetUp();
-    this->mesh.refine_global(1);
+    refine_azimuthal(this->mesh, 2);
+    refine_radial(this->mesh, 2, this->max_levels);
+    this->PrintMesh();
     dealii::FE_DGQ<dim_> fe(1);
     this->dof_handler.initialize(mesh, fe);
   }
