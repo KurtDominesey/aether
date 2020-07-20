@@ -297,9 +297,9 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       flux_coarsened_g = flux_coarsened.block(g);
       diff -= flux_coarsened_g;
       for (int n = 0; n < quadrature.size(); ++n) {
-        transport.collide(diff_l2, diff.block(n));
+        transport.collide_ordinate(diff_l2, diff.block(n));
         l2_errors[g] += quadrature.weight(n) * (diff.block(n) * diff_l2);
-        transport.collide(diff_l2, flux_coarsened_g.block(n));
+        transport.collide_ordinate(diff_l2, flux_coarsened_g.block(n));
         l2_norm += quadrature.weight(n) * (flux_coarsened_g.block(n) * diff_l2);
       }
       l2_errors[g] = std::sqrt(l2_errors[g]);
@@ -330,9 +330,9 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       d2m.vmult(diff, flux_coarse.block(g));
       d2m.vmult(flux_coarsened_g, flux_coarsened.block(g));
       diff -= flux_coarsened_g;
-      transport.collide(diff_l2, diff);
+      transport.collide_ordinate(diff_l2, diff);
       double l2_error = std::sqrt(diff * diff_l2);
-      transport.collide(diff_l2, flux_coarsened_g);
+      transport.collide_ordinate(diff_l2, flux_coarsened_g);
       double l2_norm = std::sqrt(flux_coarsened_g * diff_l2);
       if (is_relative)
         l2_error /= l2_norm;

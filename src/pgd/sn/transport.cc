@@ -180,6 +180,29 @@ void Transport<dim, qdim>::collide(dealii::BlockVector<double> &dst,
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::collide_ordinate(dealii::Vector<double> &dst,
+                                            const dealii::Vector<double> &src) 
+                                            const {
+  std::vector<dealii::types::global_dof_index> dof_indices(
+      this->dof_handler.get_fe().dofs_per_cell);
+  using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
+  int c = 0;
+  for (ActiveCell cell = this->dof_handler.begin_active();
+       cell != this->dof_handler.end(); ++cell, ++c) {
+    if (!cell->is_locally_owned())
+      continue;
+    const dealii::FullMatrix<double> &mass= this->cell_matrices[c].mass;
+    cell->get_dof_indices(dof_indices);
+    for (int i = 0; i < mass.n(); ++i) {
+      dst[dof_indices[i]] = 0;
+      for (int j = 0; j < mass.m(); ++j) {
+        dst[dof_indices[i]] += mass[i][j] * src[dof_indices[j]];
+      }
+    }
+  }
+}
+
+template <int dim, int qdim>
 double Transport<dim, qdim>::inner_product(
     const dealii::Vector<double> &left, 
     const dealii::Vector<double> &right) const {

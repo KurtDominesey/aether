@@ -116,7 +116,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         for (int n = 0; n < quadrature.size(); ++n) {
           diff = modal[g].block(n);
           diff -= reference_g.block(n);
-          transport.collide(diff_l2, diff);
+          transport.collide_ordinate(diff_l2, diff);
           l2_errors[m] += quadrature.weight(n) * (diff * diff_l2) / width;
         }
       }
@@ -161,7 +161,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         }
         diff = modal[g].block(0);
         diff -= reference_g_m.block(0);
-        transport.collide(diff_l2, diff);
+        transport.collide_ordinate(diff_l2, diff);
         l2_errors[m] += (diff * diff_l2) / width;
       }
     }
@@ -196,7 +196,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       double l2_energy = summands_energy.l2_norm();
       double l2_spaceangle = 0;
       for (int n = 0; n < quadrature.size(); ++n) {
-        transport.collide(mode_l2, modes_spaceangle[m].block(n));
+        transport.collide_ordinate(mode_l2, modes_spaceangle[m].block(n));
         l2_spaceangle += (modes_spaceangle[m].block(n) * mode_l2)
                          * quadrature.weight(n);
       }
@@ -255,11 +255,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         }
         for (int n = 0; n < quadrature.size(); ++n) {
           if (!do_stream) {
-            transport.collide(residual_l2, residual_g.block(n));
+            transport.collide_ordinate(residual_l2, residual_g.block(n));
             l2_residuals[m] += (residual_g.block(n) * residual_l2) 
                               * quadrature.weight(n) / width;
           } else {
-            transport.collide(swept_l2, swept_g.block(n));
+            transport.collide_ordinate(swept_l2, swept_g.block(n));
             l2_residuals[m] += (swept_g.block(n) * swept_l2) 
                               * quadrature.weight(n) / width;
           }
@@ -337,7 +337,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         AssertThrow(width > 0, dealii::ExcInvalidState());
         residual_g = residual.block(g);
         for (int n = 0; n < quadrature.size(); ++n) {
-          transport.collide(residual_l2, residual_g.block(n));
+          transport.collide_ordinate(residual_l2, residual_g.block(n));
           l2_residuals[m] += (residual_g.block(n) * residual_l2)
                              * quadrature.weight(n) / width;
         }
