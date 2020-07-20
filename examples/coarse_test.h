@@ -293,6 +293,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         GetL2ErrorsCoarseMoments(l2_errors_decomp_m_rel, fluxes_coarsened[i], 
                                 flux_coarsened, transport, d2m, true, table, 
                                 decomp+"_m_rel"+m);
+      }
     }
     for (int g = 0; g < num_groups_coarse; ++g) {
       table.add_value("flux_coarse", flux_coarse_cp.block(g).l2_norm());
