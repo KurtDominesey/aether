@@ -49,6 +49,11 @@ void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh);
 
 void mesh_mox_assembly(dealii::Triangulation<2> &mesh);
 
+void refine_azimuthal(dealii::Triangulation<2> &mesh, int times=1);
+
+void refine_radial(dealii::Triangulation<2> &mesh, int times=1, 
+                   std::vector<int> max_levels={});
+
 }  // namespace aether
 
 #endif  // AETHER_MESH_H_

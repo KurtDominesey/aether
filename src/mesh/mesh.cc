@@ -326,4 +326,62 @@ void mesh_mox_assembly(dealii::Triangulation<2> &mesh) {
   mesh.set_manifold(1, trans_manifold);
 }
 
+void refine_azimuthal(dealii::Triangulation<2> &mesh, int times) {
+  for (int i = 0; i < times; ++i) {
+    for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
+      auto line = cell->line(0);
+      auto end = line->vertex(1);
+      dealii::Tensor<1, 2> path(end - line->vertex(0));
+      dealii::Tensor<1, 2> diag(end);
+      double skew = std::acos(std::abs(path*diag / (path.norm()*diag.norm())));
+      skew = std::isnan(skew) ? 0 : skew;
+      bool y_parallel_to_diag = skew > dealii::numbers::PI / 16;
+      dealii::Triangulation<2>::cell_iterator parent = cell;
+      while (parent->level() > 0)
+        parent = parent->parent();
+      bool at_origin = false;
+      for (int i = 0; i < dealii::GeometryInfo<2>::vertices_per_cell; ++i) {
+        if (parent->vertex(i) == dealii::Point<2>(0, 0))
+          at_origin = true;
+      }
+      if (at_origin) {
+        cell->set_refine_flag(dealii::RefinementCase<2>::isotropic_refinement);
+      } else {
+        cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(y_parallel_to_diag));
+      }
+    }
+    mesh.execute_coarsening_and_refinement();
+  }
+}
+
+void refine_radial(dealii::Triangulation<2> &mesh, int times,
+                   std::vector<int> max_levels) {
+  for (int i = 0; i < times; ++i) {
+    for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
+      auto line = cell->line(0);
+      auto end = line->vertex(1);
+      dealii::Tensor<1, 2> path(end - line->vertex(0));
+      dealii::Tensor<1, 2> diag(end);
+      double skew = std::acos(std::abs(path*diag / (path.norm()*diag.norm())));
+      skew = std::isnan(skew) ? 0 : skew;
+      bool y_parallel_to_diag = skew > dealii::numbers::PI / 16;
+      dealii::Triangulation<2>::cell_iterator parent = cell;
+      while (parent->level() > 0)
+        parent = parent->parent();
+      bool at_origin = false;
+      for (int i = 0; i < dealii::GeometryInfo<2>::vertices_per_cell; ++i) {
+        if (parent->vertex(i) == dealii::Point<2>(0, 0))
+          at_origin = true;
+      }
+      if (!at_origin) {
+        if (!max_levels.empty() && cell->level() >= max_levels[cell->material_id()])
+          continue;
+        cell->set_refine_flag(
+            dealii::RefinementCase<2>::cut_axis(!y_parallel_to_diag));
+      }
+    }
+    mesh.execute_coarsening_and_refinement();
+  }
+}
+
 }  // namespace aether

@@ -124,6 +124,23 @@ TEST(MeshTest, Pincell) {
   grid_out.write_svg(triangulation, file);
 }
 
+TEST(MeshTest, SymmetricQuarterPincellRefined) {
+  dealii::Triangulation<2> triangulation;
+  std::vector<double> radii{0.4095, 0.4180, 0.4750, 0.4850, 0.5400}; //{0.4095, 0.4750, 0.54};
+  std::vector<int> materials;
+  for (int i = 0; i < radii.size() + 1; ++i)
+    materials.push_back(i);
+  std::vector<int> max_levels{4, 2, 2, 2, 2, 4};
+  mesh_symmetric_quarter_pincell(triangulation, radii, 0.63, materials);
+  dealii::GridOut grid_out;
+  grid_out.set_flags(svg_flags());
+  refine_azimuthal(triangulation, 2);
+  refine_radial(triangulation, 2, max_levels);
+  std::string filename = "symmetric_quarter_pincell_refined.svg";
+  std::ofstream file(filename);
+  grid_out.write_svg(triangulation, file);
+}
+
 TEST(MeshTest, MoxAssembly) {
   dealii::Triangulation<2> mesh;
   mesh_mox_assembly(mesh);
