@@ -209,7 +209,8 @@ double EnergyMgFull::enrich(const double factor) {
 }
 
 double EnergyMgFull::normalize() {
-  return modes.back().l2_norm();
+  return 0;
+  // return modes.back().l2_norm();
   // modes.back() /= modes.back().l2_norm();
   // double sum = 0;
   // for (int g = 0; g < modes.back().size(); ++g)
@@ -387,18 +388,35 @@ void EnergyMgFull::update(
     }
   }
   dealii::Vector<double> solution_u(source_u.size());
-  if (modes.size() * num_groups > 1000) {
+  if (true) {
     for (int m = 0; m < modes.size(); ++m) {
       int mm = m * num_groups;
       for (int g = 0; g < num_groups; ++g) {
         solution_u[mm+g] = modes[m][g];
       }
     }
-    dealii::SolverControl control(1000, source_u.l2_norm()*1e-4);
-    dealii::SolverGMRES<dealii::Vector<double>> solver(control);
+    dealii::SolverControl control(500, 1e-6);
+    dealii::SolverGMRES<dealii::Vector<double>> solver(control,
+       dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(52));
+    solver.connect([](const unsigned int iteration,
+                      const double check_value,
+                      const dealii::Vector<double>&) {
+      std::cout << "update " << iteration << ": " << check_value << std::endl;
+      return dealii::SolverControl::success;
+    });
+    dealii::SparsityPattern pattern;
+    pattern.copy_from(matrix_u);
+    dealii::SparseMatrix<double> matrix_u_sp(pattern);
+    matrix_u_sp.copy_from(matrix_u);
+    // dealii::PreconditionSOR<dealii::SparseMatrix<double>> preconditioner;
+    // preconditioner.initialize(matrix_u_sp);
+    dealii::PreconditionBlockSOR<dealii::SparseMatrix<double>> preconditioner;
+    preconditioner.initialize(matrix_u_sp,
+        dealii::PreconditionBlock<dealii::SparseMatrix<double>>::AdditionalData(
+          num_groups));
+    // dealii::PreconditionIdentity preconditioner;
     try {
-      solver.solve(matrix_u, solution_u, source_u, 
-                  dealii::PreconditionIdentity());
+      solver.solve(matrix_u_sp, solution_u, source_u, preconditioner);
     } catch (dealii::SolverControl::NoConvergence &failure) {
       std::cout << "failure in updating energy\n";
       failure.print_info(std::cout);

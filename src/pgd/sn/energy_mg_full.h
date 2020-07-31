@@ -1,11 +1,13 @@
 #ifndef AETHER_PGD_SN_ENERGY_MG_FULL_H_
 #define AETHER_PGD_SN_ENERGY_MG_FULL_H_
 
+#include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/precondition.h>
+#include <deal.II/lac/precondition_block.h>
 
 #include "pgd/sn/inner_products.h"
 #include "pgd/sn/linear_updatable_interface.h"
