@@ -124,6 +124,10 @@ void write_mgxs(
     scatter_data.write_dataset("g_max", std::vector<int>(num_groups, num_groups));
     scatter_data.write_dataset("scatter_matrix", scatter_matrix);
   }
+  std::stringstream datetime;
+  std::time_t t = std::time(nullptr);
+  datetime << std::put_time(std::localtime(&t), "%F %T");
+  file.set_attribute("datetime", datetime.str());
 }
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
