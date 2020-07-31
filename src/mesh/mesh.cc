@@ -327,23 +327,34 @@ void mesh_mox_assembly(dealii::Triangulation<2> &mesh) {
 }
 
 void refine_azimuthal(dealii::Triangulation<2> &mesh, int times) {
+  dealii::Point<2> origin;
   for (int i = 0; i < times; ++i) {
     for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
-      auto line = cell->line(0);
-      auto end = line->vertex(1);
-      dealii::Tensor<1, 2> path(end - line->vertex(0));
-      dealii::Tensor<1, 2> diag(end);
-      double skew = std::acos(std::abs(path*diag / (path.norm()*diag.norm())));
-      skew = std::isnan(skew) ? 0 : skew;
-      bool y_parallel_to_diag = skew > dealii::numbers::PI / 16;
+      // find origin
       dealii::Triangulation<2>::cell_iterator parent = cell;
       while (parent->level() > 0)
         parent = parent->parent();
-      bool at_origin = false;
-      for (int i = 0; i < dealii::GeometryInfo<2>::vertices_per_cell; ++i) {
-        if (parent->vertex(i) == dealii::Point<2>(0, 0))
-          at_origin = true;
+      bool at_origin = true;
+      for (int f = 0; f < dealii::GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto& manifold = 
+            mesh.get_manifold(parent->face(f)->manifold_id());
+        const dealii::SphericalManifold<2> *circle = 
+            dynamic_cast<const dealii::SphericalManifold<2>*>(&manifold);
+        if (circle != nullptr) {
+          origin = circle->center;
+          at_origin = false;
+          break;
+        }
       }
+      // determine orientation
+      auto line = cell->line(0);
+      auto end = line->vertex(1);
+      dealii::Tensor<1, 2> path(end - line->vertex(0));
+      dealii::Tensor<1, 2> diag(end - origin);
+      double skew = std::acos(std::abs(path*diag / (path.norm()*diag.norm())));
+      skew = std::isnan(skew) ? 0 : skew;
+      bool y_parallel_to_diag = skew > dealii::numbers::PI / 16;
+      // do refinement
       if (at_origin) {
         cell->set_refine_flag(dealii::RefinementCase<2>::isotropic_refinement);
       } else {
@@ -355,24 +366,35 @@ void refine_azimuthal(dealii::Triangulation<2> &mesh, int times) {
 }
 
 void refine_radial(dealii::Triangulation<2> &mesh, int times,
-                   std::vector<int> max_levels) {
+                   const std::vector<int> max_levels) {
+  dealii::Point<2> origin;
   for (int i = 0; i < times; ++i) {
     for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
-      auto line = cell->line(0);
-      auto end = line->vertex(1);
-      dealii::Tensor<1, 2> path(end - line->vertex(0));
-      dealii::Tensor<1, 2> diag(end);
-      double skew = std::acos(std::abs(path*diag / (path.norm()*diag.norm())));
-      skew = std::isnan(skew) ? 0 : skew;
-      bool y_parallel_to_diag = skew > dealii::numbers::PI / 16;
+      // find origin
       dealii::Triangulation<2>::cell_iterator parent = cell;
       while (parent->level() > 0)
         parent = parent->parent();
-      bool at_origin = false;
-      for (int i = 0; i < dealii::GeometryInfo<2>::vertices_per_cell; ++i) {
-        if (parent->vertex(i) == dealii::Point<2>(0, 0))
-          at_origin = true;
+      bool at_origin = true;
+      for (int f = 0; f < dealii::GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto& manifold =
+            mesh.get_manifold(parent->face(f)->manifold_id());
+        const dealii::SphericalManifold<2> *circle = 
+            dynamic_cast<const dealii::SphericalManifold<2>*>(&manifold);
+        if (circle != nullptr) {
+          origin = circle->center;
+          at_origin = false;
+          break;
+        }
       }
+      // determine orientation
+      auto line = cell->line(0);
+      auto end = line->vertex(1);
+      dealii::Tensor<1, 2> path(end - line->vertex(0));
+      dealii::Tensor<1, 2> diag(end - origin);
+      double skew = std::acos(std::abs(path*diag / (path.norm()*diag.norm())));
+      skew = std::isnan(skew) ? 0 : skew;
+      bool y_parallel_to_diag = skew > dealii::numbers::PI / 16;
+      // do refinement
       if (!at_origin) {
         if (!max_levels.empty() && cell->level() >= max_levels[cell->material_id()])
           continue;
