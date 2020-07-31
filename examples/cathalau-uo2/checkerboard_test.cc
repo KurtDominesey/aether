@@ -79,7 +79,12 @@ class CheckerboardTest : public CathalauTest,
     mesh.set_manifold(mani_id_left, mani_left);
     mesh.set_manifold(mani_id_right, mani_right);
     set_all_boundaries_reflecting(mesh);
-    mesh.refine_global(1);
+    std::vector<int> max_levels_half = max_levels;
+    max_levels.insert(
+        max_levels.end(), max_levels_half.begin(), max_levels_half.end());
+    refine_azimuthal(mesh, 2);
+    refine_radial(mesh, 2, max_levels);
+    this->PrintMesh();
     dealii::FE_DGQ<dim_> fe(1);
     dof_handler.initialize(mesh, fe);
     dealii::GridOut grid_out;
