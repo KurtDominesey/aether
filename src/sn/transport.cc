@@ -330,7 +330,7 @@ void Transport<dim, qdim>::vmult_octant(
           } else {  // face->at_boundary()
             // inflow from boundary
             if (face->boundary_id() == types::reflecting_boundary_id) {
-             int n_refl = quadrature.reflected_index(n, matrices.normals[f][0]);
+              int n_refl = quadrature.reflected_index(n, matrices.normals[f][0]);
               for (int j = 0; j < dof_indices.size(); ++j)
                 dst_boundary[j] = dst.block(n_refl)[dof_indices[j]];
             } else {
