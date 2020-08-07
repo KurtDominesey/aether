@@ -41,7 +41,7 @@ class ExampleTest : public ::testing::Test {
  protected:
   dealii::Triangulation<dim> mesh;
   dealii::DoFHandler<dim> dof_handler;
-  QAngle<qdim> quadrature;
+  QPglc<qdim> quadrature;
   std::unique_ptr<Mgxs> mgxs;
 
   std::string GetTestName() const {

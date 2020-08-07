@@ -34,7 +34,8 @@ class QAngle : public dealii::Quadrature<qdim> {
   const std::vector<dealii::Point<qdim>>& get_angles() const;
   const dealii::Tensor<1, dim>& ordinate(const int n) const;
   const std::vector<dealii::Tensor<1, dim>>& get_ordinates() const;
-  int reflected_index(const int n, const dealii::Tensor<1, dim> &normal) const;
+  virtual int reflected_index(
+      const int n, const dealii::Tensor<1, dim> &normal) const;
  protected:
   std::vector<dealii::Point<qdim>> quadrature_angles;
   std::vector<dealii::Tensor<1, dim>> ordinates;

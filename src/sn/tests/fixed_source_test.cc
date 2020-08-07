@@ -9,6 +9,7 @@
 #include <deal.II/lac/precondition.h>
 
 #include "sn/quadrature.h"
+#include "sn/quadrature_lib.h"
 #include "sn/fixed_source.h"
 #include "sn/fixed_source_gs.cc"
 #include "gtest/gtest.h"
@@ -23,17 +24,14 @@ class FixedSourceAbstractTest : public ::testing::Test {
     dealii::GridGenerator::subdivided_hyper_cube(mesh, 128, -1, 1);
     dealii::FE_DGQ<dim> fe(1);
     dof_handler.initialize(mesh, fe);
-    int num_ords_qdim = 4;
-    int num_ords = std::pow(num_ords_qdim, qdim);
-    quadrature = dealii::QGauss<qdim>(num_ords_qdim);
-    int num_dofs = dof_handler.n_dofs();
+    quadrature = QPglc<dim, qdim>(2);
   }
 
   static const int dim = 1;
   static const int qdim = 1;
   dealii::Triangulation<1> mesh;
   dealii::DoFHandler<dim> dof_handler;
-  QAngle<dim, qdim> quadrature;
+  QPglc<dim, qdim> quadrature;
   std::vector<std::vector<dealii::BlockVector<double>>> boundary_conditions;
 };
 

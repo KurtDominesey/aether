@@ -6,6 +6,7 @@
 #include <deal.II/base/function_lib.h>
 
 #include "sn/quadrature.h"
+#include "sn/quadrature_lib.h"
 #include "sn/transport.h"
 #include "sn/transport_block.h"
 #include "functions/attenuated.h"
@@ -24,16 +25,16 @@ class Transport1DTest : public ::testing::TestWithParam<int> {
     dealii::GridGenerator::subdivided_hyper_cube(mesh, 64, 0, 1);
     dealii::FE_DGQ<dim> fe(TestWithParam::GetParam());
     dof_handler.initialize(mesh, fe);
-    int num_polar = 8;
-    quadrature = dealii::QGauss<qdim>(num_polar);
-    source.reinit(num_polar, dof_handler.n_dofs());
-    flux.reinit(num_polar, dof_handler.n_dofs());
+    int num_polar = 4;
+    quadrature = QPglc<dim, qdim>(num_polar);
+    source.reinit(quadrature.size(), dof_handler.n_dofs());
+    flux.reinit(quadrature.size(), dof_handler.n_dofs());
     boundary_conditions.resize(
-        2, dealii::BlockVector<double>(num_polar, fe.dofs_per_cell));
+        2, dealii::BlockVector<double>(quadrature.size(), fe.dofs_per_cell));
   }
 
   dealii::Triangulation<dim> mesh;
-  dealii::Quadrature<qdim> quadrature;
+  QPglc<dim, qdim> quadrature;
   dealii::DoFHandler<dim> dof_handler;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> flux;
@@ -175,18 +176,12 @@ class TransportMmsTest : public ::testing::Test {
     dealii::FE_DGQ<dim> fe(1);
     dof_handler.set_fe(fe);
     int num_polar = 2;
-    dealii::Quadrature<1> q_polar = dealii::QGauss<1>(2 * num_polar);
     if (qdim == 1) {
-      quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_polar);
+      quadrature = QPglc<dim, qdim>(num_polar);
     } else {
       AssertDimension(qdim, 2);
       int num_azimuthal = num_polar;
-      dealii::QMidpoint<1> q_base;
-      dealii::QIterated<1> q_azimuthal(q_base, 4 * num_polar);
-      if (dim == 2)
-        q_polar = impose_polar_symmetry(q_polar);
-      dealii::QAnisotropic<2> q_to_cast(q_polar, q_azimuthal);
-      quadrature = dynamic_cast<dealii::Quadrature<qdim>&>(q_to_cast);
+      quadrature = QPglc<dim, qdim>(num_polar, num_azimuthal);
     }
     boundary_conditions.resize(
         dim == 1 ? 2 : 1,
@@ -255,7 +250,7 @@ class TransportMmsTest : public ::testing::Test {
   }
 
   dealii::Triangulation<dim> mesh;
-  dealii::Quadrature<qdim> quadrature;
+  QPglc<dim, qdim> quadrature;
   dealii::DoFHandler<dim> dof_handler;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> flux;

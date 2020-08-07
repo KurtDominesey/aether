@@ -94,7 +94,7 @@ class Transport {
    * @param quadrature Angular quadrature.
    */
   Transport(const dealii::DoFHandler<dim> &dof_handler,
-            const dealii::Quadrature<qdim> &quadrature);
+            const QAngle<dim, qdim> &quadrature);
 
   virtual ~Transport() {}
 
@@ -143,7 +143,7 @@ class Transport {
   //! DoF handler for the finite elelments.
   const dealii::DoFHandler<dim> &dof_handler;
   //! Angular quadrature.
-  const dealii::Quadrature<qdim> &quadrature;
+  const QAngle<dim, qdim> &quadrature;
 
  protected:
   void assemble_cell_matrices();

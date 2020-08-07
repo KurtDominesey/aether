@@ -8,6 +8,7 @@
 #include <deal.II/lac/precondition.h>
 
 #include "sn/quadrature.h"
+#include "sn/quadrature_lib.h"
 #include "sn/within_group.h"
 #include "functions/attenuated.h"
 #include "gtest/gtest.h"
@@ -28,7 +29,7 @@ class WithinGroupTest : public ::testing::Test {
     dof_handler.initialize(mesh, fe);
     int num_ords_qdim = 8;
     int num_ords = std::pow(num_ords_qdim, qdim);
-    quadrature = dealii::QGauss<qdim>(num_ords_qdim);
+    quadrature = QPglc<qdim>(num_ords_qdim/2);
     int num_dofs = dof_handler.n_dofs();
     source.reinit(num_ords, num_dofs);
     uncollided.reinit(num_ords, num_dofs);
@@ -39,7 +40,7 @@ class WithinGroupTest : public ::testing::Test {
 
   dealii::Triangulation<dim> mesh;
   dealii::DoFHandler<dim> dof_handler;
-  QAngle<dim, qdim> quadrature;
+  QPglc<dim, qdim> quadrature;
   std::vector<dealii::BlockVector<double>> boundary_conditions;
   dealii::BlockVector<double> source;
   dealii::BlockVector<double> uncollided;
