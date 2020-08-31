@@ -404,16 +404,21 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       const TransportCorrection correction) {
     const int num_modes = modes_spaceangle.size();
     const int num_groups = mgxs_fine.total.size();
+    const int num_moments = d2m.n_block_rows(order);
     dealii::BlockVector<double> flux_l(
         num_groups, (order+1) * dof_handler.n_dofs());
-    dealii::BlockVector<double> mode_lb(order+1, dof_handler.n_dofs());
-    dealii::Vector<double> mode_l((order+1) * dof_handler.n_dofs());
+    dealii::BlockVector<double> flux_m(
+        num_groups, num_moments * dof_handler.n_dofs());
+    dealii::BlockVector<double> mode_mb(num_moments, dof_handler.n_dofs());
+    dealii::Vector<double> mode_m(num_moments * dof_handler.n_dofs());
     for (int m = 0; m < num_modes; ++m) {
-      d2m.discrete_to_legendre(mode_lb, modes_spaceangle[m]);
-      mode_l = mode_lb;
+      d2m.vmult(mode_mb, modes_spaceangle[m]);
+      mode_m = mode_mb;
       for (int g = 0; g < num_groups; ++g)
-        flux_l.block(g).add(modes_energy[m][g], mode_l);
+        flux_m.block(g).add(modes_energy[m][g], mode_m);
     }
+    for (int g = 0; g < num_groups; ++g)
+      d2m.moment_to_legendre(flux_l.block(g), flux_m.block(g), order);
     return collapse_mgxs(flux_l, dof_handler, transport, mgxs_fine, g_maxes,
                          correction);
   }
