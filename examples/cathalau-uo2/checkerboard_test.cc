@@ -53,7 +53,7 @@ class CheckerboardTest : public CathalauTest,
     }
     for (int g = 0; g < mgxs->group_structure.size(); ++g)
       mgxs->group_structure[g] = mgxs_uo2.group_structure[g];
-    quadrature = QPglc<qdim_>(4, 4);
+    quadrature = QPglc<qdim_>(4, 8);
     AssertDimension(regions.size(), radii.size()+1);
     const int mani_id_trans = 1;
     const int mani_id_left = 2;
