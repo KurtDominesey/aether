@@ -87,9 +87,6 @@ class CheckerboardTest : public CathalauTest,
     this->PrintMesh();
     dealii::FE_DGQ<dim_> fe(1);
     dof_handler.initialize(mesh, fe);
-    dealii::GridOut grid_out;
-    std::ofstream file("checkerboard.svg");
-    grid_out.write_svg(mesh, file);
     std::cout << "return SetUp\n";
   }
 
