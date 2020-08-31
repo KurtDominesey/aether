@@ -12,9 +12,9 @@ class C5G7CompareTest : public C5G7Test, public CompareTest<dim_, qdim_> {
 };
 
 TEST_F(C5G7CompareTest, Progressive) {
-  this->Compare(30, 50, 1e-6, 1000, 1e-6, false);
+  this->Compare(30, 50, 1e-4, 50, 1e-10, false);
 }
 
 TEST_F(C5G7CompareTest, WithUpdate) {
-  this->Compare(30, 50, 1e-6, 1000, 1e-6, true);
+  this->Compare(30, 50, 1e-4, 50, 1e-10, true);
 }

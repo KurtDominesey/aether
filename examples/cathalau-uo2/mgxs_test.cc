@@ -48,7 +48,7 @@ class CathalauMgxsTest : public CathalauTest,
 };
 
 TEST_P(CathalauMgxsTest, ToCasmo70) {
-  this->CompareMgxs(50, 100, 1e-8, 1000, 1e-8, true);
+  this->CompareMgxs(50, 50, 1e-4, 50, 1e-10, true);
 }
 
 INSTANTIATE_TEST_CASE_P(Fuel, CathalauMgxsTest, 

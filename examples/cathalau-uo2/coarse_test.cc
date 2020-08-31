@@ -27,7 +27,7 @@ TEST_P(CathalauCoarseTest, UniformFissionSource) {
       310, 312, 314, 315, 317, 318, 319, 321, 322, 323, 324, 325, 327, 330,
       333, 334, 336, 337, 338, 339, 340, 341, 343, 345, 347, 348, 349, 350,
       351, 352, 353, 354, 355, 357, 358, 359, 361};
-  this->CompareCoarse(50, 50, 1e-8, true, 1000, 1e-8, g_maxes, this->materials);
+  this->CompareCoarse(50, 50, 1e-4, true, 50, 1e-10, g_maxes, this->materials, {}, true);
 }
 
 INSTANTIATE_TEST_CASE_P(Fuel, CathalauCoarseTest,

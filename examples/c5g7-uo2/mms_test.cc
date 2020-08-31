@@ -14,12 +14,12 @@ class C5G7MmsTest : public C5G7Test,
 
 TEST_P(C5G7MmsTest, FullOrder) {
   double factor = dealii::numbers::PI_2 / this->pitch;
-  this->TestFullOrder(5, 3000, 1e-6, 2 * factor);
+  this->TestFullOrder(4, 3000, 1e-10, 2 * factor);
 }
 
 TEST_P(C5G7MmsTest, Pgd) {
   double factor = dealii::numbers::PI_2 / this->pitch;
-  this->TestPgd(5, 50, 2 * factor);
+  this->TestPgd(4, 50, 2 * factor);
 }
 
 INSTANTIATE_TEST_CASE_P(FEDegree, C5G7MmsTest, ::testing::Range(0, 3));
