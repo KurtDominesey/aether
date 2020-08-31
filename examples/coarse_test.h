@@ -9,6 +9,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
   dealii::ConvergenceTable table;
   dealii::BlockVector<double> source_coarse;
   dealii::BlockVector<double> flux_coarsened;
+  std::vector<double> group_structure_coarse;
   using CompareTest<dim, qdim>::mesh;
   using CompareTest<dim, qdim>::quadrature;
   using CompareTest<dim, qdim>::dof_handler;
@@ -93,7 +94,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     const int num_svecs = svecs_spaceangle.size();
     // Get coarsened quantities
     const int num_groups_coarse = g_maxes.size();
-    std::vector<double> group_structure_coarse(num_groups_coarse+1);
+    group_structure_coarse.resize(num_groups_coarse+1);
     group_structure_coarse[0] = mgxs->group_structure[0];
     flux_coarsened.reinit(
         num_groups_coarse, quadrature.size()*dof_handler.n_dofs());
