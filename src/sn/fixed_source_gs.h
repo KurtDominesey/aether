@@ -3,6 +3,7 @@
 
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_gmres.h>
+#include <deal.II/lac/solver_richardson.h>
 #include <deal.II/lac/precondition.h>
 
 #include "sn/within_group.h"

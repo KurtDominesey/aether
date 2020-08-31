@@ -91,4 +91,8 @@ template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 1>;
 template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 2>;
 template class FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, 3>;
 
+template class FixedSourceGS<dealii::SolverRichardson<dealii::Vector<double>>, 1>;
+template class FixedSourceGS<dealii::SolverRichardson<dealii::Vector<double>>, 2>;
+template class FixedSourceGS<dealii::SolverRichardson<dealii::Vector<double>>, 3>;
+
 }  // namespace aether::sn
