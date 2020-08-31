@@ -23,6 +23,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const double tol_fullorder,
                      const std::vector<int> &g_maxes,
                      const std::vector<std::string> &materials,
+                     std::vector<double> factors = {},
                      const bool precomputed=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
@@ -36,6 +37,11 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     std::vector<dealii::BlockVector<double>> sources_spaceangle;
     this->WriteUniformFissionSource(sources_energy, sources_spaceangle);
     const int num_sources = sources_energy.size();
+    if (factors.empty())
+      factors.resize(num_sources, 1.0);
+    AssertThrow(factors.size() == num_sources, dealii::ExcInvalidState());
+    for (int j = 0; j < num_sources; ++j)
+      sources_energy[j] *= factors[j];
     // Create boundary conditions
     std::vector<std::vector<dealii::BlockVector<double>>> 
         boundary_conditions_one(1);
