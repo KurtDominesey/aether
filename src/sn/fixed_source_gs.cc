@@ -51,8 +51,14 @@ void FixedSourceGS<SolverType, dim, qdim>::vmult(
     m2d.vmult(downscattered, downscattered_m);
     within_groups[g].transport.vmult(transported, downscattered);
     transported += src.block(g);
-    solver.solve(within_groups[g], dst.block(g), transported,
-                 dealii::PreconditionIdentity());
+    try {
+      solver.solve(within_groups[g], dst.block(g), transported,
+                  dealii::PreconditionIdentity());
+    } catch (dealii::SolverControl::NoConvergence &failure) {
+      // TODO: log this event, don't print
+      std::cout << "Within-group failure in group " << g << std::endl;
+      failure.print_info(std::cout);
+    }
     d2m.vmult(dst_m.block(g), dst.block(g));
   }
 }
