@@ -14,7 +14,10 @@ class DiscreteToMomentDimTest : public ::testing::Test {
  protected:
   static const int dim = T::value;
   void SetUp() override {
-    quadrature = QPglc<dim>(4, 4);
+    if (dim == 1)
+      quadrature = QPglc<dim>(4);
+    else
+      quadrature = QPglc<dim>(4, 4);
     d2m = std::make_unique<DiscreteToMoment<dim>>(quadrature);
   }
   QAngle<dim> quadrature;
