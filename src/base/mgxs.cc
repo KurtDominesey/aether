@@ -190,7 +190,8 @@ Mgxs collapse_mgxs(const dealii::Vector<double> &spectrum,
   dealii::BlockVector<double> spectrum_b(1, spectrum.size());
   spectrum_b = spectrum;
   std::vector<dealii::BlockVector<double>> spectra(num_materials, spectrum_b);
-  return collapse_mgxs(spectra, mgxs, g_maxes);
+  Assert(correction == CONSISTENT_P, dealii::ExcInvalidState());
+  return collapse_mgxs(spectra, mgxs, g_maxes, correction);
 }
 
 Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
