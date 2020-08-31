@@ -189,8 +189,8 @@ void QAngle<dim, qdim>::q_angle_init() {
 template <int dim, int qdim>
 int QAngle<dim, qdim>::reflected_index(
     const int n, const dealii::Tensor<1, dim> &normal) const {
-  throw dealii::ExcMessage(
-      "This angular quadrature does not support refecting boundaries");
+  AssertThrow(false, dealii::ExcMessage(
+      "This angular quadrature does not support refecting boundaries"));
 }
 
 template class QAngle<1>;
