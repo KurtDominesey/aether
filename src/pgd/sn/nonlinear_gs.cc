@@ -39,8 +39,11 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
   std::vector<InnerProducts> ip_x_ones_step(ip_x_step_step);
   std::vector<std::vector<double>> ip_b_ones(inner_products_b);
   */
+  double res = 0;
   for (int i = 0; i < linear_ops.size(); ++i) {
     set_coefficients(i, coefficients_x, coefficients_b);
+    res += std::pow(
+        linear_ops[i]->get_residual(coefficients_x, coefficients_b), 2);
     linear_ops[i]->step(steps[i], b, coefficients_x, coefficients_b);
     // if (should_normalize) {
     //   norms[i] = linear_ops[i]->normalize();
@@ -361,15 +364,25 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
   if (should_normalize) {
     for (int i = 0; i < linear_ops.size(); ++i) {
       norms[i] = linear_ops[i]->normalize();
+      // if (norms[i] > 0) {
+      //   for (int m = 0; m < inner_products_x[i].size(); ++m)
+      //     inner_products_x[i][m] *= (1.0/norms[i]);
+      //   for (int n = 0; n < inner_products_b[i].size(); ++n)
+      //     inner_products_b[i][n] /= norms[i];
+      // }
       if (i == 1) {
         linear_ops[i-1]->scale(norms[i]);
+        // for (int m = 0; m < inner_products_x[i-1].size(); ++m)
+        //   inner_products_x[i-1][m] *= norms[i];
+        // for (int n = 0; n < inner_products_b[i-1].size(); ++n)
+        //   inner_products_b[i-1][n] *= norms[i];
       }
     }
     for (int i = 0; i < linear_ops.size(); ++i)
       linear_ops[i]->get_inner_products(inner_products_x[i], 
                                         inner_products_b[i]);
   }
-  return get_residual();
+  return std::sqrt(res);
 }
 
 double NonlinearGS::get_residual() const {
