@@ -4,9 +4,11 @@
 #include <hdf5.h>
 
 #include <deal.II/base/hdf5.h>
+#include <deal.II/lac/solver_relaxation.h>
 
 #include "example_test.h"
 
+#include "base/stagnation_control.h"
 #include "base/lapack_full_matrix.cc"
 #include "sn/fixed_source_problem.cc"
 
@@ -49,17 +51,40 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
   void RunFullOrder(dealii::BlockVector<double> &flux,
                     const dealii::BlockVector<double> &source,
                     const FixedSourceProblem<dim, qdim, TransportType> &problem,
-                    const int max_iters, const double tol) {
+                    const int max_iters, const double tol,
+                    std::vector<double> *history_data = nullptr) {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
-    dealii::ReductionControl control_wg(500, 1e-6, 1e-4);
+    dealii::ReductionControl control_wg(500, tol, 1e-2);
+    // dealii::IterationNumberControl control_wg(500, tol);
     dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+    // solver_wg.connect([](const unsigned int iteration,
+    //                      const double check_value,
+    //                      const dealii::Vector<double>&) {
+    //   std::cout << "within group " << iteration << ": " << check_value 
+    //             << std::endl;
+    //   return dealii::SolverControl::success;
+    // });
     FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim, qdim>
         preconditioner(problem.fixed_source, solver_wg);
     // dealii::PreconditionIdentity preconditioner;
-    dealii::SolverControl control(max_iters, tol);
-    dealii::SolverGMRES<dealii::BlockVector<double>> solver(control);
-    solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
+    // dealii::SolverControl control(max_iters, tol);
+    StagnationControl control(max_iters, tol);
+    control.enable_history_data();
+    dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+    solver.connect([](const unsigned int iteration,
+                      const double check_value,
+                      const dealii::BlockVector<double>&) {
+      std::cout << iteration << ": " << check_value << std::endl;
+      return dealii::SolverControl::success;
+    });
+    try {
+      solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
+    } catch (dealii::SolverControl::NoConvergence &failure) {
+      failure.print_info(std::cout);
+    }
+    if (history_data != nullptr)
+      *history_data = control.get_history_data();
   }
 
   void RunPgd(pgd::sn::NonlinearGS &nonlinear_gs, const int num_modes,
@@ -71,8 +96,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       double residual = 0;
       std::cout << "mode " << m << std::endl;
       for (int k = 0; k < max_iters; ++k) {
+        bool should_normalize = true;
         try {
-          residual = nonlinear_gs.step(_, _);
+          residual = nonlinear_gs.step(_, _, should_normalize, false);
+          if (!k)
+            residual = std::numeric_limits<double>::infinity();
           std::cout << "picard " << k << " : " << residual << std::endl;
           if (residual < tol)
             break;
@@ -446,8 +474,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                const int max_iters_fullorder,
                const double tol_fullorder,
                const bool do_update,
-               const bool precomputed_full=false,
-               const bool precomputed_pgd=false) {
+               const bool precomputed_full=true,
+               const bool precomputed_pgd=true) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -470,21 +498,21 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
             sources_energy[j][g], sources_spaceangle[j].block(0));
     FixedSourceProblem<dim, qdim> problem_full(
         dof_handler, quadrature, *mgxs, boundary_conditions);
-    const std::string filename = this->GetTestName() + ".h5";
+    const std::string filename_full = this->GetTestName() + "_full.h5";
     namespace HDF5 = dealii::HDF5;
     if (precomputed_full) {
-      HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+      HDF5::File file(filename_full, HDF5::File::FileAccessMode::open);
       flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
     } else {
+      std::vector<double> history_data;
+      // run problem
       RunFullOrder(flux_full, source_full, problem_full, 
-                   max_iters_fullorder, tol_fullorder);
-      dealii::Vector<double> flux_full_v(flux_full.size());
-      flux_full_v = flux_full;
-      HDF5::File file(filename, HDF5::File::FileAccessMode::create);
-      file.write_dataset("flux_full", flux_full_v);
+                   max_iters_fullorder, tol_fullorder, &history_data);
+      this->WriteFlux(flux_full, history_data, filename_full);
     }
     this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
     // Compute svd of full order
+    std::cout << "compute svd\n";
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
     ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
@@ -509,9 +537,10 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     pgd::sn::FixedSourceP fixed_source_p(
         problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
     pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
+    const std::string filename_pgd = this->GetTestName() + "_pgd.h5";
     if (precomputed_pgd) {
       // read from file
-      HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+      HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::open);
       for (int m = 0; m < num_modes; ++m) {
         const std::string mm = std::to_string(m);
         fixed_source_p.enrich(0);
@@ -541,7 +570,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       unconverged_txt.close();
       std::cout << "wrote unconverged\n";
       // write to file
-      HDF5::File file(filename, HDF5::File::FileAccessMode::open);
+      HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::create);
       for (int m = 0; m < num_modes; ++m) {
         const std::string mm = std::to_string(m);
         file.write_dataset(
@@ -562,7 +591,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     std::vector<double> l2_residuals_streamed(num_modes+1);
     std::vector<double> l2_residuals_swept(num_modes+1);
     std::vector<double> l2_norms(num_modes+1);
-    std::cout << "get l2 errors discrete\n";
+    std::cout << "get l2 errors svd\n";
     GetL2ErrorsDiscrete(l2_errors_svd_d, svecs_spaceangle, svecs_energy, 
                         flux_full, problem.transport, table, "error_svd_d");
     GetL2ErrorsMoments(l2_errors_svd_m, svecs_spaceangle, svecs_energy, 
@@ -572,6 +601,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       table.add_value("error_svd_d", std::nan("p"));
       table.add_value("error_svd_m", std::nan("p"));
     }
+    std::cout << "get l2 errors pgd\n";
     GetL2ErrorsDiscrete(l2_errors_d, modes_spaceangle, energy_mg.modes, 
                         flux_full, problem.transport, table, "error_d");
     GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_mg.modes, 
@@ -603,12 +633,12 @@ template void CompareTest<2, 2>::RunFullOrder(
     dealii::BlockVector<double> &flux,
     const dealii::BlockVector<double> &source,
     const FixedSourceProblem<2, 2, pgd::sn::Transport<2, 2>> &problem,
-    const int max_iters, const double tol);
+    const int max_iters, const double tol, std::vector<double> *history);
 // template <int dim, int qdim>
 template void CompareTest<2, 2>::RunFullOrder(
     dealii::BlockVector<double> &flux,
     const dealii::BlockVector<double> &source,
     const FixedSourceProblem<2, 2, Transport<2, 2>> &problem,
-    const int max_iters, const double tol);
+    const int max_iters, const double tol, std::vector<double> *history);
 
 #endif  // AETHER_EXAMPLES_COMPARE_TEST_H_
