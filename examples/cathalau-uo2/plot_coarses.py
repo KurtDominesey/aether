@@ -1,5 +1,6 @@
 import ast
 import copy
+import math
 import sys
 import re
 
@@ -11,6 +12,8 @@ import openmc
 
 ALPHA = 0.6
 
+JCP = True
+
 def right_yticks():
     ax2 = plt.gca().secondary_yaxis('right')
     ax2.tick_params(axis='y', which='both', direction='in')
@@ -20,7 +23,9 @@ def plot_coarses(filename, savename, show_pgd=True, show_scalar=False,
                  **kwargs):
     if isinstance(show_pgd, str):
         show_pgd = ast.literal_eval(show_pgd)
-    groups = openmc.mgxs.GROUP_STRUCTURES['CASMO-70']
+    # groups = openmc.mgxs.GROUP_STRUCTURES['CASMO-70']
+    folder = '/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/'
+    groups = np.load(folder+'casmo-sh-70.npy')[::-1]
     widths = groups[1:] - groups[:-1]
     widths = widths[::-1]
     table = np.genfromtxt(filename, names=True)
@@ -30,6 +35,8 @@ def plot_coarses(filename, savename, show_pgd=True, show_scalar=False,
     norm_coarsened = sum(coarsened**2)**0.5
     names = list(table.dtype.names)
     for i, name in enumerate(names):
+        if 'norm' in name or 'source' in name:
+            continue
         kwargs_line = copy.copy(kwargs)
         kwargs_line['alpha'] = alpha
         match = re.match('.*_m([0-9]+)$', name)
@@ -48,9 +55,9 @@ def plot_coarses(filename, savename, show_pgd=True, show_scalar=False,
                 if not show_pgd:
                     continue
                 # kwargs_line['ls'] = '-'
-                incrs = (1, 10, 20)
-                colors = {1: 'C0', 10: 'C1', 20: 'C2'}
-                if not incr in (1, 10, 20):
+                incrs = (1, 10, 20, 30)
+                colors = {incr: 'C' + str(i) for i, incr in enumerate(incrs)}
+                if not incr in incrs:
                     continue
                 kwargs_line['color'] = colors[incr]
                 kwargs_line['label'] = 'Coarse, $M={}$'.format(incr)
@@ -69,7 +76,7 @@ def plot_coarses(filename, savename, show_pgd=True, show_scalar=False,
                     names.append(name)
                     continue
                 # kwargs_line['color'] = None
-        if 'flux' in name or 'pgd' in name or 'abs' in name:
+        if 'flux' in name or 'pgd' in name or 'abs' in name or 'svd' in name:
             continue
         if '_m_' not in name and show_pgd:
             if show_scalar:
@@ -88,11 +95,25 @@ def plot_coarses(filename, savename, show_pgd=True, show_scalar=False,
                  **kwargs_line)
     plt.xscale('log')
     plt.yscale('log')
-    plt.ylabel('Relative $L2$ Error')
+    plt.ylabel('Relative $L^2$ Error')
     plt.xlabel('Energy [eV]')
     plt.tight_layout(pad=0.2)
+    # yticks for each decade
+    locmaj = plt.gca().yaxis.get_major_locator()
+    locs = locmaj()
+    numdecs = math.log10(locs[-1] / locs[0])
+    locmaj.set_params(numdecs=numdecs, numticks=numdecs)
+    locmin = plt.gca().yaxis.get_minor_locator()
+    locmin.set_params(subs=np.arange(1, 10), numdecs=numdecs, numticks=9*numdecs)
     # plt.legend(loc='lower left', ncol=2)
     # right_yticks()
+    # locmaj_x = plt.gca().xaxis.get_major_locator()
+    # locs_x = locmaj_x()
+    # numdecs_x = math.log10(locs_x[-1] / locs_x[0])
+    # # locmaj_x.set_params(numdecs=numdecs_x, numticks=numdecs_x)
+    # locmin_x = plt.gca().xaxis.get_minor_locator()
+    # locmin_x.set_params(subs=np.arange(1, 11), numdecs=numdecs_x, 
+    #                     numticks=10*numdecs_x)
     plt.savefig(savename)
 
 def line(**kwargs):
@@ -109,8 +130,6 @@ def plot_all(*args):
     fuels = sys.argv[3:]
     fuels_str = '-'.join(str(fuel) for fuel in fuels)
     savename = name.format(fuel=fuels_str)+'_'+suffix+'.pdf'
-    plt.style.use('thesis.mplstyle')
-    matplotlib.rc('figure', figsize=(6.5, 4.5))
     matplotlib.rc('lines', linewidth=1.25)
     quantities = ['Angular, $\\psi$', 'Scalar, $\\phi$']
     ncols = len(quantities)
@@ -141,19 +160,21 @@ def plot_all(*args):
                 pass
             if i == 0:
                 plt.title(quantity)
+                upper = 1.45 if not JCP else 1.525
                 if j == 0:
                     lines = [line(color='black', ls=ls, label=label)
-                             for label, ls in (('Consistent P', '-'), 
-                                               ('Inconsistent P', ':'))]
+                             for label, ls in (('Consistent-P', '-'), 
+                                               ('Inconsistent-P', ':'))]
                     plt.legend(handles=lines, loc='upper center',
                                title='Transport Correction', ncol=2,
-                               bbox_to_anchor=(0.5, 1.45))
+                               bbox_to_anchor=(0.5, upper))
                 if j == ncols - 1:
                     lines = [line(alpha=ALPHA, color='C'+str(i), label=label)
-                             for i, label in enumerate((1, 10, 20))]
+                             for i, label in enumerate((1, 10, 20, 30))]
                     plt.legend(handles=lines, loc='upper center', 
                                title='Cross-Sections, $M=$',
-                               ncol=len(lines), bbox_to_anchor=(0.5, 1.45))
+                               ncol=len(lines), bbox_to_anchor=(0.5, upper),
+                               columnspacing=1.3)
             # handles = plt.gca().get_legend_handles_labels()
             if i == nrows - 1 and j == 0:
                 lines = [line(alpha=ALPHA, color='black', 
@@ -167,11 +188,18 @@ def plot_all(*args):
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
-    ax0.set_ylabel('Relative $L2$ Error', labelpad=32.5)
-    ax0.set_xlabel('Energy [eV]', labelpad=20)
+    ax0.set_ylabel('Relative $L^2$ Error', labelpad=32.5 if not JCP else 30)
+    ax0.set_xlabel('Energy [eV]', labelpad=20 if not JCP else 17.5)
     # ax0.legend(loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.225),
     #            title='Transport Correction')
     plt.savefig(savename)
 
 if __name__ == '__main__':
+    # python plot_coarses.py Fuel_CathalauCoarseTestUniformFissionSource_{fuel} ip uo2 mox43
+    if JCP:
+        plt.style.use('jcp.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4))
+    else:
+        plt.style.use('thesis.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4.5))
     plot_all(*sys.argv[1:])

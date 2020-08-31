@@ -10,24 +10,37 @@ import openmc
 
 ALPHA = 0.75
 
+JCP = True
+
 # def right_yticks():
 #     ax2 = plt.gca().secondary_yaxis('right')
 #     ax2.tick_params(axis='y', which='both', direction='in')
 #     plt.setp(ax2.get_yticklabels(), visible=False)
 
 def plot_coarse(filename, savename, is_relative, show_scalar=False):
-    groups = openmc.mgxs.GROUP_STRUCTURES['CASMO-70']
-    widths = groups[1:] - groups[:-1]
+    # groups = openmc.mgxs.GROUP_STRUCTURES['CASMO-70']
+    folder = '/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/'
+    groups = np.load(folder+'casmo-sh-70.npy')[::-1]
+    # widths = groups[1:] - groups[:-1]
+    widths = np.log(groups[1:]/groups[:-1])
     widths = widths[::-1]
     # widths = np.append(widths, widths[-1])
     table = np.genfromtxt(filename, names=True)
     alpha = 0.75
     alpha2 = 0.5
-    coarsened = table['flux_coarsened'] / np.sqrt(widths)
-    norm_coarsened = sum(coarsened**2)**0.5
+    # coarsened = table['flux_coarsened']
+    coarsened = table['l2_norm_d']
+    norm_coarsened = sum(coarsened**2 / widths)**0.5
+    coarsened_m = table['l2_norm_m']
+    norm_coarsened_m = sum(coarsened_m**2 / widths)**0.5
+    print('norm_coarsened', norm_coarsened)
+    print('norm_coarsened_m', norm_coarsened_m)
     is_sep = False
     for name in table.dtype.names:
-        kwargs_line = {}
+        invisible = False
+        if 'source' in name or 'norm' in name:
+            continue
+        kwargs_line = {'alpha': alpha}
         match = re.match('.*_m([0-9]+)$', name)
         if match:
             is_modal = True
@@ -55,18 +68,28 @@ def plot_coarse(filename, savename, is_relative, show_scalar=False):
                 kwargs_line['zorder'] = 4
         if 'flux' in name:
             continue
-        if 'pgd' in name:
+        if 'svd' in name:
+            continue
+        if 'pgd' in name or 'svd' in name:
             # continue
             incr = name.split('_')[-1].split('m')[-1]
             incr = int(incr)
             # if not (incr / 10) % 2:
             #     continue
             if not incr <= 30:
-                continue
-            kwargs_line['label'] = 'PGD, $M={}$'.format(incr)
-            # if incr not in [20, 40, 60]:
-            #     continue
-            # kwargs_line['color'] = 'C' + str()
+                invisible = True
+            else:
+                kwargs_line['label'] = 'PGD, $M={}$'.format(incr)
+                # if incr not in [20, 40, 60]:
+                #     continue
+                # kwargs_line['color'] = 'C' + str()
+                if 'svd' in name:
+                    kwargs_line['alpha'] = 0.25
+                    kwargs_line['color'] = {
+                        10: 'C0',
+                        20: 'C1',
+                        30: 'C2'
+                    }[incr]
         if is_relative and 'abs' in name:
             continue
         elif not is_relative and 'rel' in name:
@@ -83,28 +106,33 @@ def plot_coarse(filename, savename, is_relative, show_scalar=False):
         xdata = range(len(table[name]))
         ydata = np.array(table[name])
         if 'abs' in name:
-            ydata /= np.sqrt(widths)
+            pass
+            # ydata /= np.sqrt(widths)
         # mids = (groups[1:] + groups[:-1])/2
         if 'abs' in name:
-            norm = sum(ydata**2)**0.5
+            # ydata /= np.sqrt(widths)
+            norm = sum(ydata**2 / widths)**0.5
+            ydata /= widths
             # if name == 'coarse_d_abs':
             #     norm_coarse = norm
             norm /= norm_coarsened
             ydata /= norm_coarsened
             # ls = '--' if '_m_' in name else '--'
             ls = '-.' if kwargs_line.get('ls', '') == ':' else '--'
-        plt.step(groups[::-1], np.append(ydata[0], ydata), where='pre',
-                 alpha=alpha, **kwargs_line)
+        if not invisible:
+            plt.step(groups[::-1], np.append(ydata[0], ydata), where='pre',
+                    **kwargs_line)
         if 'abs' in name:
-            plt.axhline(norm, color=plt.gca().lines[-1].get_color(), ls=ls,
-                        alpha=alpha2)
             print('{:.2e}'.format(norm), name)
+            if not invisible:
+                plt.axhline(norm, color=plt.gca().lines[-1].get_color(), ls=ls,
+                            alpha=alpha2)
     plt.xscale('log')
     plt.yscale('log')
     if not is_relative:
-        plt.ylabel('Normalized $L2$ Error')
+        plt.ylabel('Normalized $L^2$ Error')
     else:
-        plt.ylabel('Relative $L2$ Error')
+        plt.ylabel('Relative $L^2$ Error')
     plt.xlabel('Energy [eV]')
     # kw_black = {'color': 'black', 'alpha': alpha}
     # kw_black2 = {'color': 'black', 'alpha': alpha2}
@@ -174,11 +202,9 @@ def logticks(axis):
 
 def plot_all(name, suffix):
     savename = name + '_' + suffix + '.pdf'
-    plt.style.use('thesis.mplstyle')
-    matplotlib.rc('figure', figsize=(6.5, 4.5))
     matplotlib.rc('lines', linewidth=1.25)
     quantities = ['Angular, $\\psi$', 'Scalar, $\\phi$']
-    ylabels = ['Relative $L2$ Error', 'Normalized $L2$ Error']
+    ylabels = ['Relative $L^2$ Error', 'Normalized $L^2$ Error [1/$u$]']
     ncols = len(quantities)
     nrows = len(ylabels)
     ij = 0
@@ -202,19 +228,20 @@ def plot_all(name, suffix):
                 pass
             if i == 0:
                 plt.title(quantity)
+                upper = 1.45 if not JCP else 1.495
                 if j == 0:
                     lines = [line(color=color, label=label)
-                             for label, color in (('Consistent P', 'black'), 
-                                                  ('Inconsistent P', 'gray'))]
+                             for label, color in (('Consistent-P', 'black'), 
+                                                  ('Inconsistent-P', 'gray'))]
                     plt.legend(handles=lines, loc='upper center',
                                title='Transport Correction', ncol=2,
-                               bbox_to_anchor=(0.5, 1.45))
+                               bbox_to_anchor=(0.5, upper))
                 if j == ncols - 1:
                     lines = [line(alpha=ALPHA, color='C'+str(i), label=label)
                              for i, label in enumerate((10, 20, 30))]
                     plt.legend(handles=lines, loc='upper center', 
                                title='PGD, $M=$',
-                               ncol=len(lines), bbox_to_anchor=(0.5, 1.45))
+                               ncol=len(lines), bbox_to_anchor=(0.5, upper))
             # handles = plt.gca().get_legend_handles_labels()
             if i == nrows - 1 and j == 0:
                 if not is_sep:
@@ -230,7 +257,7 @@ def plot_all(name, suffix):
                 plt.legend(handles=lines, loc='lower left', ncol=ncol)
             if j == ncols -1 and i == nrows - 1:
                 lines = [line(alpha=ALPHA, color='black', ls='--',
-                             label='Total error')]
+                             label='Total error [-]')]
                 plt.legend(handles=lines, loc='lower left')
             if j == ncols - 1:
                 plt.setp(axij.get_yticklabels(), visible=False)
@@ -241,11 +268,18 @@ def plot_all(name, suffix):
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
-    ax0.set_xlabel('Energy [eV]', labelpad=20)
+    ax0.set_xlabel('Energy [eV]', labelpad=20 if not JCP else 18)
     plt.savefig(savename)
 
 if __name__ == '__main__':
+    if JCP:
+        plt.style.use('jcp.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4.25))
+    else:
+        plt.style.use('thesis.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4.5))
     plot_all(*sys.argv[1:])
     # python plot_coarse.py Fuel_CathalauCoarseTestUniformFissionSource_uo2 pgd
     # python plot_coarse.py Fuel_CathalauCoarseTestUniformFissionSource_mox43 pgd
+    # python plot_coarse.py Pattern_CheckerboardTestUnequalPowers_0 jcp
     # python plot_coarse.py CheckerboardTestUniformFissionSource pgd

@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
+JCP = None
+
 def right_yticks():
     ax = plt.gca()
     # ax.minorticks_on()
@@ -64,8 +66,8 @@ def plot_compare(filename, savename, **kwargs):
         kwargs_line['ls'] = '-'
         kwargs_line['marker'] = 'o'
         kwargs_line['alpha'] = 0.8
-        kwargs_line['markersize'] = 2.75
-        kwargs_line['markevery'] = 2
+        # kwargs_line['markersize'] = 2.75
+        # kwargs_line['markevery'] = 2
         if 'error' in name:
             kwargs_line['color'] = 'C0'
         if 'residual' in name:
@@ -100,7 +102,7 @@ def plot_compare(filename, savename, **kwargs):
             xdata = xdata[:-1]
         # ydata /= ydata[0]
         plt.plot(xdata, ydata, **kwargs_line)
-        if 'error' in name:
+        if 'error' in name and 'svd' not in name:
             print(name, ' & '.join('%.2e' % y for y in ydata[10::10]))
     # plt.xticks(refinements)
     # plt.legend(loc='best')
@@ -129,6 +131,8 @@ def main(fuel, ext):
     ij = 0
     for i, param in enumerate(params):
         for j, algorithm in enumerate(algorithms):
+            # if param == 'SHEM-361' and algorithm == 'WithUpdate':
+            #     break
             ij += 1
             if ij == 1:
                 axij = plt.subplot(nrows, ncols, ij)
@@ -150,7 +154,8 @@ def main(fuel, ext):
             color = None
             plt.gca().set_prop_cycle(None)
             plot_compare(name+'.txt', name+'.'+ext, 
-                         label=label, color=color)
+                         label=label, color=color, 
+                         markevery=2, markersize=2.75)
             # plt.gca().yaxis.get_ticklocs(minor=True)
             # plt.gca().minorticks_on()
             plt.gca().tick_params(axis='y', which='both', left=True)
@@ -176,21 +181,35 @@ def main(fuel, ext):
                 pass
                 right_yticks()
                 plt.setp(axij.get_yticklabels(), visible=False)
+    rect = [0.03, 0.025, 1, 0.925]
+    if JCP:
+        rect[-1] = 0.915
     plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=0.5, 
-                     rect=(0.03, 0.025, 1, 0.925))
+                     rect=rect)
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
-    ax0.set_xlabel('Modes $M$', labelpad=20)
-    ax0.set_ylabel('$L2$ Error', labelpad=32.5)
+    ax0.set_xlabel('Modes $M$', labelpad=20 if not JCP else 17.5)
+    ax0.set_ylabel('Normalized $L^2$ Error', labelpad=32.5 if not JCP else 30)
+    bbox_to_anchor = [0.49, 1.14]
+    if JCP:
+        bbox_to_anchor[1] = 1.165
     legend = ax0.legend(reversed(handles), reversed(desc), loc='upper center', 
                         ncol=math.ceil(len(handles)/2),
-                        bbox_to_anchor=(0.49, 1.14))
+                        bbox_to_anchor=bbox_to_anchor)
     # plt.tight_layout(pad=0.02)
-    plt.savefig('compare_{fuel}.pdf'.format(fuel=fuel))
+    plt.savefig('compare-{fuel}.pdf'.format(fuel=fuel))
 
 if __name__ == '__main__':
+    # python plot_compare.py uo2 pdf
+    # python plot_comapre.py mox43 pdf
     plt.style.use('thesis.mplstyle')
     matplotlib.rc('figure', figsize=(6.5, 6.375))
+    if sys.argv[-1] == 'jcp':
+        sys.argv.pop()
+        JCP = True
+        plt.style.use('jcp.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 5.5))
+        matplotlib.rc('legend', fontsize=10)
     main(*sys.argv[1:])
     # plot_compare(*sys.argv[1:])

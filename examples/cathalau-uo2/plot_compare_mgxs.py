@@ -21,6 +21,8 @@ def plot_compare(filename, show_ip=False, **kwargs):
             continue
         if not show_ip and 'ip' in name:
             continue
+        if 'uo2' in filename and '26' in name:
+            continue
         # table[name] *= 100
         plt.plot([0, 1], np.abs([table[name][1], table[name][-1]]))
     plt.yscale('log')
@@ -112,7 +114,13 @@ if __name__ == '__main__':
     # python plot_compare_mgxs.py Fuel_CathalauMgxsTestToCasmo70_{fuel} ip uo2 mox43
 
     # main(sys.argv[1])
-    plt.style.use('./thesis.mplstyle')
+    JCP = True
+    if JCP:
+        plt.style.use('./jcp.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4.25))
+    else:
+        plt.style.use('./thesis.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4.5))
     # matplotlib.rc('legend', fontsize=10.95, title_fontsize=10.95)
     # matplotlib.rc('axes.grid', which='both')
     # matplotlib.rc('ytick', right=True, direction='in')
@@ -124,7 +132,6 @@ if __name__ == '__main__':
     nrows = order + 1
     ncols = len(fuels)
     # matplotlib.rc('figure', figsize=(6.5, (6+3/8)/2 * nrows))
-    matplotlib.rc('figure', figsize=(6.5, 4.5))
     ij = 0
     for ell in range(order+1):
         for j, fuel in enumerate(fuels):
@@ -176,7 +183,7 @@ if __name__ == '__main__':
     # plt.gca().autoscale(True, axis='x', tight=True)
     # plt.tight_layout(pad=0.2)
     plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=0.5, 
-                     rect=(0.05, 0.035, 1, 0.89))
+                     rect=(0.05, 0.035, 1, 0.89 if not JCP else 0.88))
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
@@ -185,8 +192,9 @@ if __name__ == '__main__':
         r'$\left\vert\Sigma_{t,g,\ell}-\Sigma_{t,g,\ell}^{\mathrm{PGD}}\right\vert'
         r'/\Sigma_{t,g,\ell}$',
         labelpad=32.5)
-    ax0.set_xlabel('Modes $M$', labelpad=20)
-    ax0.legend(*handles, loc='upper center', ncol=7, bbox_to_anchor=(0.5, 1.225),
+    ax0.set_xlabel('Modes $M$', labelpad=20 if not JCP else 18)
+    ax0.legend(*handles, loc='upper center', ncol=7, 
+               bbox_to_anchor=(0.5, 1.225 if not JCP else 1.24),
                title='Group $g=$')
     # legend = ax0.legend(reversed(handles), reversed(desc), loc='upper center', 
     #                     ncol=math.ceil(len(handles)/2),

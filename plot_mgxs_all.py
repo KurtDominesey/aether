@@ -8,10 +8,12 @@ import openmc.mgxs
 
 import plot_mgxs
 
+JCP = True
+
 def plot_all(loc, fuels):
     # fuels are columns
     # group structures are rows
-    base = loc + '/{fuel}/mgxs-{group_structure}.h5'
+    base = loc + '/{fuel}/mgxs-uncorrected-{group_structure}.h5'
     group_structures = ['CASMO-70', 'XMAS-172', 'SHEM-361']
     nrows = len(group_structures)
     ncols = len(fuels)
@@ -55,16 +57,19 @@ def plot_all(loc, fuels):
         lines.append(line)
     # plt.figlegend(lines, materials, loc='upper center',
     #               ncol=len(materials))
-    plt.tight_layout(pad=0.2, rect=(0.03, 0.04, 1, 0.92))
+    # plt.yscale('linear')
+    plt.tight_layout(pad=0.2, rect=(0.03, 0.04, 1, 0.92 if not JCP else 0.925))
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
-    ax0.set_xlabel('Energy [eV]', labelpad=20)
-    ax0.set_ylabel(r'Total Cross-Section $\Sigma_t$ [b]', labelpad=25)
+    ax0.set_xlabel('Energy [eV]', labelpad=20 if not JCP else 18)
+    ax0.set_ylabel(r'Total Cross-Section $\Sigma_t$ [cm\textsuperscript{-1}]', 
+                   labelpad=25 if not JCP else 23)
     legend = ax0.legend(lines, materials, loc='upper center', ncol=len(materials),
-                        bbox_to_anchor=(0.5, 1.17))
+                        bbox_to_anchor=(0.5, 1.17) if not JCP else (0.5, 1.175))
 
 if __name__ == '__main__':
+    # python plot_mgxs_all.py mgxs-all.pdf ../openmc-c5g7 uo2 mox43
     import mpl_rc
     normal = 12
     small = 10.95
@@ -73,6 +78,9 @@ if __name__ == '__main__':
     mpl_rc.set_rc(small, figsize)
     # matplotlib.rc('legend', fontsize=footnotesize, title_fontsize=footnotesize)
     matplotlib.rc('axes', titlesize=small)
+    if JCP:
+        plt.style.use('./examples/cathalau-uo2/jcp.mplstyle')
+        matplotlib.rc('figure', figsize=(6.5, 4.125))
     print(sys.argv)
     # matplotlib.rc()
     plot_all(sys.argv[2], sys.argv[3:])

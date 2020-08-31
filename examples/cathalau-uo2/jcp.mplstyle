@@ -7,8 +7,8 @@ axes.labelsize : 10
 axes.titlesize : 10
 axes.grid : True
 grid.alpha : 0.5
-legend.fontsize : 8
-legend.title_fontsize : 8
+legend.fontsize : 10
+legend.title_fontsize : 10
 legend.framealpha : 0.85
 figure.figsize : 6.5, 3.5
 savefig.transparent : True

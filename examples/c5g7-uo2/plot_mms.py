@@ -31,7 +31,7 @@ def plot_rate(name_base, degrees, suffix, plot_theoretical=True, **kwargs):
     legend = plt.legend(title='{Polynomial Order} $p=$', 
                         loc='lower left', framealpha=0.85, ncol=2)
     plt.xlabel('Mesh Refinements')
-    plt.ylabel('$L2$ Error')
+    plt.ylabel('$L^2$ Error')
 
 def plot_mms(savename):
     name_base = 'FEDegree_C5G7MmsTest{rom}_{{degree}}.txt'
@@ -48,13 +48,16 @@ def plot_mms(savename):
     plt.savefig(savename)
 
 if __name__ == '__main__':
+    # python plot_mms.py mms.pdf
     import mpl_rc
     # fontsize = 12
     small = 10.95
     footnotesize = 10
     figsize = (6.5, 2+3/8)
-    mpl_rc.set_rc(small, figsize)
-    matplotlib.rc('legend', fontsize=footnotesize)
-    matplotlib.rc('legend', title_fontsize=footnotesize)
+    plt.style.use('../cathalau-uo2/jcp.mplstyle')
+    matplotlib.rc('figure', figsize=figsize)
+    # mpl_rc.set_rc(small, figsize)
+    # matplotlib.rc('legend', fontsize=footnotesize)
+    # matplotlib.rc('legend', title_fontsize=footnotesize)
     plot_mms(sys.argv[1])
     print(sys.argv[1])

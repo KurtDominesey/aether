@@ -57,6 +57,7 @@ def plot_compare(filename, savename):
     plt.xlabel('Modes $M$')
     plt.tight_layout(pad=0.2)
     plt.savefig(savename)
+    print(plt.ylim())
     plt.close()
 
 def main(ext, suffix=''):
@@ -67,6 +68,8 @@ def main(ext, suffix=''):
         plot_compare(name+'.txt', name+suffix+'.'+ext)
 
 if __name__ == '__main__':
+    # python plot_compare.py pdf
+    # python plot_compare.py pdf
     small = 10.95
     footnotesize = 10
     import mpl_rc
