@@ -144,13 +144,13 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       nonlinear_gs.enrich();
       for (int k = 0; k < max_iters_nonlinear; ++k) {
         try {
-        double residual = nonlinear_gs.step(_, _);
-        if (residual < tol_nonlinear)
-          break;
+          double residual = nonlinear_gs.step(_, _);
+          if (residual < tol_nonlinear)
+            break;
         } catch (dealii::SolverControl::NoConvergence &failure) {
           failure.print_info(std::cout);
           break;
-      }
+        }
       }
       if (do_update) {
         nonlinear_gs.finalize();
