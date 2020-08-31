@@ -103,30 +103,61 @@ void DiscreteToMoment<dim, qdim>::discrete_to_legendre(
 }
 
 template <int dim, int qdim>
+void DiscreteToMoment<dim, qdim>::moment_to_legendre(
+    dealii::Vector<double> &dst, const dealii::Vector<double> &moments, 
+    const int order) const {
+  const int num_moments = n_block_rows(order);
+  const int num_dofs = moments.size() / num_moments;
+  AssertThrow(moments.size() == num_moments * num_dofs, 
+              dealii::ExcInvalidState());
+  AssertThrow(dst.size() == (order+1) * num_dofs,
+              dealii::ExcInvalidState());
+  dealii::BlockVector<double> dst_b(order+1, num_dofs);
+  dealii::BlockVector<double> moments_b(num_moments, num_dofs);
+  moments_b = moments;
+  moment_to_legendre(dst_b, moments_b);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void DiscreteToMoment<dim, qdim>::discrete_to_legendre(
     dealii::BlockVector<double> &dst, const dealii::BlockVector<double> &src)
     const {
-  dst = 0;
   const int order = dst.n_blocks() - 1;
   const int num_moments = n_block_rows(order);
   const int num_dofs = dst.block(0).size();
   dealii::BlockVector<double> moments(num_moments, num_dofs);
   vmult(moments, src);
+  moment_to_legendre(dst, moments);
+}
+
+template <int dim, int qdim>
+void DiscreteToMoment<dim, qdim>::moment_to_legendre(
+    dealii::BlockVector<double> &dst, 
+    const dealii::BlockVector<double> &moments)
+    const {
+  dst = 0;
+  const int order = dst.n_blocks() - 1;
+  dealii::BlockVector<double> square(moments);
+  square.scale(moments);
   for (int ell = 0, lm = 0; ell <= order; ++ell) {
     switch (dim) {
       case 1:
-        dst.block(ell) += moments.block(ell);
+        dst.block(ell) += square.block(ell);
         break;
       case 2:
         for (int m = -ell; m <= -ell; m += 2, ++lm)
-          dst.block(ell) += moments.block(lm);
+          dst.block(ell) += square.block(lm);
         break;
       case 3:
         for (int m = -ell; m <= -ell; ++m, ++lm)
-          dst.block(ell) += moments.block(lm);
+          dst.block(ell) += square.block(lm);
         break;
     }
   }
+  for (int i = 0; i < dst.size(); ++i)
+    dst[i] = std::sqrt(dst[i]);
+  dst.block(0) = moments.block(0);  //!
 }
 
 template class DiscreteToMoment<1>;

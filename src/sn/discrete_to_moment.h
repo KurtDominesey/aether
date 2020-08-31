@@ -27,6 +27,11 @@ class DiscreteToMoment {
                             const dealii::Vector<double> &src) const;
   void discrete_to_legendre(dealii::BlockVector<double> &dst,
                             const dealii::BlockVector<double> &src) const;
+  void moment_to_legendre(dealii::Vector<double> &dst,
+                          const dealii::Vector<double> &moments,
+                          const int order) const;
+  void moment_to_legendre(dealii::BlockVector<double> &dst,
+                          const dealii::BlockVector<double> &moments) const;
 
  protected:
   const QAngle<dim, qdim> &quadrature;
