@@ -86,7 +86,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     const int num_svecs = svecs_spaceangle.size();
     // Run infinite medium
     std::cout << "run infinite medium\n";
-    AssertDimension(sources_energy.size(), 1);
     dealii::Vector<double> spectrum(num_groups);
     RunInfiniteMedium(spectrum, sources_energy[2], *mgxs, volumes);
     Mgxs mgxs_coarse_inf = collapse_mgxs(spectrum, *mgxs, g_maxes);
