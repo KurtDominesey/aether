@@ -2,7 +2,10 @@
 #define AETHER_EXAMPLES_EXAMPLE_TEST_H_
 
 #include <regex>
+#include <hdf5.h>
+#include <ctime>
 
+#include <deal.II/base/hdf5.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -77,6 +80,29 @@ class ExampleTest : public ::testing::Test {
     std::ofstream out(filename, std::ofstream::out | std::ofstream::trunc);
     table.write_text(out);
     out.close();
+  }
+
+  void WriteFlux(const dealii::BlockVector<double> &flux,
+                 const std::vector<double> &history,
+                 const std::string &filename) {
+    dealii::Vector<double> flux_v(flux.size());
+    flux_v = flux;
+    namespace HDF5 = dealii::HDF5;
+    HDF5::File file(filename, HDF5::File::FileAccessMode::create);
+    file.write_dataset("flux_full", flux_v);
+    file.write_dataset("history_data", history);
+    // add metadata
+    file.set_attribute("n_dofs", this->dof_handler.n_dofs());
+    file.set_attribute("n_polar", this->quadrature.get_tensor_basis()[0].size());
+    if (qdim == 2)
+      file.set_attribute("n_azim", this->quadrature.get_tensor_basis()[1].size());
+    file.set_attribute("n_groups", int(this->mgxs->total.size()));
+    // timestamp
+    std::stringstream datetime;
+    std::time_t t = std::time(nullptr);
+    datetime << std::put_time(std::localtime(&t), "%F %T");
+    const std::string datetime_str = datetime.str();
+    file.set_attribute("datetime", datetime_str);
   }
 
   void PlotFlux(const dealii::BlockVector<double> &flux,
