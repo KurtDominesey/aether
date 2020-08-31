@@ -185,6 +185,22 @@ class CheckerboardTest : public CathalauTest,
       GetL2ErrorsCoarseMoments(l2_errors_coarse_sep_m_rel, flux_coarse, 
                               flux_coarsened, transport, d2m, true, table,
                               "coarse_sep_m_rel"+correction, _);
+      this->PlotFlux(flux_coarse, d2m, group_structure_coarse, 
+                     "coarse"+correction+"_dissimilar");
+      this->PlotDiffAngular(flux_coarse, flux_coarsened, d2m,
+                            "diff_angular_coarse"+correction+"_dissimilar");
+      this->PlotDiffScalar(flux_coarse, flux_coarsened, d2m,
+                           "diff_scalar_coarse"+correction+"_dissimilar");
+      for (int g = 0; g < num_groups_coarse; ++g) {
+        // table.add_value("flux_coarse_sep", flux_coarse.block(g).l2_norm());
+        // table.add_value("flux_coarsened_2", flux_coarsened.block(g).l2_norm());
+        table.add_value("source_coarse_2", source_coarse.block(g).l2_norm());
+      }
+      for (std::string key : 
+          {"flux_coarse_sep", "flux_coarsened_2", "source_coarse_2"}) {
+        table.set_scientific(key, true);
+        table.set_precision(key, 16);
+      }
     }
     std::cout << "printing table to file\n";
     this->WriteConvergenceTable(table);
