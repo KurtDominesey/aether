@@ -44,8 +44,8 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
     set_all_boundaries_reflecting(mesh);
   }
 
-  void SetVolumes() {
-    std::vector<double> volumes(materials.size());
+  void SetVolumes(std::vector<double> &volumes) {
+    volumes.resize(materials.size());
     std::vector<double> areas(radii.size());  // ring areas
     for (int r = 0; r < radii.size(); ++r)
       areas[r]= dealii::numbers::PI * std::pow(radii[r], 2);
