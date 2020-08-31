@@ -246,6 +246,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     // Post process
     std::cout << "post-processing\n";
     // pgd::sn::Transport<dim, qdim> transport(dof_handler, quadrature);
+    std::vector<double> l2_norms_d;
+    std::vector<double> l2_norms_m;
     TransportType& transport = problem.transport;
     std::cout << "init'd transport\n";
     DiscreteToMoment<qdim> &d2m = problem_full.d2m;
@@ -263,16 +265,16 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       std::vector<double> l2_errors_coarse_m_abs;
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs, flux_coarse, 
                                 flux_coarsened, transport, false, table, 
-                                "coarse_d_abs"+label);
+                                "coarse_d_abs"+label, l2_norms_d);
       GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs, flux_coarse, 
                               flux_coarsened, transport, d2m, false, table, 
-                              "coarse_m_abs"+label);
+                              "coarse_m_abs"+label, l2_norms_m);
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
                                 flux_coarsened, transport, true, table, 
-                                "coarse_d_rel"+label);
+                                "coarse_d_rel"+label, l2_norms_d);
       GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel, flux_coarse, 
                                flux_coarsened, transport, d2m, true, table,
-                               "coarse_m_rel"+label);
+                               "coarse_m_rel"+label, l2_norms_m);
       this->PlotFlux(flux_coarse, problem_full.d2m, 
                       group_structure_coarse, "coarse"+label);
       this->PlotDiffAngular(flux_coarse, flux_coarsened, problem_full.d2m,
@@ -288,16 +290,16 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         std::string labelm = label+ "_m" + std::to_string(m_coarses[i]);
         GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs_mi, flux_coarses[i], 
                                   flux_coarsened, transport, false, table, 
-                                  "coarse_d_abs"+labelm);
+                                  "coarse_d_abs"+labelm, l2_norms_d);
         GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs_mi, flux_coarses[i], 
                                  flux_coarsened, transport, d2m, false, table, 
-                                 "coarse_m_abs"+labelm);
+                                 "coarse_m_abs"+labelm, l2_norms_m);
         GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel_mi, flux_coarses[i], 
                                   flux_coarsened, transport, true, table, 
-                                  "coarse_d_rel"+labelm);
+                                  "coarse_d_rel"+labelm, l2_norms_d);
         GetL2ErrorsCoarseMoments(l2_errors_coarse_m_rel_mi, flux_coarses[i], 
                                  flux_coarsened, transport, d2m, true, table,
-                                 "coarse_m_rel"+labelm);
+                                 "coarse_m_rel"+labelm, l2_norms_m);
       }
     }
     for (int d = 0; d < 2; ++d) {
@@ -312,16 +314,16 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         std::string m = "_m" + std::to_string((i + 1) * incr);
         GetL2ErrorsCoarseDiscrete(l2_errors_decomp_d_abs, fluxes_coarsened[i], 
                                   flux_coarsened, transport, false, table,
-                                  decomp+"_d_abs"+m);
+                                  decomp+"_d_abs"+m, l2_norms_d);
         GetL2ErrorsCoarseMoments(l2_errors_decomp_m_abs, fluxes_coarsened[i], 
                                 flux_coarsened, transport, d2m, false, table,
-                                decomp+"_m_abs"+m);
+                                decomp+"_m_abs"+m, l2_norms_m);
         GetL2ErrorsCoarseDiscrete(l2_errors_decomp_d_rel, fluxes_coarsened[i], 
                                   flux_coarsened, transport, true, table, 
-                                  decomp+"_d_rel"+m);
+                                  decomp+"_d_rel"+m, l2_norms_d);
         GetL2ErrorsCoarseMoments(l2_errors_decomp_m_rel, fluxes_coarsened[i], 
                                 flux_coarsened, transport, d2m, true, table, 
-                                decomp+"_m_rel"+m);
+                                decomp+"_m_rel"+m, l2_norms_m);
         this->PlotFlux(fluxes_coarsened[i], problem_full.d2m, 
                        group_structure_coarse, decomp+"_coarsened"+m);
         this->PlotDiffAngular(fluxes_coarsened[i], flux_coarsened, 
@@ -330,17 +332,24 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
             problem_full.d2m, decomp+"_diff_scalar_coarsened"+m);
       }
     }
+    // */
     for (int g = 0; g < num_groups_coarse; ++g) {
-      table.add_value("flux_coarse", flux_coarse_cp.block(g).l2_norm());
+      // table.add_value("flux_coarse", flux_coarse_cp.block(g).l2_norm());
       table.add_value("flux_coarsened", flux_coarsened.block(g).l2_norm());
-      // table.add_value("source_coarse", source_coarse.block(g).l2_norm());
+      table.add_value("source_coarse", source_coarse.block(g).l2_norm());
+      table.add_value("l2_norm_d", l2_norms_d[g]);
+      table.add_value("l2_norm_m", l2_norms_m[g]);
     }
     table.set_scientific("flux_coarse", true);
     table.set_scientific("flux_coarsened", true);
     table.set_scientific("source_coarse", true);
+    table.set_scientific("l2_norm_d", true);
+    table.set_scientific("l2_norm_m", true);
     table.set_precision("flux_coarse", 16);
     table.set_precision("flux_coarsened", 16);
-    // table.set_precision("source_coarse", 16);
+    table.set_precision("source_coarse", 16);
+    table.set_precision("l2_norm_d", 16);
+    table.set_precision("l2_norm_m", 16);
     this->WriteConvergenceTable(table);
   }
 
@@ -351,10 +360,13 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       const pgd::sn::Transport<dim, qdim> &transport,
       const bool is_relative,
       dealii::ConvergenceTable &table,
-      const std::string &key) {
+      const std::string &key,
+      std::vector<double> &l2_norms) {
     const int num_groups = flux_coarse.n_blocks();
     AssertDimension(num_groups, flux_coarsened.n_blocks());
     l2_errors.resize(num_groups);
+    l2_norms.clear();
+    l2_norms.resize(num_groups);
     dealii::BlockVector<double> diff(quadrature.size(), dof_handler.n_dofs());
     dealii::BlockVector<double> flux_coarsened_g(diff);
     dealii::Vector<double> diff_l2(dof_handler.n_dofs());
@@ -370,8 +382,9 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         l2_norm += quadrature.weight(n) * (flux_coarsened_g.block(n) * diff_l2);
       }
       l2_errors[g] = std::sqrt(l2_errors[g]);
+      l2_norms[g] = std::sqrt(l2_norm);
       if (is_relative)
-        l2_errors[g] /= std::sqrt(l2_norm);
+        l2_errors[g] /= l2_norms[g];
       table.add_value(key, l2_errors[g]);
     }
     table.set_scientific(key, true);
@@ -386,10 +399,13 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       const sn::DiscreteToMoment<qdim> &d2m,
       const bool is_relative,
       dealii::ConvergenceTable &table,
-      const std::string &key) {
+      const std::string &key,
+      std::vector<double> &l2_norms) {
     const int num_groups = flux_coarse.n_blocks();
     AssertDimension(num_groups, flux_coarsened.n_blocks());
     l2_errors.resize(num_groups);
+    l2_norms.clear();
+    l2_norms.resize(num_groups);
     dealii::Vector<double> diff(dof_handler.n_dofs());
     dealii::Vector<double> diff_l2(diff);
     dealii::Vector<double> flux_coarsened_g(diff);
@@ -404,6 +420,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       if (is_relative)
         l2_error /= l2_norm;
       l2_errors[g] = l2_error;
+      l2_norms[g] = l2_norm;
       table.add_value(key, l2_errors[g]);
     }
     table.set_scientific(key, true);

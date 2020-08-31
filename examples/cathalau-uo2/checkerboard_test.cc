@@ -167,6 +167,7 @@ class CheckerboardTest : public CathalauTest,
       std::cout << "d2m\n";
       // DiscreteToMoment<qdim_> d2m(quadrature);
       DiscreteToMoment<qdim_> &d2m = problem_coarse.d2m;
+      std::vector<double> _;
       std::vector<double> l2_errors_coarse_sep_d_rel;
       std::vector<double> l2_errors_coarse_sep_m_rel;
       std::vector<double> l2_errors_coarse_sep_d_abs;
@@ -174,29 +175,19 @@ class CheckerboardTest : public CathalauTest,
       std::cout << "coarse_sep_d_abs\n";
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_sep_d_abs, flux_coarse, 
                                 flux_coarsened, transport, false, table, 
-                                "coarse_sep_d_abs"+correction);
+                                "coarse_sep_d_abs"+correction, _);
       std::cout << "coarse_sep_m_abs\n";
       GetL2ErrorsCoarseMoments(l2_errors_coarse_sep_m_abs, flux_coarse, 
                               flux_coarsened, transport, d2m, false, table, 
-                              "coarse_sep_m_abs"+correction);
+                              "coarse_sep_m_abs"+correction, _);
       std::cout << "coarse_sep_d_rel\n";
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_sep_d_rel, flux_coarse, 
                                 flux_coarsened, transport, true, table, 
-                                "coarse_sep_d_rel"+correction);
+                                "coarse_sep_d_rel"+correction, _);
       std::cout << "coarse_sep_m_rel\n";
       GetL2ErrorsCoarseMoments(l2_errors_coarse_sep_m_rel, flux_coarse, 
                               flux_coarsened, transport, d2m, true, table,
-                              "coarse_sep_m_rel"+correction);
-      // for (int g = 0; g < num_groups_coarse; ++g) {
-      //   table.add_value("flux_coarse_sep", flux_coarse.block(g).l2_norm());
-      //   // table.add_value("flux_coarsened_2", flux_coarsened.block(g).l2_norm());
-      //   // table.add_value("source_coarse_2", source_coarse.block(g).l2_norm());
-      // }
-      // for (std::string key : 
-      //     {"flux_coarse_sep"/*, "flux_coarsened_2", "source_coarse_2"*/}) {
-      //   table.set_scientific(key, true);
-      //   table.set_precision(key, 16);
-      // }
+                              "coarse_sep_m_rel"+correction, _);
     }
     std::cout << "printing table to file\n";
     this->WriteConvergenceTable(table);
