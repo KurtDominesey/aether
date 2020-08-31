@@ -14,7 +14,7 @@ class C5G7Test : virtual public ExampleTest<dim_, qdim_> {
     const std::vector<std::string> materials =  {"water", "uo2"};
     mgxs = std::make_unique<Mgxs>(7, materials.size(), 1);
     read_mgxs(*mgxs, "c5g7.h5", "294K", materials, true);
-    quadrature = QPglc<qdim_>(4, 6);
+    quadrature = QPglc<qdim_>(4, 8);
     mesh_symmetric_quarter_pincell(mesh, {0.54}, pitch, {0, 1});
     set_all_boundaries_reflecting(mesh);
     mesh.refine_global(0);

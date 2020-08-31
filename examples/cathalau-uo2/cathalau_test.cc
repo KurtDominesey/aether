@@ -38,7 +38,7 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
         + materials[2] + "/" + "mgxs-" + group_structure + ".h5";
     mgxs = std::make_unique<Mgxs>(num_groups, materials.size(), 1);
     read_mgxs(*mgxs, filename, "294K", materials, true);
-    quadrature = QPglc<qdim_>(4, 4);
+    quadrature = QPglc<dim_, qdim_>(4, 8);
     AssertDimension(regions.size(), radii.size()+1);
     mesh_symmetric_quarter_pincell(mesh, radii, pitch, regions);
     set_all_boundaries_reflecting(mesh);
