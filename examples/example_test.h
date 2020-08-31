@@ -7,6 +7,7 @@
 
 #include <deal.II/base/hdf5.h>
 #include <deal.II/fe/fe_dgq.h>
+#include <deal.II/fe/fe_system.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/base/convergence_table.h>
@@ -114,19 +115,30 @@ class ExampleTest : public ::testing::Test {
     const int num_groups = flux.n_blocks();
     const int digits = std::to_string(num_groups).size();
     AssertDimension(group_structure.size(), num_groups+1);
-    dealii::BlockVector<double> flux_m(num_groups, this->dof_handler.n_dofs());
+    // dealii::BlockVector<double> flux_m(num_groups, 3*this->dof_handler.n_dofs());
+    std::vector<dealii::BlockVector<double>> moments(num_groups,
+        dealii::BlockVector<double>(d2m.n_block_rows(1), this->dof_handler.n_dofs()));
+    dealii::Vector<double> flat(moments[0].size());
     for (int g = 0; g < num_groups; ++g) {
-      const std::string gs = std::to_string(g+1);
-      d2m.vmult(flux_m.block(g), flux.block(g));
+      std::string gs = std::to_string(g+1);
+      gs = "g" + std::string(digits - gs.size(), '0') + gs + "_";
+      d2m.vmult(flat, flux.block(g));
       if (!group_structure.empty()) {
         int g_rev = num_groups - 1 - g;
-        flux_m.block(g) /=
+        flat /=
             std::log(group_structure[g_rev+1] / group_structure[g_rev]);
       }
-      data_out.add_data_vector(
-          flux_m.block(g), "g" + std::string(digits - gs.size(), '0') + gs,
-          dealii::DataOut_DoFData<dealii::DoFHandler<dim>,
-                                  dim>::DataVectorType::type_dof_data);
+      moments[g] = flat;
+      // moments[g].block(1) += moments[g].block(2);
+      data_out.add_data_vector(moments[g].block(0), gs+"scalar");
+      data_out.add_data_vector(moments[g].block(1), gs+"current_y");
+      data_out.add_data_vector(moments[g].block(2), gs+"current_x");
+      // data_out.add_data_vector(
+      //     moments[g], {gs+"scalar", gs+"current_x", gs+"current_y"},
+      //     dealii::DataOut_DoFData<dealii::DoFHandler<dim>, dim>::DataVectorType::type_dof_data,
+      //     {dealii::DataComponentInterpretation::component_is_scalar,
+      //         dealii::DataComponentInterpretation::component_is_scalar,
+      //         dealii::DataComponentInterpretation::component_is_scalar});
     }
     data_out.build_patches();
     std::string name = GetTestName();
@@ -134,6 +146,28 @@ class ExampleTest : public ::testing::Test {
       name += "-" + suffix;
     std::ofstream output(name+".vtu");
     data_out.write_vtu(output);
+    /*
+    // plot current
+    dealii::FESystem<dim, dim> fe(this->dof_handler.get_fe(), dim);
+    dealii::DoFHandler<dim, dim> dof_handler_v;
+    dof_handler_v.initialize(
+        this->dof_handler.get_triangulation(), fe);
+    dealii::DataOut<dim> data_out_v;
+    data_out_v.attach_dof_handler(dof_handler_v);
+    for (int g = 0; g < moments.size(); ++g) {
+      std::string gs = std::to_string(g+1);
+      gs = "g" + std::string(digits - gs.size(), '0') + gs + "_";
+      data_out_v.add_data_vector(
+          moments[g], {gs+"scalar", gs+"current", gs+"current"},
+          dealii::DataOut_DoFData<dealii::DoFHandler<dim>, dim>::DataVectorType::type_dof_data,
+          {dealii::DataComponentInterpretation::component_is_scalar,
+           dealii::DataComponentInterpretation::component_is_part_of_vector,
+           dealii::DataComponentInterpretation::component_is_part_of_vector});
+    }
+    data_out_v.build_patches();
+    std::ofstream output_v(name+"_v.vtu");
+    data_out_v.write_vtu(output_v);
+    */
   }
 
   void PlotDiffAngular(const dealii::BlockVector<double> &flux,
@@ -144,22 +178,32 @@ class ExampleTest : public ::testing::Test {
     data_out.attach_dof_handler(this->dof_handler);
     const int num_groups = flux.n_blocks();
     const int digits = std::to_string(num_groups).size();
-    dealii::BlockVector<double> diff_m(num_groups, this->dof_handler.n_dofs());
+    // dealii::BlockVector<double> diff_m(num_groups, this->dof_handler.n_dofs());
+    std::vector<dealii::BlockVector<double>> diff_m(
+        num_groups, dealii::BlockVector<double>(
+          d2m.n_block_rows(1), this->dof_handler.n_dofs()));
+    dealii::Vector<double> flat(diff_m[0].size());
     dealii::Vector<double> diff_g(
         this->quadrature.size()*this->dof_handler.n_dofs());
     dealii::Vector<double> ref_m(this->dof_handler.n_dofs());
     for (int g = 0; g < num_groups; ++g) {
-      const std::string gs = std::to_string(g+1);
+      std::string gs = std::to_string(g+1);
+      gs = "g" + std::string(digits - gs.size(), '0') + gs + "_";
       diff_g = flux.block(g);
       diff_g -= ref.block(g);
-      d2m.vmult(diff_m.block(g), diff_g);
+      d2m.vmult(flat, diff_g);
       d2m.vmult(ref_m, ref.block(g));
-      for (int i = 0; i < diff_m.block(g).size(); ++i)
-        diff_m.block(g)[i] /= ref_m[i];
-      data_out.add_data_vector(
-          diff_m.block(g), "g" + std::string(digits - gs.size(), '0') + gs,
-          dealii::DataOut_DoFData<dealii::DoFHandler<dim>,
-                                  dim>::DataVectorType::type_dof_data);
+      diff_m[g] = flat;
+      for (int lm = 0; lm < diff_m[g].n_blocks(); ++lm)
+        for (int i = 0; i < diff_m[g].block(lm).size(); ++i)
+          diff_m[g].block(lm)[i] /= ref_m[i];
+      data_out.add_data_vector(diff_m[g].block(0), gs+"scalar");
+      data_out.add_data_vector(diff_m[g].block(1), gs+"current_y");
+      data_out.add_data_vector(diff_m[g].block(2), gs+"current_x");
+      // data_out.add_data_vector(
+      //     diff_m.block(g), "g" + std::string(digits - gs.size(), '0') + gs,
+      //     dealii::DataOut_DoFData<dealii::DoFHandler<dim>,
+      //                             dim>::DataVectorType::type_dof_data);
     }
     data_out.build_patches();
     std::string name = GetTestName();
