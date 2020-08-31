@@ -58,12 +58,11 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       HDF5::File file(filename_h5, HDF5::File::FileAccessMode::open);
       flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
     } else {
+      std::vector<double> history_data;
       CompareTest<dim, qdim>::RunFullOrder(flux_full, source_full, problem_full, 
-                                           max_iters_fullorder, tol_fullorder);
-      dealii::Vector<double> flux_full_v(flux_full.size());
-      flux_full_v = flux_full;
-      HDF5::File file(filename_h5, HDF5::File::FileAccessMode::create);
-      file.write_dataset("flux_full", flux_full_v);
+                                           max_iters_fullorder, tol_fullorder, 
+                                           &history_data);
+      this->WriteFlux(flux_full, history_data, filename_h5);
     }
     this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
     dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
