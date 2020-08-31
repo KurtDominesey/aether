@@ -86,6 +86,17 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         INCONSISTENT_P);
     write_mgxs(mgxs_coarse_ip, test_name+"_ip_mgxs.h5", "294K", materials);
     std::cout << "MGXS TO FILE " << filename << std::endl;
+    // Print spectra
+    dealii::ConvergenceTable table_spectra;
+    for (int j = 0; j < num_materials; ++j) {
+      std::string key = "j" + std::to_string(j);
+      for (int g = 0; g < num_groups; ++g) {
+        table_spectra.add_value(key, spectra[j].block(0)[g]);
+      }
+      table_spectra.set_scientific(key, true);
+      table_spectra.set_precision(key, 16);
+    }
+    this->WriteConvergenceTable(table_spectra, "_spectra");
     // Compute svd of full order
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
     std::vector<dealii::Vector<double>> svecs_energy;
