@@ -18,8 +18,8 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
   const double pitch = 0.63;
   std::string group_structure = "CASMO-70";
   std::vector<std::string> materials = {"void", "water", "uo2", "zr", "al"};
-  std::vector<double> radii = {0.4095, 0.4180, 0.4750, 0.4850, 0.5400};
-  std::vector<int> regions = {2, 0, 3, 0, 4, 1};
+  const std::vector<double> radii = {0.4095, 0.4180, 0.4750, 0.4850, 0.5400};
+  const std::vector<int> regions = {2, 0, 3, 0, 4, 1};
   std::vector<int> max_levels = {2, 4, 4, 2, 2};
 
   void SetUp() override {
@@ -39,24 +39,6 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
     mgxs = std::make_unique<Mgxs>(num_groups, materials.size(), 1);
     read_mgxs(*mgxs, filename, "294K", materials, true);
     quadrature = QPglc<dim_, qdim_>(4, 8);
-    // smear void gaps
-    for (int i = 1, d = 0; i < regions.size() - 1; i += 2, ++d) {
-      int ii = i - d;
-      double a0 = std::pow(radii[ii+1], 2) - std::pow(radii[ii], 2);
-      double a1 = std::pow(radii[ii+1], 2) - std::pow(radii[ii-1], 2);
-      double ratio = a0 / a1;
-      int material = regions[ii];
-      AssertThrow(material == 0, dealii::ExcInvalidState());
-      for (int g = 0; g < mgxs->total.size(); ++g) {
-        mgxs->total[g][material] *= ratio;
-        for (int gp = 0; gp < mgxs->total.size(); ++gp) {
-          mgxs->scatter[g][gp][material] *= ratio;
-        }
-      }
-      radii.erase(radii.begin()+ii);
-      regions.erase(regions.begin()+ii);
-      std::cout << ratio << std::endl;
-    }
     AssertDimension(regions.size(), radii.size()+1);
     mesh_symmetric_quarter_pincell(mesh, radii, pitch, regions);
     set_all_boundaries_reflecting(mesh);
