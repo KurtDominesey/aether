@@ -168,6 +168,14 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       dealii::PreconditionIdentity preconditioner;
       std::cout << "running full-order: cycle " << cycle << std::endl;
       solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
+      // Plot solution
+      dealii::DataOut<dim> data_out;
+      data_out.attach_dof_handler(this->dof_handler);
+      data_out.add_data_vector(flux.block(0), "g1 scalar");
+      data_out.build_patches();
+      std::string name = this->GetTestName() + "_cycle" + std::to_string(cycle);
+      std::ofstream output_vtu(name+".vtu");
+      data_out.write_vtu(output_vtu);
       // Post-process
       dealii::BlockVector<double> flux_g(
           quadrature.size(), dof_handler.n_dofs());
