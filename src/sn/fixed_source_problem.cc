@@ -13,5 +13,6 @@ void FixedSourceProblem<dim, qdim, TransportType, TransportBlockType>::
 template class FixedSourceProblem<1>;
 template class FixedSourceProblem<2>;
 template class FixedSourceProblem<3>;
+template class FixedSourceProblem<2, 2, aether::pgd::sn::Transport<2, 2>>;
 
 }  // namespace aether::sn
