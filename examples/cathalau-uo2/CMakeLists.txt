@@ -31,7 +31,7 @@ deal_ii_setup_target(aether)
 set(test "test.exe")
 add_executable(${test} "test.cc" "cathalau_test.cc" 
     "mms_test.cc" "compare_test.cc" "mgxs_test.cc" "coarse_test.cc" 
-    "checkerboard_test.cc")
+    "checkerboard_test.cc" "self_shielding_test.cc")
 target_link_libraries(${test} aether)
 
 target_compile_options(${test} PUBLIC ${GTEST_CFLAGS})
