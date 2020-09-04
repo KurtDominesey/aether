@@ -165,6 +165,12 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       problem.sweep_source(uncollided, source);
       dealii::SolverControl control(max_iters, tol);
       dealii::SolverGMRES<dealii::BlockVector<double>> solver(control);
+      solver.connect([](const unsigned int iteration,
+                        const double check_value,
+                        const dealii::BlockVector<double>&) {
+        std::cout << iteration << ": " << check_value << std::endl;
+        return dealii::SolverControl::success;
+      });
       dealii::PreconditionIdentity preconditioner;
       std::cout << "running full-order: cycle " << cycle << std::endl;
       solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
