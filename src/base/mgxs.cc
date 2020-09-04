@@ -177,8 +177,10 @@ Mgxs collapse_mgxs(const dealii::BlockVector<double> &flux,
   std::vector<dealii::BlockVector<double>> spectra;
   // std::cout << "collapse spectra\n";
   collapse_spectra(spectra, flux, dof_handler, transport);
-  AssertDimension(spectra.size(), mgxs.total.size());
-  AssertDimension(spectra[0].size(), mgxs.total[0].size());
+  // check number of materials
+  AssertDimension(spectra.size(), mgxs.total[0].size());
+  // check number of groups
+  AssertDimension(spectra[0].block(0).size(), mgxs.total.size());
   // std::cout << "collapse mgxs\n";
   return collapse_mgxs(spectra, mgxs, g_maxes, correction);
 }
