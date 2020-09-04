@@ -11,6 +11,8 @@
 #include "sn/fixed_source.h"
 #include "sn/quadrature.h"
 
+#include "pgd/sn/transport.h"
+
 namespace aether::sn {
 
 template <int dim, int qdim = dim == 1 ? 1 : 2,
@@ -27,11 +29,11 @@ class FixedSourceProblem {
                     const dealii::BlockVector<double> &src) const;
   FixedSource<dim, qdim> fixed_source;
   TransportType transport;
+  Scattering<dim> scattering;
   DiscreteToMoment<dim, qdim> d2m;
   MomentToDiscrete<dim, qdim> m2d;
 
  protected:
-  Scattering<dim> scattering;
   std::vector<WithinGroup<dim, qdim>> within_groups;
   std::vector<std::vector<ScatteringBlock<dim>>> downscattering;
   std::vector<std::vector<ScatteringBlock<dim>>> upscattering;
