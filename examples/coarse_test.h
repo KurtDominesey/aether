@@ -55,8 +55,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       for (int j = 0; j < num_sources; ++j)
         source_full.block(g).add(
             sources_energy[j][g], sources_spaceangle[j].block(0));
-    // using TransportType = pgd::sn::Transport<dim, qdim>;
-    FixedSourceProblem<dim, qdim> problem_full(
+    using TransportType = pgd::sn::Transport<dim, qdim>;
+    FixedSourceProblem<dim, qdim, TransportType> problem_full(
         dof_handler, quadrature, *mgxs, boundary_conditions);
     // TransportType transport = problem_full.transport.transport;
     const std::string filename_h5 = this->GetTestName() + ".h5";
@@ -72,6 +72,11 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       this->WriteFlux(flux_full, history_data, filename_h5);
     }
     this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
+    // get k1 (first iteration eigenvalue)
+    double denominator = 0;
+    double k1 = this->ComputeEigenvalue(problem_full, flux_full, source_full, 
+                                        *mgxs, denominator);
+    // collapse mgxs
     dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
     dealii::BlockVector<double> flux_full_l1(num_groups, 2*dof_handler.n_dofs());
     for (int g = 0; g < num_groups; ++g) {
@@ -186,6 +191,17 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                           problem_full.transport, problem.d2m, *mgxs, g_maxes,
                           1, INCONSISTENT_P));
       }
+      // get k1
+      dealii::BlockVector<double> flux_pgd(
+          num_groups, quadrature.size()*dof_handler.n_dofs());
+      for (int mm = 0; mm <= m; ++mm) {
+        for (int g = 0; g < num_groups; ++g)
+          flux_pgd.block(g).add(energy_mg.modes[mm][g],
+                                fixed_source_p.caches[mm].mode.block(0));
+      }
+      double _ = 0;
+      double k1_pgd = this->ComputeEigenvalue(problem_full, flux_pgd, 
+                                              source_full, *mgxs, _);
     }
     modes_spaceangle.clear();
     std::cout << "done running pgd\n";

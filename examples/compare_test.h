@@ -121,6 +121,34 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     }
   }
 
+  double ComputeEigenvalue(
+        FixedSourceProblem<dim, qdim, pgd::sn::Transport<dim, qdim>> &problem,
+        dealii::BlockVector<double> &flux, dealii::BlockVector<double> &source,
+        Mgxs &mgxs_problem, double &denominator) {
+    denominator = 0;  // power 0
+    double numerator = 0;  // power 1
+    dealii::Vector<double> scalar(dof_handler.n_dofs());
+    dealii::Vector<double> fissioned(dof_handler.n_dofs());
+    dealii::Vector<double> dual(dof_handler.n_dofs());
+    const int num_groups = source.n_blocks();
+    for (int g = 0; g < num_groups; ++g) {
+      // from source
+      problem.d2m.vmult(scalar, source.block(g));
+      problem.transport.collide_ordinate(dual, scalar);
+      for (int i = 0; i < dual.size(); ++i)
+        denominator += dual[i];
+      // from flux
+      problem.d2m.vmult(scalar, flux.block(g));
+      ScatteringBlock<dim> nu_fission(
+          problem.scattering, mgxs_problem.nu_fission[g]);
+      nu_fission.vmult(fissioned, scalar);
+      problem.transport.collide_ordinate(dual, fissioned);
+      for (int i = 0; i < dual.size(); ++i)
+        numerator += dual[i];
+    }
+    return numerator / denominator;
+  }
+
   void GetL2ErrorsDiscrete(
       std::vector<double> &l2_errors,
       const std::vector<dealii::BlockVector<double>> &modes_spaceangle,
