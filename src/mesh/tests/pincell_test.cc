@@ -2,10 +2,8 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_refinement.h>
 
-#include "mesh/mesh.cc"
+#include "mesh/mesh.h"
 #include "gtest/gtest.h"
-
-#include "base/tests/mgxs_test.cc"
 
 namespace aether {
 

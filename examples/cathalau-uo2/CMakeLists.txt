@@ -21,7 +21,7 @@ project(c5g7-uo2)
 find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
-file(GLOB_RECURSE source_lib "../../src/*.cc")
+file(GLOB_RECURSE source_lib "../../src/*.cc" "../../src/*/*.cc")
 include_directories(${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src)
 
 add_library(aether ${source_lib})

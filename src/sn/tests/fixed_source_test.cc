@@ -11,7 +11,7 @@
 #include "sn/quadrature.h"
 #include "sn/quadrature_lib.h"
 #include "sn/fixed_source.h"
-#include "sn/fixed_source_gs.cc"
+#include "sn/fixed_source_gs.h"
 #include "gtest/gtest.h"
 
 namespace aether::sn {

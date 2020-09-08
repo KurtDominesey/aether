@@ -1,5 +1,4 @@
-// #include "../mgxs.h"
-#include "base/mgxs.cc"
+#include "base/mgxs.h"
 #include "gtest/gtest.h"
 
 namespace aether {

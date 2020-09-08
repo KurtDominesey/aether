@@ -1,7 +1,7 @@
 #include <deal.II/base/quadrature_lib.h>
 
-#include "sn/discrete_to_moment.cc"
-#include "sn/moment_to_discrete.cc"
+#include "sn/discrete_to_moment.h"
+#include "sn/moment_to_discrete.h"
 #include "sn/quadrature_lib.h"
 #include "gtest/gtest.h"
 

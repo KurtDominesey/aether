@@ -4,7 +4,7 @@
 #include <deal.II/base/convergence_table.h>
 
 #include "base/mgxs.h"
-#include "pgd/sn/nonlinear_gs.cc"
+#include "pgd/sn/nonlinear_gs.h"
 #include "pgd/sn/fixed_source_p.h"
 #include "pgd/sn/transport.h"
 #include "pgd/sn/linear_interface.h"

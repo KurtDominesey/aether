@@ -22,7 +22,7 @@ find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
 set(main "src/main.cc")
-file(GLOB_RECURSE source  "src/[!main]*.cc")
+file(GLOB_RECURSE source "src/[!main]*.cc" "src/*/*.cc" )
 include_directories(${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src)
 
 set(exec "aether.exe")

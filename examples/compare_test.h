@@ -9,8 +9,8 @@
 #include "example_test.h"
 
 #include "base/stagnation_control.h"
-#include "base/lapack_full_matrix.cc"
-#include "sn/fixed_source_problem.cc"
+#include "base/lapack_full_matrix.h"
+#include "sn/fixed_source_problem.h"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
