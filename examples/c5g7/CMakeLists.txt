@@ -44,3 +44,8 @@ DEAL_II_INVOKE_AUTOPILOT()
 
 INCLUDE_DIRECTORIES("../../src")
 TARGET_INCLUDE_DIRECTORIES(${TARGET} PUBLIC "../../src")
+
+file(GLOB_RECURSE source_lib "../../src/*.cc" "../../src/*/*.cc")
+add_library(aether ${source_lib})
+deal_ii_setup_target(aether)
+target_link_libraries(${TARGET} aether)

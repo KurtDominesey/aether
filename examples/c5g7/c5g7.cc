@@ -14,18 +14,20 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/data_out_dof_data.h>
 
+#include "base/mgxs.h"
 #include "mesh/mesh.h"
 #include "types/types.h"
-#include "sn/quadrature.cc"
-#include "sn/discrete_to_moment.cc"
-#include "sn/moment_to_discrete.cc"
-#include "sn/transport.cc"
-#include "sn/transport_block.cc"
-#include "sn/scattering.cc"
-#include "sn/scattering_block.cc"
-#include "sn/within_group.cc"
-#include "sn/fixed_source.cc"
-#include "sn/fixed_source_gs.cc"
+#include "sn/quadrature.h"
+#include "sn/quadrature_lib.h"
+#include "sn/discrete_to_moment.h"
+#include "sn/moment_to_discrete.h"
+#include "sn/transport.h"
+#include "sn/transport_block.h"
+#include "sn/scattering.h"
+#include "sn/scattering_block.h"
+#include "sn/within_group.h"
+#include "sn/fixed_source.h"
+#include "sn/fixed_source_gs.h"
 
 using namespace aether;
 
@@ -36,8 +38,8 @@ int main() {
   dealii::Triangulation<dim> mesh;
   double pitch = 0.63;  // cm
   double radius = 0.54;  // cm
-  mesh_quarter_pincell(mesh, {radius}, pitch, {1, 0});
-  mesh.refine_global(2);
+  mesh_eighth_pincell(mesh, {radius/std::sqrt(2), radius}, pitch, {1, 1, 0});
+  mesh.refine_global(4);
   // Create finite elements
   std::cout << "create finite elements\n";
   dealii::FE_DGQ<dim> fe(1);
@@ -45,29 +47,16 @@ int main() {
   dof_handler.distribute_dofs(fe);
   // Create quadrature
   std::cout << "create quadrature\n";
-  int num_ords_per_oct = 8;
-  dealii::Quadrature<1> q_polar = dealii::QGauss<1>(num_ords_per_oct*2);
-  std::vector<dealii::Point<1>> points(num_ords_per_oct);
-  std::vector<double> weights(num_ords_per_oct);
-  for (int n = 0; n < num_ords_per_oct; ++n) {
-    points[n](0) = (n + 0.5) / num_ords_per_oct;
-    weights[n] = 1.0 / num_ords_per_oct;
-  }
-  dealii::Quadrature<1> q_azimuthal_base(points, weights);
-  dealii::QIterated<1> q_azimuthal(q_azimuthal_base, 4);
-  double sum_weights = 0;
-  for (int n = 0; n < q_azimuthal.size(); ++n)
-    sum_weights += q_azimuthal.weight(n);
-  AssertThrow(std::abs(1 - sum_weights) < 1e-13,
-      dealii::ExcMessage("Azimuthal weights sum to " +
-                         std::to_string(sum_weights) + " not one"));
-  q_polar = sn::impose_polar_symmetry(q_polar);
-  dealii::QAnisotropic<2> quadrature(q_polar, q_azimuthal);
+  int num_polar = 16;
+  int num_azim = num_polar;
+  sn::QPglc<dim> quadrature(num_polar, num_azim);
   std::ofstream quadrature_csv("quadrature.csv");
-  for (int n = 0; n < quadrature.size(); ++n)
+  for (int n = 0; n < quadrature.size(); ++n) {
     quadrature_csv << quadrature.point(n)[0] << ","
                    << quadrature.point(n)[1] << ","
                    << quadrature.weight(n) << "\n";
+    std::cout << quadrature.angle(n) << std::endl;
+  }
   quadrature_csv.close();
   // Read cross-section files
   std::cout << "read cross-section files\n";
@@ -117,10 +106,9 @@ int main() {
         xs_scatter[g][gp][i] = xs_scatter_pivot[i][gp][g];
     }
   }
+  const auto mgxs_ = read_mgxs("c5g7.h5", temperature, materials);
   // Create boundary conditions (empty, all reflecting)
   std::cout << "create boundary condtions\n";
-  // std::vector<dealii::BlockVector<double>> boundary_conditions(
-  //     1, dealii::BlockVector<double>(quadrature.size(), fe.dofs_per_cell));
   std::vector<dealii::BlockVector<double>> boundary_conditions;
   // Create operators
   std::cout << "create operators\n";
@@ -134,9 +122,10 @@ int main() {
   std::vector<std::vector<sn::ScatteringBlock<dim>>> downscattering(num_groups);
   std::vector<std::vector<sn::ScatteringBlock<dim>>> upscattering(num_groups); 
   for (int g = 0; g < num_groups; ++g) {
-    sn::TransportBlock transport_wg(transport, xs_total[g], 
-                                    boundary_conditions);
-    sn::ScatteringBlock scattering_wg(scattering, xs_scatter[g][g]);
+    auto transport_wg = std::make_shared<sn::TransportBlock<dim>>(
+      transport, xs_total[g], boundary_conditions);
+    auto scattering_wg = std::make_shared<sn::ScatteringBlock<dim>>(
+      scattering, xs_scatter[g][g]);
     within_groups.emplace_back(transport_wg, m2d, scattering_wg, d2m);
     AssertDimension(xs_scatter[g].size(), num_groups);
     for (int gp = g - 1; gp >= 0; --gp)
@@ -153,7 +142,7 @@ int main() {
   std::cout << "create final (fixed source) operators\n";
   sn::FixedSource fixed_source(within_groups, downscattering, upscattering, 
                                m2d, d2m);
-  dealii::ReductionControl control_wg(3000, 1e-5, 1e-5);
+  dealii::ReductionControl control_wg(3000, 1e-7, 1e-2);
   dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
   sn::FixedSourceGS fixed_source_gs(within_groups, downscattering, upscattering,
                                     m2d, d2m, solver_wg);
@@ -176,8 +165,7 @@ int main() {
       for (int n = 0; n < quadrature.size(); ++n)
         for (int i = 0; i < dof_indices.size(); ++i)
           source.block(g)[dof_indices[i] + n*dof_handler.n_dofs()]
-            = chi[cell->material_id()][g];
-            // = cell->material_id(); //chi[1][g];
+            = mgxs_.chi[g][cell->material_id()];
     // set boundary ids
     if (cell->at_boundary()) {
       for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
@@ -194,14 +182,9 @@ int main() {
                                      false);
   // Solve the fixed source problem
   std::cout << "solve the fixed source problem\n";
-  dealii::SolverControl control_mg(5000, 1e-4);
-  dealii::SolverRichardson<dealii::BlockVector<double>> solver_mg(control_mg);
+  dealii::SolverControl control_mg(5000, 1e-6);
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver_mg(control_mg);
   solver_mg.solve(fixed_source, flux, uncollided, fixed_source_gs);
-  // try {
-  //   solver_mg.solve(fixed_source, flux, uncollided, dealii::PreconditionIdentity());
-  // } catch (dealii::SolverControl::NoConvergence &e) {
-  //   std::cout << e.what();
-  // }
   // Output results
   std::cout << "output results\n";
   dealii::DataOut<dim> data_out;
