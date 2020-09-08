@@ -37,12 +37,6 @@ class DiscreteToMoment {
   const QAngle<dim, qdim> &quadrature;
 };
 
-int num_moments(int order, int dim);
-
-int legendre_order(int num_moments, int dim);
-
-int num_moments_of_order(int ell, int dim);
-
 }  // namespace aether::sn
 
 #endif  // AETHER_SN_DISCRETE_TO_MOMENT_H_
