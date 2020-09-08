@@ -2381,6 +2381,8 @@ LAPACKFullMatrix_<number>::print_formatted(std::ostream &     out,
 }
 
 
+template class LAPACKFullMatrix_<double>;
+
 //----------------------------------------------------------------------//
 
 template <typename number>
