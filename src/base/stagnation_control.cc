@@ -5,9 +5,7 @@ namespace aether {
 dealii::SolverControl::State StagnationControl::check(
     const unsigned int step, const double check_value) {
   if (step > 0 && check_value >= lvalue) {
-    // if (m_log_result)
-    //   dealii::deallog << "Convergence step " << step << " value " << check_value
-    //                   << std::endl;
+    // TODO: log result if "m_log_result" is true
     lstep = step;
     lvalue = check_value;
     lcheck = failure;
