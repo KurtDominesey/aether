@@ -131,8 +131,20 @@ class ExampleTest : public ::testing::Test {
       moments[g] = flat;
       // moments[g].block(1) += moments[g].block(2);
       data_out.add_data_vector(moments[g].block(0), gs+"scalar");
-      data_out.add_data_vector(moments[g].block(1), gs+"current_y");
-      data_out.add_data_vector(moments[g].block(2), gs+"current_x");
+      switch (dim) {
+        case 1:
+          data_out.add_data_vector(moments[g].block(1), gs+"current_x");
+          break;
+        case 2:
+          data_out.add_data_vector(moments[g].block(1), gs+"current_y");
+          data_out.add_data_vector(moments[g].block(2), gs+"current_x");
+          break;
+        case 3:
+          data_out.add_data_vector(moments[g].block(1), gs+"current_y");
+          data_out.add_data_vector(moments[g].block(2), gs+"current_z");
+          data_out.add_data_vector(moments[g].block(3), gs+"current_x");
+          break;
+      }
       // data_out.add_data_vector(
       //     moments[g], {gs+"scalar", gs+"current_x", gs+"current_y"},
       //     dealii::DataOut_DoFData<dealii::DoFHandler<dim>, dim>::DataVectorType::type_dof_data,
@@ -198,8 +210,20 @@ class ExampleTest : public ::testing::Test {
         for (int i = 0; i < diff_m[g].block(lm).size(); ++i)
           diff_m[g].block(lm)[i] /= ref_m[i];
       data_out.add_data_vector(diff_m[g].block(0), gs+"scalar");
-      data_out.add_data_vector(diff_m[g].block(1), gs+"current_y");
-      data_out.add_data_vector(diff_m[g].block(2), gs+"current_x");
+      switch (dim) {
+        case 1:
+          data_out.add_data_vector(diff_m[g].block(1), gs+"current_x");
+          break;
+        case 2:
+          data_out.add_data_vector(diff_m[g].block(1), gs+"current_y");
+          data_out.add_data_vector(diff_m[g].block(2), gs+"current_x");
+          break;
+        case 3:
+          data_out.add_data_vector(diff_m[g].block(1), gs+"current_y");
+          data_out.add_data_vector(diff_m[g].block(2), gs+"current_z");
+          data_out.add_data_vector(diff_m[g].block(3), gs+"current_x");
+          break;
+      }
       // data_out.add_data_vector(
       //     diff_m.block(g), "g" + std::string(digits - gs.size(), '0') + gs,
       //     dealii::DataOut_DoFData<dealii::DoFHandler<dim>,
