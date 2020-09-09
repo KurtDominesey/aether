@@ -5,23 +5,11 @@
 #include "mesh/mesh.h"
 #include "gtest/gtest.h"
 
+#include "svg_flags.h"
+
 namespace aether {
 
 namespace {
-
-dealii::GridOutFlags::Svg svg_flags() {
-  dealii::GridOutFlags::Svg svg;
-  svg.coloring = dealii::GridOutFlags::Svg::Coloring::material_id;
-  svg.margin = false;
-  svg.label_cell_index = false;
-  svg.label_level_number = false;
-  svg.label_level_subdomain_id = false;
-  svg.label_material_id = false;
-  svg.label_subdomain_id = false;
-  svg.draw_colorbar = false;
-  svg.draw_legend = false;
-  return svg;
-}
 
 TEST(MeshTest, QuarterPincell) {
   dealii::Triangulation<2> triangulation;
@@ -35,13 +23,10 @@ TEST(MeshTest, QuarterPincell) {
 
 TEST(MeshTest, SymmetricQuarterPincell) {
   dealii::Triangulation<2> triangulation;
-  // mesh_symmetric_quarter_pincell(triangulation, {0.44, 0.54}, 0.63, {1, 1, 0});
   std::vector<double> radii{0.4095, 0.4750, 0.54};
   std::vector<int> materials;
   for (int i = 0; i < radii.size() + 1; ++i)
     materials.push_back(i);
-  // std::vector<int> materials(radii.size(), 1);
-  // materials.push_back(0);
   mesh_symmetric_quarter_pincell(triangulation, radii, 0.63, materials);
   dealii::GridOut grid_out;
   grid_out.set_flags(svg_flags());
@@ -60,23 +45,16 @@ TEST(MeshTest, Refinement) {
   std::vector<int> materials(radii.size()+1);
   std::iota(materials.begin(), materials.end(), 0);
   mesh_symmetric_quarter_pincell(mesh, radii, 0.63, materials);
-  // for (int i = 0; i < radii.size() + 1; ++i)
-  //   materials.push_back(i);
   double target = 7.5e-2;
   dealii::Vector<double> measures;
   do {
     measures.reinit(mesh.n_active_cells());
     int c = 0;
-    for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell, ++c)
-      measures[c] = std::max(cell->extent_in_direction(1), cell->extent_in_direction(0)); //cell->diameter();
-    // dealii::GridRefinement::refine(mesh, measures, target);
-    for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell) {
-      // if (cell->refinement_case() == dealii::RefinementCase<2>::no_refinement)
-      //   continue;
-      if (std::max(cell->extent_in_direction(1),
-                   cell->extent_in_direction(0)) < target)
+    for (auto cell = mesh.begin_active(); cell != mesh.end(); ++cell, ++c) {
+      measures[c] = 
+          std::max(cell->extent_in_direction(1), cell->extent_in_direction(0));
+      if (measures[c] < target)
         continue;
-      // cell->set_refine_flag(dealii::RefinementCase<2>::no_refinement);
       int i = cell->extent_in_direction(1) > cell->extent_in_direction(0);
       cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(i));
     }
@@ -124,7 +102,7 @@ TEST(MeshTest, Pincell) {
 
 TEST(MeshTest, SymmetricQuarterPincellRefined) {
   dealii::Triangulation<2> triangulation;
-  std::vector<double> radii{0.4095, 0.4180, 0.4750, 0.4850, 0.5400}; //{0.4095, 0.4750, 0.54};
+  std::vector<double> radii{0.4095, 0.4180, 0.4750, 0.4850, 0.5400};
   std::vector<int> materials;
   for (int i = 0; i < radii.size() + 1; ++i)
     materials.push_back(i);
@@ -137,16 +115,6 @@ TEST(MeshTest, SymmetricQuarterPincellRefined) {
   std::string filename = "symmetric_quarter_pincell_refined.svg";
   std::ofstream file(filename);
   grid_out.write_svg(triangulation, file);
-}
-
-TEST(MeshTest, MoxAssembly) {
-  dealii::Triangulation<2> mesh;
-  mesh_mox_assembly(mesh);
-  mesh.refine_global(0);
-  dealii::GridOut grid_out;
-  std::string filename = "mox_assembly.svg";
-  std::ofstream file(filename);
-  grid_out.write_svg(mesh, file);
 }
 
 }  // namespace
