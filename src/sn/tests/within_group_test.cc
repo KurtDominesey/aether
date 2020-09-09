@@ -85,9 +85,6 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScattering) {
   TypeParam solver(solver_control);
   solver.solve(within_group, this->flux, this->uncollided, 
                dealii::PreconditionIdentity());
-  // std::cout << "iterations required " 
-  //           << solver_control.last_step() 
-  //           << std::endl;
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {
       ASSERT_NEAR(1, this->flux.block(n)[i], 1e-10);
@@ -124,9 +121,6 @@ TYPED_TEST(WithinGroupTest, IsotropicPureScatteringReflected) {
   TypeParam solver(solver_control);
   solver.solve(within_group, this->flux, this->uncollided, 
                dealii::PreconditionIdentity());
-  // std::cout << "iterations required " 
-  //           << solver_control.last_step() 
-  //           << std::endl;
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {
       ASSERT_NEAR(1, this->flux.block(n)[i], 1e-10);
@@ -169,9 +163,6 @@ TYPED_TEST(WithinGroupTest, IsotropicInfiniteMedium) {
   TypeParam solver(solver_control);
   solver.solve(within_group, this->flux, this->uncollided, 
                dealii::PreconditionIdentity());
-  // std::cout << "iterations required " 
-  //           << solver_control.last_step() 
-  //           << std::endl;
   double solution = strength / (cross_section_total - cross_section_scattering);
   for (int n = 0; n < num_ords; ++n) {
     for (int i = 0; i < num_dofs; ++i) {

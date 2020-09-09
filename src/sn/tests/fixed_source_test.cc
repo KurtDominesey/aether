@@ -109,9 +109,6 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicPureScattering) {
     within_groups[g].transport.vmult(uncollided.block(g), source.block(g),
                                      false);
   solver.solve(fixed_source, flux, uncollided, fixed_source_gs);
-  // std::cout << "iterations required " 
-  //           << solver_control.last_step() 
-  //           << std::endl;
   for (int g = 0; g < num_groups; ++g)
     for (int i = 0; i < flux.block(g).size(); ++i)
       ASSERT_NEAR(1, flux.block(g)[i], 1e-10);
@@ -166,9 +163,6 @@ TYPED_TEST(FixedSourceTest, IsotropicPureScattering) {
     within_groups[g].transport.vmult(uncollided.block(g), source.block(g),
                                      false);
   solver.solve(fixed_source, flux, uncollided, dealii::PreconditionIdentity());
-  // std::cout << "iterations required " 
-  //           << solver_control.last_step() 
-  //           << std::endl;
   for (int g = 0; g < num_groups; ++g)
     for (int i = 0; i < flux.block(g).size(); ++i)
       ASSERT_NEAR(1, flux.block(g)[i], 1e-10);
@@ -235,9 +229,6 @@ TYPED_TEST(FixedSourceRelaxedTest, IsotropicInfiniteMedium) {
     within_groups[g].transport.vmult(uncollided.block(g), source.block(g),
                                      false);
   solver.solve(fixed_source, flux, uncollided, fixed_source_gs);
-  // std::cout << "iterations required " 
-  //           << solver_control.last_step() 
-  //           << std::endl;
   double solution = strength / (xs_total_value - xs_scatter_value);
   for (int g = 0; g < num_groups; ++g)
     for (int i = 0; i < flux.block(g).size(); ++i)
