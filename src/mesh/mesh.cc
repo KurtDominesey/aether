@@ -263,10 +263,11 @@ template void set_all_boundaries_reflecting<2>(dealii::Triangulation<2>&);
 template void set_all_boundaries_reflecting<3>(dealii::Triangulation<3>&);
 
 void mesh_mox_assembly(dealii::Triangulation<2> &mesh) {
-  // std::vector<int> materials_f = {2, 0, 3, 0, 4, 1};
-  std::vector<int> materials_f = {2, 3, 4, 1};
-  std::vector<int> materials_g = {1, 4, 1};
-  // std::vector<double> radii_f = {0.4095, 0.4180, 0.4750, 0.4850, 0.54};
+  std::map<std::string, int> fuels{
+    {"l", 1}, {"m", 2}, {"h", 3}
+  };
+  std::vector<int> materials_c = {3, 4, 0};
+  std::vector<int> materials_g = {0, 4, 0};
   std::vector<double> radii_f = {0.4095, 0.4750, 0.54};
   std::vector<double> radii_g = {0.34, 0.54};
   const double pitch = 1.26;
@@ -286,11 +287,14 @@ void mesh_mox_assembly(dealii::Triangulation<2> &mesh) {
     for (int j = 0; j < mox_assm[i].size(); ++j, ++ij) {
       std::vector<int> materials;
       std::vector<double> radii;
-      if (mox_assm[i][j] == "g") {
+      const std::string &pincell = mox_assm[i][j];
+      if (pincell == "g") {
         materials = materials_g;
         radii = radii_g;
       } else {
-        materials = materials_f;
+        materials.push_back(fuels[pincell]);
+        materials.insert(
+            materials.end(), materials_c.begin(), materials_c.end());
         radii = radii_f;
       }
       bool dcut = j == mox_assm[i].size() - 1;
