@@ -114,9 +114,9 @@ class SelfShieldingTest : public CathalauTest {
     }
     this->PlotFlux(flux, problem.d2m, mgxs->group_structure, "full");
     // find diagonal spectra
-    const int n_out = (num_azim - 1) / 2 + 1;
+    const int n_out = (num_azim - 1) / 2;
     const int n_in = n_out + num_azim * 2;
-    // casmo-sh-70 coarse group 27
+    // casmo-sh-70 coarse group 27 (1-indexed!)
     const int g_min = 224;
     const int g_max = 276;
     const int num_subgroups = g_max - g_min + 1;
@@ -124,32 +124,64 @@ class SelfShieldingTest : public CathalauTest {
     dealii::Vector<double> spectra_in(num_subgroups);
     dealii::Vector<double> spectra_iso(num_subgroups);
     dealii::Vector<double> spectra_center(num_subgroups);
+    dealii::Vector<double> spectra_pin(num_subgroups);
     dealii::Vector<double> cross_section(num_subgroups);
+    std::vector<dealii::BlockVector<double>> spectra;
+    dealii::BlockVector<double> scalar(num_groups, dof_handler.n_dofs());
+    for (int g = 0; g < num_groups; ++g)
+      problem.d2m.vmult(scalar.block(g), flux.block(g));
+    collapse_spectra(spectra, scalar, dof_handler, problem.transport);
     Assert(quadrature.is_tensor_product(), dealii::ExcInvalidState());
     const dealii::Quadrature<1> &q_polar = quadrature.get_tensor_basis()[0];
-    for (int g = g_min, gg = 0; g <= g_max; ++g, ++gg) {
+    // for (int n = 0; n < quadrature.size(); ++n)
+    //   std::cout << "n: " << n 
+    //             << ", (" << quadrature.point(n)[0] 
+    //             << ", " << quadrature.point(n)[1] << ")\n";
+    for (int g = g_min-1, gg = 0; g <= (g_max-1); ++g, ++gg) {
       cross_section[gg] = mgxs->total[g][j_fuel];
-      for (int i = 0; i < dofs_per_cell; ++i) {
-        for (int j = 0; j < dofs_per_cell; ++j) {
-          i_diag = i_diags[j];
-          for (int n_polar = 0; n_polar < num_polar; ++n_polar) {
-            int nn_out = n_out * num_polar + n_polar;
-            int nn_in = n_in * num_polar + n_polar;
-            spectra_out[gg] += flux.block(g)[nn_out*dof_handler.n_dofs()+i_diag]
-                              * mass[i][j] * q_polar.weight(n_polar);
-            spectra_in[gg] += flux.block(g)[nn_in*dof_handler.n_dofs()+i_diag]
-                              * mass[i][j] * q_polar.weight(n_polar);
-          }
-          for (int n = 0; n < quadrature.size(); ++n){
-            spectra_iso[gg] += flux.block(g)[n*dof_handler.n_dofs()+i_diag] 
-                               * mass[i][j] * quadrature.weight(n);
-          }
-        }
+      for (int n_polar = 0; n_polar < num_polar; ++n_polar) {
+        int nn_out = n_out * num_polar + n_polar;
+        int nn_in = n_in * num_polar + n_polar;
+        std::cout << "n_out: " << n_out << ", n_in: " << n_in << std::endl;
+        AssertThrow(std::abs(quadrature.point(nn_out)[1]-0.125) < 1e-16,
+                    dealii::ExcMessage("Ordinate not out, " +
+                      std::to_string(quadrature.point(nn_out)[1]))
+        );
+        AssertThrow(std::abs(quadrature.point(nn_in)[1]-0.625) < 1e-16,
+                    dealii::ExcMessage("Ordinate not in, " +
+                      std::to_string(quadrature.point(nn_in)[1]))
+        );
+        spectra_out[gg] += flux.block(g)[nn_out*dof_handler.n_dofs()+i_diag]
+                           * q_polar.weight(n_polar);
+        spectra_in[gg] += flux.block(g)[nn_in*dof_handler.n_dofs()+i_diag]
+                          * q_polar.weight(n_polar);
       }
+      for (int n = 0; n < quadrature.size(); ++n){
+        spectra_iso[gg] += flux.block(g)[n*dof_handler.n_dofs()+i_diag] 
+                           * quadrature.weight(n);
+      }
+      // for (int i = 0; i < dofs_per_cell; ++i) {
+      //   for (int j = 0; j < dofs_per_cell; ++j) {
+      //     i_diag = i_diags[j];
+      //     for (int n_polar = 0; n_polar < num_polar; ++n_polar) {
+      //       int nn_out = n_out * num_polar + n_polar;
+      //       int nn_in = n_in * num_polar + n_polar;
+      //       spectra_out[gg] += flux.block(g)[nn_out*dof_handler.n_dofs()+i_diag]
+      //                         * mass[i][j] * q_polar.weight(n_polar);
+      //       spectra_in[gg] += flux.block(g)[nn_in*dof_handler.n_dofs()+i_diag]
+      //                         * mass[i][j] * q_polar.weight(n_polar);
+      //     }
+      //     for (int n = 0; n < quadrature.size(); ++n){
+      //       spectra_iso[gg] += flux.block(g)[n*dof_handler.n_dofs()+i_diag] 
+      //                          * mass[i][j] * quadrature.weight(n);
+      //     }
+      //   }
+      // }
       for (int n = 0; n < quadrature.size(); ++n) {
         spectra_center[gg] += flux.block(g)[n*dof_handler.n_dofs()+i_center] 
                               * quadrature.weight(n);
       }
+      spectra_pin[gg] = spectra[j_fuel].block(0)[g];
     }
     double vol = 0;
     for (int i = 0; i < dofs_per_cell; ++i) {
@@ -157,16 +189,20 @@ class SelfShieldingTest : public CathalauTest {
         vol += mass[i][j];
       }
     }
+    double vol_pin = dealii::numbers::PI_4 * std::pow(radii[0], 2);
     for (int g = 0; g < num_subgroups; ++g) {
-      spectra_iso[g] /= vol;
-      spectra_in[g] /= vol;
-      spectra_out[g] /= vol;
+      // spectra_iso[g] /= vol;
+      // spectra_in[g] /= vol;
+      // spectra_out[g] /= vol;
+      spectra_pin[g] /= vol_pin;
     }
     // print out
     std::vector<dealii::Vector<double>*> outputs = 
-        {&cross_section, &spectra_iso, &spectra_in, &spectra_out, &spectra_center};
+        {&cross_section, &spectra_iso, &spectra_in, &spectra_out, 
+         &spectra_center, &spectra_pin};
     std::ofstream csv(this->GetTestName()+".csv", std::ofstream::trunc);
-    csv << "cross_section, spectra_iso, spectra_in, spectra_out, spectra_center\n";
+    csv << "cross_section, spectra_iso, spectra_in, spectra_out, "
+        << "spectra_center, spectra_pin\n";
     csv.precision(16);
     csv << std::scientific;
     for (int g = 0; g < num_subgroups; ++g) {
