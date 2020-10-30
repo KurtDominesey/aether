@@ -218,7 +218,12 @@ def plot_all(name, suffix):
                 axij = plt.subplot(nrows, ncols, ij, sharey=axj0)
             is_sep = plot_coarse(name+'.txt', savename, not i, j)
             plt.xlabel(None)
-            plt.ylabel(ylabel if j == 0 else None)
+            ylabel = plt.ylabel(ylabel if j == 0 else None)
+            if j == 0 and JCP:
+                # push ylabel down to avoid whitespace between subplots
+                x, y = ylabel.get_position()
+                plt.gca().get_yaxis().set_label_coords(
+                    x, y*0.885, transform=ylabel.get_transform())
             if j > 0:
                 plt.setp(axij.get_yticklabels(), visible=False)
             if i < nrows - 1:
@@ -228,7 +233,7 @@ def plot_all(name, suffix):
                 pass
             if i == 0:
                 plt.title(quantity)
-                upper = 1.45 if not JCP else 1.495
+                upper = 1.45 if not JCP else 1.525
                 if j == 0:
                     lines = [line(color=color, label=label)
                              for label, color in (('Consistent-P', 'black'), 
@@ -264,7 +269,7 @@ def plot_all(name, suffix):
                 right_yticks()
                 plt.setp(axij.get_yticklabels(), visible=False)
     plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=-0.1, 
-                     rect=(0, 0.04, 1, 1))
+                     rect=(0, 0.04, 1, 1 if not JCP else 1))
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
@@ -274,7 +279,7 @@ def plot_all(name, suffix):
 if __name__ == '__main__':
     if JCP:
         plt.style.use('jcp.mplstyle')
-        matplotlib.rc('figure', figsize=(6.5, 4.25))
+        matplotlib.rc('figure', figsize=(6.5, 4))
     else:
         plt.style.use('thesis.mplstyle')
         matplotlib.rc('figure', figsize=(6.5, 4.5))

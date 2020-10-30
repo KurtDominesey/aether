@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, '../cathalau-uo2')
 import plot_compare
 
+JCP = True
+
 def main(ext):
     name_base = 'C5G7CompareTest{algorithm}'
     algorithms = ('Progressive', 'WithUpdate')
@@ -65,24 +67,27 @@ def main(ext):
             plot_compare.right_yticks()
             plt.setp(axij.get_yticklabels(), visible=False)
     plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=0.5, 
-                     rect=(0.028, 0.05, 1, 0.825)
+                     rect=(0.028 if not JCP else 0.028, 0.05, 
+                           1, 0.825 if not JCP else 0.815)
                      )
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
     ax0.set_xticks([])
     ax0.set_yticks([])
-    ax0.set_xlabel('Modes $M$', labelpad=20)
-    ax0.set_ylabel('Normalized $L^2$ Error', labelpad=32.5)
+    ax0.set_xlabel('Modes $M$', labelpad=20 if not JCP else 17.5)
+    ax0.set_ylabel('Normalized $L^2$ Error', labelpad=32.5 if not JCP else 30)
     legend = ax0.legend(reversed(handles), reversed(desc), loc='upper center', 
                         ncol=math.ceil(len(handles)/2),
-                        bbox_to_anchor=(0.48, 1.45))
+                        bbox_to_anchor=(0.48, 1.45 if not JCP else 1.475))
     # plt.tight_layout(pad=0.02)
     plt.savefig('compare.pdf')
 
 if __name__ == '__main__':
     # python plot_compare_cathalau.py pdf
-    # plt.style.use('../cathalau-uo2/thesis.mplstyle')
-    plt.style.use('../cathalau-uo2/thesis.mplstyle')
+    if JCP:
+        plt.style.use('../cathalau-uo2/jcp.mplstyle')
+    else:
+        plt.style.use('../cathalau-uo2/thesis.mplstyle')
     # matplotlib.rc('figure', figsize=(6.5, 2+7/8))
-    matplotlib.rc('figure', figsize=(6.5, 2.75))
+    matplotlib.rc('figure', figsize=(6.5, 2.75 if not JCP else 2+5/8))
     main(*sys.argv[1:])
     # plot_compare(*sys.argv[1:])
