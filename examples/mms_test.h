@@ -300,9 +300,6 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       for (int g = 0; g < num_groups; ++g) {
         flux_g = fixed_source_p.caches[0].mode.block(0);
         flux_g *= energy_mg.modes[0][g];
-        for (int m = 1; m < num_modes; ++m) {
-          // pass
-        }
         flux_g /= solutions_energy[0][g];
         for (int n = 0; n < quadrature.size(); ++n) {
           dealii::Vector<double> difference_per_cell(mesh.n_active_cells());

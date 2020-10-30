@@ -45,7 +45,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
         dof_handler, quadrature, *mgxs, boundary_conditions);
     this->RunFullOrder(flux_full, source_full, problem_full, 
                        max_iters_fullorder, tol_fullorder);
-    // flux_full = 1;
     dealii::BlockVector<double> flux_full_l0(num_groups, dof_handler.n_dofs());
     dealii::BlockVector<double> flux_full_l1(num_groups, 2*dof_handler.n_dofs());
     for (int g = 0; g < num_groups; ++g) {
@@ -68,15 +67,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
         flux_full_l1, dof_handler, problem_full.transport, *mgxs, g_maxes,
         INCONSISTENT_P);
     std::cout << "collapsed mgxs IP\n";
-    // std::cout << flux_full_L0.l2_norm() << " "
-    //           << flux_full_L1.l2_norm() << " "
-    //           << flux_full_L1.block(0).l2_norm() << " "
-    //           << flux_full_L1.block(1).l2_norm() << std::endl;
-    // std::cout << mgxs_coarse_ip.total[26][2] << std::endl;
-    // const std::string test_name = this->GetTestName();
-    // const std::string filename = test_name + "_mgxs.h5";
-    // write_mgxs(mgxs_coarse, filename, "294K", materials);
-    // std::cout << "MGXS TO FILE " << filename << std::endl;
     // Compute svd
     std::cout << "compute svd\n";
     std::vector<dealii::BlockVector<double>> svecs_spaceangle;
@@ -114,8 +104,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     std::vector<pgd::sn::LinearInterface*> linear_ops = 
         {&energy_mg, &fixed_source_p};
     pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
-    // this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-    //              do_update);
     // pgd main loop
     dealii::Vector<double> spectrum_one;
     std::vector<dealii::BlockVector<double>> modes_spaceangle;
@@ -139,7 +127,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       }
       if (do_update) {
         nonlinear_gs.finalize();
-        // if (m > 0)
         nonlinear_gs.update();
       }
       if (m == 0)
@@ -175,10 +162,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     }
     this->WriteConvergenceTable(table_spectrum, "_spectrum");
     // Post-process
-    // std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
-    //     dealii::BlockVector<double>(quadr.ature.size(), dof_handler.n_dofs()));
-    // for (int m = 0; m < num_modes; ++m)
-    //   modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
     dealii::ConvergenceTable table;
     std::vector<double> l2_errors_d(num_modes+1);
     std::vector<double> l2_errors_m(num_modes+1);
@@ -189,8 +172,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
                              flux_full, problem.transport, problem.d2m, table, 
                              "error_m");
     std::cout << "getting mgxs coarses\n";
-    // GetMgxsCoarses(mgxs_coarses, modes_spaceangle, energy_mg.modes, 
-    //                problem_full.transport, problem.d2m, *mgxs, g_maxes);
     std::vector<Mgxs> mgxs_coarses_svd;
     GetMgxsCoarses(mgxs_coarses_svd, svecs_spaceangle, svecs_energy,
                    problem_full.transport, problem.d2m, *mgxs, g_maxes);
@@ -198,9 +179,7 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     for (int j = 0; j < num_materials; ++j) {
       if (j != 2)
         continue;
-      // std::string material = materials[j];
       for (int g_coarse = 0; g_coarse < g_maxes.size(); ++g_coarse) {
-        // int gg_coarse = g_maxes.size() - g_coarse;
         if (g_coarse+1 < 21 || g_coarse+1 > 27)
           continue;
         std::string key = "j" + std::to_string(j) 
@@ -221,9 +200,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
           double full_ip = mgxs_coarse_ip.total[g_coarse][j];
           double error_ip = (full_ip - mgxs_coarses_ip[m].total[g_coarse][j]) 
                             / full_ip;
-          // std::cout << full << ", " 
-          //           << full_ip << ", " 
-          //           << mgxs_coarses_ip[m].total[g_coarse][j] << std::endl;
           table.add_value(key+"ip", error_ip);
         }
         table.set_scientific(key, true);
@@ -246,16 +222,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
     const int num_materials = mgxs.total[0].size();
     AssertDimension(spectrum.size(), num_groups);
     AssertDimension(volumes.size(), num_materials);
-    // // Mix mgxs 
-    // for (int j = 0; j < num_materials; ++j) {
-    //   double volume = volumes[j];
-    //   for (int g = 0; g < num_groups; ++g) {
-    //     mgxs.total[g][j] *= volume;
-    //     for (int gp = 0; gp < num_groups; ++gp) {
-    //       mgxs.scatter[g][gp][j] *= volume;
-    //     }
-    //   }
-    // }
     // Assemble linear system
     dealii::FullMatrix<double> matrix(num_groups);
     for (int j = 0; j < num_materials; ++j) {
@@ -282,7 +248,6 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
       const int m_start = 0,
       const int order = 0,
       const TransportCorrection correction = CONSISTENT_P) {
-    // AssertDimension(mgxs_coarses.size(), 0);
     const int num_modes = modes_spaceangle.size();
     const int num_groups = mgxs_fine.total.size();
     const int num_moments = d2m.n_block_rows(order);
@@ -292,27 +257,11 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
                                        num_moments * dof_handler.n_dofs());
     dealii::Vector<double> mode_m(num_moments * dof_handler.n_dofs());
     dealii::BlockVector<double> mode_mb(num_moments, dof_handler.n_dofs());
-    // dealii::Vector<double> mode_spaceangle(
-    //     quadrature.size() * dof_handler.n_dofs());
     for (int m = 0; m < num_modes; ++m) {
-      // // mode_spaceangle = modes_spaceangle[m];
-      // mode_mb = 0;
-      // d2m.vmult(mode_mb, modes_spaceangle[m]);
-      // // mode_mb = mode_m;
-      // mode_lb = 0;
-      // for (int ell = 0, lm = 0; ell <= order; ++ell) {
-      //   for (int m = -ell; m <= ell; ++m, ++lm) {
-      //     if (dim == 2 && (m + ell) % 2)
-      //       continue;
-      //     std::cout << "lm " << lm << std::endl;
-      //     mode_lb.block(ell) += mode_mb.block(lm);
-      //   }
-      // }
       d2m.vmult(mode_mb, modes_spaceangle[m]);
       mode_m = mode_mb;
       for (int g = 0; g < num_groups; ++g)
         flux_m.block(g).add(modes_energy[m][g], mode_m);
-      // std::cout << "m=" << m << std::endl;
       if (m >= m_start) {
         for (int g = 0; g < num_groups; ++g)
           d2m.moment_to_legendre(flux_l.block(g), flux_m.block(g), order);

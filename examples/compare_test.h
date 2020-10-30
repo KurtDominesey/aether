@@ -56,19 +56,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
     dealii::ReductionControl control_wg(500, tol, 1e-2);
-    // dealii::IterationNumberControl control_wg(500, tol);
     dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
-    // solver_wg.connect([](const unsigned int iteration,
-    //                      const double check_value,
-    //                      const dealii::Vector<double>&) {
-    //   std::cout << "within group " << iteration << ": " << check_value 
-    //             << std::endl;
-    //   return dealii::SolverControl::success;
-    // });
     FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim, qdim>
         preconditioner(problem.fixed_source, solver_wg);
-    // dealii::PreconditionIdentity preconditioner;
-    // dealii::SolverControl control(max_iters, tol);
     StagnationControl control(max_iters, tol);
     control.enable_history_data();
     dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
@@ -167,7 +157,6 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       reference_g = reference.block(g);
       int g_rev = num_groups - 1 - g;
       double width =
-          // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
           std::log(mgxs->group_structure[g_rev+1]/mgxs->group_structure[g_rev]);
       AssertThrow(width > 0, dealii::ExcInvalidState());
       for (int m = 0; m < l2_errors.size(); ++m) {
@@ -211,7 +200,6 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       d2m.vmult(reference_g_m, reference_g_d);
       int g_rev = num_groups - 1 - g;
       double width =
-          // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
           std::log(mgxs->group_structure[g_rev+1]/mgxs->group_structure[g_rev]);
       AssertThrow(width > 0, dealii::ExcInvalidState());
       for (int m = 0; m < l2_errors.size(); ++m) {
@@ -247,7 +235,6 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int g = 0; g < summands_energy.size(); ++g) {
         int g_rev = num_groups - 1 - g;
         double width = 
-            // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
             std::log(mgxs->group_structure[g_rev+1]
                      /mgxs->group_structure[g_rev]);
         AssertThrow(width > 0, dealii::ExcInvalidState());
@@ -296,12 +283,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     for (int m = 0; m < l2_residuals.size(); ++m) {
       // get norm of residual
       swept = 0;
-      // for (int sweep = 0; sweep < 100; ++sweep)
-      // problem.sweep_source(swept, residual);
       for (int g = 0; g < num_groups; ++g) {
         int g_rev = num_groups - 1 - g;
         double width =
-            // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
             std::log(mgxs->group_structure[g_rev+1]
                      /mgxs->group_structure[g_rev]);
         AssertThrow(width > 0, dealii::ExcInvalidState());
@@ -391,7 +375,6 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int g = 0; g < num_groups; ++g) {
         int g_rev = num_groups - 1 - g;
         double width =
-            // mgxs->group_structure[g_rev+1] - mgxs->group_structure[g_rev];
             std::log(mgxs->group_structure[g_rev+1]
                      /mgxs->group_structure[g_rev]);
         AssertThrow(width > 0, dealii::ExcInvalidState());
@@ -438,8 +421,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       int g_rev = num_groups - 1 - g;
       double lower = mgxs->group_structure[g_rev] > 0 ?
                      mgxs->group_structure[g_rev] : lowest;
-      double width = //mgxs->group_structure[g_rev+1]
-                     //- mgxs->group_structure[g_rev];
+      double width =
           std::log(mgxs->group_structure[g_rev+1]/lower);
       for (int n = 0; n < quadrature.size(); ++n) {
         for (int c = 0; c < masses_cho.size(); ++c) {
@@ -487,8 +469,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         int g_rev = num_groups - 1 - g;
         double lower = mgxs->group_structure[g_rev] > 0 ? 
                        mgxs->group_structure[g_rev] : lowest;
-        double width = //mgxs->group_structure[g_rev+1] 
-                      //- mgxs->group_structure[g_rev];
+        double width =
             std::log(mgxs->group_structure[g_rev+1]/lower);
         svecs_energy[s][g] = flux_matrix.get_svd_vt()(s, g) * std::sqrt(width);
       }
@@ -656,17 +637,5 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
   }
 };
 
-// template <int dim, int qdim>
-template void CompareTest<2, 2>::RunFullOrder(
-    dealii::BlockVector<double> &flux,
-    const dealii::BlockVector<double> &source,
-    const FixedSourceProblem<2, 2, pgd::sn::Transport<2, 2>> &problem,
-    const int max_iters, const double tol, std::vector<double> *history);
-// template <int dim, int qdim>
-template void CompareTest<2, 2>::RunFullOrder(
-    dealii::BlockVector<double> &flux,
-    const dealii::BlockVector<double> &source,
-    const FixedSourceProblem<2, 2, Transport<2, 2>> &problem,
-    const int max_iters, const double tol, std::vector<double> *history);
 
 #endif  // AETHER_EXAMPLES_COMPARE_TEST_H_

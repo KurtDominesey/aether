@@ -27,11 +27,6 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const bool precomputed=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
-    // for (int g = 0; g < num_groups; ++g) {
-    //   for (int gp = 0; gp < num_groups; ++gp)
-    //     std::cout << mgxs->scatter[g][gp][1] << " ";
-    //   std::cout << "\n";
-    // }
     // Create sources
     std::vector<dealii::Vector<double>> sources_energy;
     std::vector<dealii::BlockVector<double>> sources_spaceangle;
@@ -154,8 +149,6 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         {&energy_mg, &fixed_source_p};
     pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
     // run pgd
-    // this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-    //              do_update);
     std::vector<int> m_coarses = {1, 10, 20, 30};
     const int incr = 10;
     std::vector<dealii::BlockVector<double>> modes_spaceangle;
@@ -261,7 +254,6 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     }
     // Post process
     std::cout << "post-processing\n";
-    // pgd::sn::Transport<dim, qdim> transport(dof_handler, quadrature);
     std::vector<double> l2_norms_d;
     std::vector<double> l2_norms_m;
     TransportType& transport = problem.transport;
@@ -302,7 +294,6 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         std::vector<double> l2_errors_coarse_m_rel_mi;
         std::vector<double> l2_errors_coarse_d_abs_mi;
         std::vector<double> l2_errors_coarse_m_abs_mi;
-        // std::string m = "_m" + std::to_string((i + 1) * incr);
         std::string labelm = label+ "_m" + std::to_string(m_coarses[i]);
         GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_abs_mi, flux_coarses[i], 
                                   flux_coarsened, transport, false, table, 
@@ -350,18 +341,15 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     }
     // */
     for (int g = 0; g < num_groups_coarse; ++g) {
-      // table.add_value("flux_coarse", flux_coarse_cp.block(g).l2_norm());
       table.add_value("flux_coarsened", flux_coarsened.block(g).l2_norm());
       table.add_value("source_coarse", source_coarse.block(g).l2_norm());
       table.add_value("l2_norm_d", l2_norms_d[g]);
       table.add_value("l2_norm_m", l2_norms_m[g]);
     }
-    table.set_scientific("flux_coarse", true);
     table.set_scientific("flux_coarsened", true);
     table.set_scientific("source_coarse", true);
     table.set_scientific("l2_norm_d", true);
     table.set_scientific("l2_norm_m", true);
-    table.set_precision("flux_coarse", 16);
     table.set_precision("flux_coarsened", 16);
     table.set_precision("source_coarse", 16);
     table.set_precision("l2_norm_d", 16);

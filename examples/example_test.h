@@ -129,7 +129,6 @@ class ExampleTest : public ::testing::Test {
             std::log(group_structure[g_rev+1] / group_structure[g_rev]);
       }
       moments[g] = flat;
-      // moments[g].block(1) += moments[g].block(2);
       data_out.add_data_vector(moments[g].block(0), gs+"scalar");
       switch (dim) {
         case 1:
@@ -145,12 +144,6 @@ class ExampleTest : public ::testing::Test {
           data_out.add_data_vector(moments[g].block(3), gs+"current_x");
           break;
       }
-      // data_out.add_data_vector(
-      //     moments[g], {gs+"scalar", gs+"current_x", gs+"current_y"},
-      //     dealii::DataOut_DoFData<dealii::DoFHandler<dim>, dim>::DataVectorType::type_dof_data,
-      //     {dealii::DataComponentInterpretation::component_is_scalar,
-      //         dealii::DataComponentInterpretation::component_is_scalar,
-      //         dealii::DataComponentInterpretation::component_is_scalar});
     }
     data_out.build_patches();
     std::string name = GetTestName();
@@ -158,28 +151,6 @@ class ExampleTest : public ::testing::Test {
       name += "-" + suffix;
     std::ofstream output(name+".vtu");
     data_out.write_vtu(output);
-    /*
-    // plot current
-    dealii::FESystem<dim, dim> fe(this->dof_handler.get_fe(), dim);
-    dealii::DoFHandler<dim, dim> dof_handler_v;
-    dof_handler_v.initialize(
-        this->dof_handler.get_triangulation(), fe);
-    dealii::DataOut<dim> data_out_v;
-    data_out_v.attach_dof_handler(dof_handler_v);
-    for (int g = 0; g < moments.size(); ++g) {
-      std::string gs = std::to_string(g+1);
-      gs = "g" + std::string(digits - gs.size(), '0') + gs + "_";
-      data_out_v.add_data_vector(
-          moments[g], {gs+"scalar", gs+"current", gs+"current"},
-          dealii::DataOut_DoFData<dealii::DoFHandler<dim>, dim>::DataVectorType::type_dof_data,
-          {dealii::DataComponentInterpretation::component_is_scalar,
-           dealii::DataComponentInterpretation::component_is_part_of_vector,
-           dealii::DataComponentInterpretation::component_is_part_of_vector});
-    }
-    data_out_v.build_patches();
-    std::ofstream output_v(name+"_v.vtu");
-    data_out_v.write_vtu(output_v);
-    */
   }
 
   void PlotDiffAngular(const dealii::BlockVector<double> &flux,
@@ -190,7 +161,6 @@ class ExampleTest : public ::testing::Test {
     data_out.attach_dof_handler(this->dof_handler);
     const int num_groups = flux.n_blocks();
     const int digits = std::to_string(num_groups).size();
-    // dealii::BlockVector<double> diff_m(num_groups, this->dof_handler.n_dofs());
     std::vector<dealii::BlockVector<double>> diff_m(
         num_groups, dealii::BlockVector<double>(
           d2m.n_block_rows(1), this->dof_handler.n_dofs()));
@@ -224,10 +194,6 @@ class ExampleTest : public ::testing::Test {
           data_out.add_data_vector(diff_m[g].block(3), gs+"current_x");
           break;
       }
-      // data_out.add_data_vector(
-      //     diff_m.block(g), "g" + std::string(digits - gs.size(), '0') + gs,
-      //     dealii::DataOut_DoFData<dealii::DoFHandler<dim>,
-      //                             dim>::DataVectorType::type_dof_data);
     }
     data_out.build_patches();
     std::string name = GetTestName();
