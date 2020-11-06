@@ -418,6 +418,8 @@ void NonlinearGS::set_inner_products() {
 }
 
 void NonlinearGS::finalize() {
+  linear_ops.back()->get_inner_products(inner_products_x.back(), 
+                                        inner_products_b.back());
   const int num_modes = inner_products_x[0].size();
   // std::cout << "num_modes " << num_modes << std::endl;
   for (int i = 0; i < linear_ops.size(); ++i) {
