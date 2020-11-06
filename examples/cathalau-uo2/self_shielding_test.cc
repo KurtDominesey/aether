@@ -92,7 +92,7 @@ class SelfShieldingTest : public CathalauTest {
     } else {
       dealii::BlockVector<double> uncollided(flux);
       problem.sweep_source(uncollided, source);
-      dealii::ReductionControl control_wg(50, tol, 1e-2);
+      dealii::ReductionControl control_wg(50, tol*1e-2, 1e-2);
       dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
       FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim_, qdim_>
           preconditioner(problem.fixed_source, solver_wg);

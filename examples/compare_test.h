@@ -55,11 +55,12 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                     std::vector<double> *history_data = nullptr) {
     dealii::BlockVector<double> uncollided(source.get_block_indices());
     problem.sweep_source(uncollided, source);
-    dealii::ReductionControl control_wg(500, tol, 1e-2);
-    dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+    dealii::ReductionControl control_wg(500, tol*1e-2, 1e-2);
+    dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg,
+        dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(32));
     FixedSourceGS<dealii::SolverGMRES<dealii::Vector<double>>, dim, qdim>
         preconditioner(problem.fixed_source, solver_wg);
-    StagnationControl control(max_iters, tol);
+    dealii::SolverControl control(max_iters, tol);
     control.enable_history_data();
     dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
     solver.connect([](const unsigned int iteration,
