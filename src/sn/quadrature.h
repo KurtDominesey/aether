@@ -12,6 +12,11 @@ dealii::Tensor<1, dim> ordinate(const dealii::Point<qdim> coordinate);
 dealii::Quadrature<1> impose_polar_symmetry(
     const dealii::Quadrature<1> &quadrature);
 
+/**
+ * Angular quadrature.
+ * 
+ * Normalized to unity, not \f$4\pi\f$.
+ */
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class QAngle : public dealii::Quadrature<qdim> {
  public:
@@ -30,15 +35,47 @@ class QAngle : public dealii::Quadrature<qdim> {
   bool operator==(const QAngle<dim, qdim> &other) const;
   void initialize(const std::vector<dealii::Point<qdim>> &points, 
                   const std::vector<double> &weights);
+  /**
+   * Return the `n`th angle.
+   * 
+   * Angles are stored as \f$(\mu,\omega)\f$ where \f$\mu\in[-1,1]\f$ is the
+   * cosine of the polar angle and \f$\omega\in[0,2\pi]\f$ is the azimuthal
+   * angle.  
+   */
   const dealii::Point<qdim>& angle(const int n) const;
+  /**
+   * Returns a reference to the whole vector of angles.
+   */
   const std::vector<dealii::Point<qdim>>& get_angles() const;
+  /**
+   * Returns the `n`th ordinate.
+   */
   const dealii::Tensor<1, dim>& ordinate(const int n) const;
+  /**
+   * Returns a reference to the whole vector of ordinates.
+   */
   const std::vector<dealii::Tensor<1, dim>>& get_ordinates() const;
+  /**
+   * Returns the index corresponding to the reflection of a given ordinate.
+   * 
+   * Throws an error if the reflected ordinate is not in the quadrature.
+   * 
+   * @param n Index of the incident ordinate
+   * @param normal Normal vector of the reflecting surface
+   */
   virtual int reflected_index(
       const int n, const dealii::Tensor<1, dim> &normal) const;
  protected:
+  //! Vector of quadrature angles.
   std::vector<dealii::Point<qdim>> quadrature_angles;
+  //! Vector of ordinates corresponding to the quadrature angles.
   std::vector<dealii::Tensor<1, dim>> ordinates;
+  /**
+   * Initializes @ref QAngle::quadrature_angles and @ref QAngle::ordinates 
+   * and asserts polar symmetry if `dim==2`. 
+   * 
+   * To be called after quadrature points and weights have been set.
+   */
   void q_angle_init();
 };
 

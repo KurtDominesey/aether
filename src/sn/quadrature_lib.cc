@@ -2,6 +2,11 @@
 
 namespace aether::sn {
 
+/**
+ * Constructor for 1D.
+ * 
+ * Throws an error if a nonzero value of `num_azim` is specified.
+ */
 template <>
 QPglc<1, 1>::QPglc(const int num_polar, const int num_azim)
     : QAngle<1, 1>(dealii::QGauss<1>(2 * num_polar)) {

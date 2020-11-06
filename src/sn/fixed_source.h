@@ -14,22 +14,52 @@ namespace aether::sn {
 
 template <class SolverType, int dim, int qdim> class FixedSourceGS;
 
+/**
+ * Fixed-source operator.
+ * 
+ * Implements \f$
+ * A_{FS}=\begin{bmatrix}
+ * A_{WG,1} & \ldots & S_{g'\rightarrow 1} & \ldots & S_{G\rightarrow 1} \\
+ * \vdots & \ddots & & & \vdots \\
+ * S_{1\rightarrow g} & & A_{WG,g} & & S_{G\rightarrow g} \\
+ * \vdots & & & \ddots & \vdots \\
+ * S_{G\rightarrow G} & \ldots & S_{g'\rightarrow G} & \ldots & A_{WG,G} \\
+ * \end{bmatrix}\f$ where 
+ * \f$S_{g'\rightarrow g}=-BM\Sigma_{s,g'\rightarrow g}D\f$.
+ * 
+ * The diagonal blocks are stored in @ref FixedSource.within_groups, the upper
+ * triangular blocks in @ref FixedSource.upscattering, and the lower triangular
+ * blocks in @ref FixedSource.downscattering.
+ */
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FixedSource {
  public:
+  /**
+   * Constructor.
+   */
   FixedSource(std::vector<WithinGroup<dim, qdim>> &within_groups,
               std::vector<std::vector<ScatteringBlock<dim>>> &downscattering,
               std::vector<std::vector<ScatteringBlock<dim>>> &upscattering,
               MomentToDiscrete<dim, qdim> &m2d,
               DiscreteToMoment<dim, qdim> &d2m);
+  /**
+   * Matrix-vector multiplication by fixed-source operator.
+   */
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
+  //! Diagonal within-group blocks, \f$A_{WG,g}\f$
   const std::vector<WithinGroup<dim, qdim>> &within_groups;
+  //! Moment to discrete operator, \f$M\f$
   const MomentToDiscrete<dim, qdim> &m2d;
 
  protected:
+  //! Ragged vector of vectors of downscattering blocks, 
+  //! \f$\Sigma_{s,g'\rightarrow g}\f$ where \f$g'<g\f$
   const std::vector<std::vector<ScatteringBlock<dim>>> &downscattering;
+  //! Ragged vector of vectors of upscattering blocks,
+  //! \f$\Sigma_{s,g'\rightarrow g}\f$ where \f$g'>g\f$
   const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering;
+  //! Discrete to moment operator, \f$D\f$
   const DiscreteToMoment<dim, qdim> &d2m;
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
   template <class SolverType, int dimm, int qdimm>

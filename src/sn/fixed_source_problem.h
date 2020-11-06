@@ -15,27 +15,57 @@
 
 namespace aether::sn {
 
+/**
+ * Convenience class which sets up a fixed-source problem.
+ * 
+ * This class constructs and stores a fixed-source operator 
+ * @ref FixedSourceProblem::fixed_source along with all constituent block
+ * operators.
+ */
 template <int dim, int qdim = dim == 1 ? 1 : 2,
           class TransportType = Transport<dim, qdim>,
           class TransportBlockType = TransportBlock<dim, qdim>>
 class FixedSourceProblem {
  public:
+  /**
+   * Constructor.
+   * 
+   * @param dof_handler DoF handler for the mesh and finite elements.
+   * @param quadrature Angular quadrature.
+   * @param mgxs Multigroup cross-sections.
+   * @param boundary_conditions The values of the incident flux for each
+   *                            group, boundary ID, ordinate, and elemental DoF. 
+   */
   FixedSourceProblem(const dealii::DoFHandler<dim> &dof_handler,
                      const QAngle<dim, qdim> &quadrature, 
                      const Mgxs &mgxs,
                      const std::vector<std::vector<dealii::BlockVector<double>>>
                          &boundary_conditions);
+  /**
+   * Apply a transport sweep to the source vector `src`.
+   * 
+   * @param dst Destination vector \f$\leftarrow\underline{L}^{-1}\f$`src`.
+   * @param src Source vector.
+   */
   void sweep_source(dealii::BlockVector<double> &dst, 
                     const dealii::BlockVector<double> &src) const;
+  //! Fixed-source operator.
   FixedSource<dim, qdim> fixed_source;
+  //! Transport operator.
   TransportType transport;
+  //! Scattering operator.
   Scattering<dim> scattering;
+  //! Discrete-to-moment operator.
   DiscreteToMoment<dim, qdim> d2m;
+  //! Moment-to-discrete operator.
   MomentToDiscrete<dim, qdim> m2d;
 
  protected:
+  //! Within-group (diagonal) blocks.
   std::vector<WithinGroup<dim, qdim>> within_groups;
+  //! Downscattering (lower triangle) blocks.
   std::vector<std::vector<ScatteringBlock<dim>>> downscattering;
+  //! Upscattering (upper triangle) blocks.
   std::vector<std::vector<ScatteringBlock<dim>>> upscattering;
 };
 
