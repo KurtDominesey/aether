@@ -8,7 +8,7 @@ class CathalauMmsTest : public CathalauTest,
                         public ::testing::WithParamInterface<int> {
  protected:
   void SetUp() override {
-    CathalauTest::SetUp();
+    CathalauTest::SetUp(true);
     dealii::FE_DGQ<dim_> fe(WithParamInterface<int>::GetParam());
     this->dof_handler.initialize(this->mesh, fe);
   };
