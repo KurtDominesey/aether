@@ -21,11 +21,11 @@ class CathalauCompareTest : public CathalauTest,
 };
 
 TEST_P(CathalauCompareTest, Progressive) {
-  this->Compare(50, 50, 1e-4, 50, 1e-8, false);
+  this->Compare(50, 50, 1e-4, 50, 1e-8, false, false, false);
 }
 
 TEST_P(CathalauCompareTest, WithUpdate) {
-  this->Compare(50, 50, 1e-4, 50, 1e-8, true);
+  this->Compare(50, 50, 1e-4, 50, 1e-8, true, false, false);
 }
 
 INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest,

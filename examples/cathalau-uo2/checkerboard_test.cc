@@ -202,7 +202,7 @@ class CheckerboardTest : public CathalauTest,
     }
     CoarseTest<dim_, qdim_>::CompareCoarse(
         num_modes, max_iters_nonlinear, tol_nonlinear, do_update, 
-        max_iters_fullorder, tol_fullorder, g_maxes, materials, factors, true);
+        max_iters_fullorder, tol_fullorder, g_maxes, materials, factors, false);
     const int num_legendre = 1;
     // const int num_groups = mgxs->total.size();
     const int num_groups_coarse = g_maxes.size();
