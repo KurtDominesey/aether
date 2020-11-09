@@ -205,16 +205,17 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           double summand = l2_error_sq * quadrature.weight(n);
           l2_errors_g[cycle][g] += summand;
           l2_errors[cycle] += summand;
-          if (cycle > 0) {
-            double ratio = l2_errors_n[cycle-1][g][n]/l2_errors_n[cycle][g][n];
-            double l2_conv = std::log(std::abs(ratio)) / std::log(2.0);
-            EXPECT_NEAR(l2_conv, dof_handler.get_fe().degree + 1, 1e-1);
-          }
         }
         l2_errors_g[cycle][g] = std::sqrt(l2_errors_g[cycle][g]);
       }
       l2_errors[cycle] = std::sqrt(l2_errors[cycle]);
       convergence_table.add_value("total", l2_errors[cycle]);
+      if (cycle > 0) {
+        double ratio = l2_errors[cycle-1]/l2_errors[cycle];
+        double l2_conv = std::log(std::abs(ratio)) / std::log(2.0);
+        EXPECT_NEAR(l2_conv, dof_handler.get_fe().degree + 1, 1e-1);
+        std::cout << l2_conv << std::endl;
+      }
     }
     convergence_table.set_scientific("total", true);
     convergence_table.set_precision("total", 16);
@@ -317,16 +318,17 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           double summand = l2_error_sq * quadrature.weight(n);
           l2_errors_g[cycle][g] += summand;
           l2_errors[cycle] += summand;
-          if (cycle > 0) {
-            double ratio = l2_errors_n[cycle-1][g][n]/l2_errors_n[cycle][g][n];
-            double l2_conv = std::log(std::abs(ratio)) / std::log(2.0);
-            EXPECT_NEAR(l2_conv, dof_handler.get_fe().degree + 1, 1e-1);
-          }
         }
         l2_errors_g[cycle][g] = std::sqrt(l2_errors_g[cycle][g]);
       }
       l2_errors[cycle] = std::sqrt(l2_errors[cycle]);
       convergence_table.add_value("total", l2_errors[cycle]);
+      if (cycle > 0) {
+        double ratio = l2_errors[cycle-1]/l2_errors[cycle];
+        double l2_conv = std::log(std::abs(ratio)) / std::log(2.0);
+        EXPECT_NEAR(l2_conv, dof_handler.get_fe().degree + 1, 1e-1);
+        std::cout << l2_conv << std::endl;
+      }
     }
     convergence_table.set_scientific("total", true);
     convergence_table.set_precision("total", 16);
