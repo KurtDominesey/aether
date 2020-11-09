@@ -164,7 +164,8 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       dealii::BlockVector<double> flux(source.get_block_indices());
       problem.sweep_source(uncollided, source);
       dealii::ReductionControl control(max_iters, 1e-10, tol);
-      dealii::SolverGMRES<dealii::BlockVector<double>> solver(control);
+      dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
+          dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
       solver.connect([](const unsigned int iteration,
                         const double check_value,
                         const dealii::BlockVector<double>&) {
