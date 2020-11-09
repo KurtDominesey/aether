@@ -23,14 +23,16 @@ void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
                           const double pitch,
                           std::vector<int> materials,
                           const int trans_mani_id = 2,
-                          const int sph_mani_id = 1);
+                          const int sph_mani_id = 1,
+                          bool octagonal = false);
 
 void mesh_eighth_pincell_ul(dealii::Triangulation<2> &tria,
                             std::vector<double> radii,
                             const double pitch,
                             std::vector<int> materials,
                             const int trans_mani_id = 2,
-                            const int sph_mani_id = 1);
+                            const int sph_mani_id = 1,
+                            bool octagonal = false);
 
 void mesh_pincell(dealii::Triangulation<2> &tria,
                   const std::vector<double> &radii,
@@ -42,7 +44,8 @@ void mesh_symmetric_quarter_pincell(dealii::Triangulation<2> &tria,
                                     const double &pitch,
                                     const std::vector<int> &materials,
                                     const int trans_mani_id = 2,
-                                    const int sph_mani_id = 1);
+                                    const int sph_mani_id = 1,
+                                    bool octagonal = false);
 
 template <int dim>
 void set_all_boundaries_reflecting(dealii::Triangulation<dim>& mesh);

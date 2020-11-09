@@ -61,7 +61,8 @@ void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
                           const double pitch,
                           std::vector<int> materials,
                           const int trans_mani_id,
-                          const int sph_mani_id) {
+                          const int sph_mani_id,
+                          bool octagonal) {
   AssertDimension(materials.size(), radii.size()+1);
   if (!radii.empty())
     Assert(radii.back() < pitch, dealii::ExcInvalidState());
@@ -89,11 +90,11 @@ void mesh_eighth_pincell(dealii::Triangulation<2> &tria,
     vertices[1+i*3] = dealii::Point<2>(radii[i], 0);
     vertices[2+i*3] = dealii::Point<2>(diag, diag);
     vertices[3+i*3] = dealii::Point<2>(ring_x, ring_y);
-    // if (i == 0) {
-    //   vertices[1+i*3] = dealii::Point<2>(ring_x, 0);
-    //   vertices[2+i*3] = dealii::Point<2>(ring_x/std::sqrt(2.0),
-    //                                      ring_x/std::sqrt(2.0));
-    // }
+    if (i == 0 && octagonal) {
+      vertices[1+i*3] = dealii::Point<2>(ring_x, 0);
+      vertices[2+i*3] = dealii::Point<2>(ring_x/std::sqrt(2.0),
+                                         ring_x/std::sqrt(2.0));
+    }
     cells[1+i*2].vertices[0] = 2 + i * 3;
     cells[1+i*2].vertices[1] = 3 + i * 3;
     cells[1+i*2].vertices[2] = 2 + (i + 1) * 3;
@@ -133,7 +134,8 @@ void mesh_eighth_pincell_ul(dealii::Triangulation<2> &tria,
                             const double pitch,
                             std::vector<int> materials,
                             const int trans_mani_id,
-                            const int sph_mani_id) {
+                            const int sph_mani_id,
+                            bool octagonal) {
   AssertDimension(materials.size(), radii.size()+1);
   if (!radii.empty())
     Assert(radii.back() < pitch, dealii::ExcInvalidState());
@@ -165,11 +167,11 @@ void mesh_eighth_pincell_ul(dealii::Triangulation<2> &tria,
     vertices[1+i*3] = dealii::Point<2>(diag, diag);
     vertices[2+i*3] = dealii::Point<2>(0, radii[i]);
     vertices[3+i*3] = dealii::Point<2>(ring_x, ring_y);
-    // if (i == 0) {
-    //   vertices[1+i*3] = dealii::Point<2>(ring_y/std::sqrt(2.0),
-    //                                      ring_y/std::sqrt(2.0));
-    //   vertices[2+i*3] = dealii::Point<2>(0, ring_y);
-    // }
+    if (i == 0 && octagonal) {
+      vertices[1+i*3] = dealii::Point<2>(ring_y/std::sqrt(2.0),
+                                         ring_y/std::sqrt(2.0));
+      vertices[2+i*3] = dealii::Point<2>(0, ring_y);
+    }
     cells[1+i*2].vertices[0] = 2 + i * 3;
     cells[1+i*2].vertices[1] = 3 + i * 3;
     cells[1+i*2].vertices[2] = 2 + (i + 1) * 3;
@@ -229,13 +231,14 @@ void mesh_symmetric_quarter_pincell(dealii::Triangulation<2> &tria,
                                     const double &pitch,
                                     const std::vector<int> &materials,
                                     const int trans_mani_id,
-                                    const int sph_mani_id) {
+                                    const int sph_mani_id,
+                                    bool octagonal) {
   dealii::Triangulation<2> octant_ul;
   dealii::Triangulation<2> octant_lr;
   mesh_eighth_pincell(octant_lr, radii, pitch, materials, 
-                      trans_mani_id, sph_mani_id);
+                      trans_mani_id, sph_mani_id, octagonal);
   mesh_eighth_pincell_ul(octant_ul, radii, pitch, materials,
-                         trans_mani_id, sph_mani_id);
+                         trans_mani_id, sph_mani_id, octagonal);
   dealii::GridGenerator::merge_triangulations(
       octant_ul, octant_lr, tria, 1e-12, true);
   tria.set_manifold(sph_mani_id, dealii::SphericalManifold<2>());
