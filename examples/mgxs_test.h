@@ -125,8 +125,8 @@ class MgxsTest : virtual public CompareTest<dim, qdim> {
         if (residual < tol_nonlinear)
           break;
       }
+      nonlinear_gs.finalize();
       if (do_update) {
-        nonlinear_gs.finalize();
         nonlinear_gs.update();
       }
       if (m == 0)

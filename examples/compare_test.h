@@ -104,8 +104,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         unconverged.push_back(m);
         residuals.push_back(residual);
       }
+      nonlinear_gs.finalize();
       if (do_update) {
-        nonlinear_gs.finalize();
         // if (m > 0)
         nonlinear_gs.update();
       }

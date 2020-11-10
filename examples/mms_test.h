@@ -292,7 +292,7 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
           // if (residual < tol)
           //   break;
         }
-        // nonlinear_gs.finalize();
+        nonlinear_gs.finalize();
         // if (m > 0)
         //   nonlinear_gs.update();
       }

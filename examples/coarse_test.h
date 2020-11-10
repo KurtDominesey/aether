@@ -167,8 +167,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
           break;
         }
       }
+      nonlinear_gs.finalize();
       if (do_update) {
-        nonlinear_gs.finalize();
         nonlinear_gs.update();
       }
       // post-process
