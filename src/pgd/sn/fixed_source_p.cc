@@ -290,7 +290,7 @@ double FixedSourceP<dim, qdim>::step(
   // fixed_source.vmult(solution, caches.back().mode);
   // uncollided -= solution;
   // caches.back().mode += uncollided;
-  dealii::IterationNumberControl solver_control(20, 1e-8);
+  dealii::IterationNumberControl solver_control(25, 1e-8);
   dealii::SolverGMRES<dealii::BlockVector<double>> solver(solver_control,
       dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
   solver.solve(fixed_source, solution, uncollided, 
