@@ -24,7 +24,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const std::vector<int> &g_maxes,
                      const std::vector<std::string> &materials,
                      std::vector<double> factors = {},
-                     const bool precomputed=false) {
+                     const bool precomputed=false,
+                     const bool should_write_mgxs=true) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -86,12 +87,14 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     Mgxs mgxs_coarse = collapse_mgxs(spectra, *mgxs, g_maxes);
     const std::string test_name = this->GetTestName();
     const std::string filename = test_name + "_mgxs.h5";
-    write_mgxs(mgxs_coarse, filename, "294K", materials);
     Mgxs mgxs_coarse_ip = collapse_mgxs(
         flux_full_l1, dof_handler, problem_full.transport, *mgxs, g_maxes,
         INCONSISTENT_P);
-    write_mgxs(mgxs_coarse_ip, test_name+"_ip_mgxs.h5", "294K", materials);
-    std::cout << "MGXS TO FILE " << filename << std::endl;
+    if (should_write_mgxs) {
+      write_mgxs(mgxs_coarse, filename, "294K", materials);
+      write_mgxs(mgxs_coarse_ip, test_name+"_ip_mgxs.h5", "294K", materials);
+      std::cout << "MGXS TO FILE " << filename << std::endl;
+    }
     // Print spectra
     dealii::ConvergenceTable table_spectra;
     for (int j = 0; j < num_materials; ++j) {
