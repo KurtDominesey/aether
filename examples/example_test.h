@@ -125,8 +125,11 @@ class ExampleTest : public ::testing::Test {
       d2m.vmult(flat, flux.block(g));
       if (!group_structure.empty()) {
         int g_rev = num_groups - 1 - g;
+        double low = group_structure[g_rev];
+        if (low == 0)
+          low = 1e-5;  // common lower bound in other group structures
         flat /=
-            std::log(group_structure[g_rev+1] / group_structure[g_rev]);
+            std::log(group_structure[g_rev+1] / low);
       }
       moments[g] = flat;
       data_out.add_data_vector(moments[g].block(0), gs+"scalar");
