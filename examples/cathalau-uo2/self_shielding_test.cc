@@ -27,7 +27,7 @@ class SelfShieldingTest : public CathalauTest {
     this->PrintMesh();
     dealii::FE_DGQ<dim_> fe(1);
     dof_handler.initialize(mesh, fe);
-    Assert(n_azim % 2, dealii::ExcMessage("Must be odd"));
+    Assert(num_azim % 2, dealii::ExcMessage("Must be odd"));
     quadrature = QPglc<dim_, qdim_>(num_polar, num_azim);
   }
 
