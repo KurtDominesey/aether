@@ -24,6 +24,7 @@ TEST(ScatteringTest, OneMaterialIsotropic) {
   ScatteringBlock<dim> scattering_block(scattering, cross_sections);
   dealii::BlockVector<double> source(1, num_dofs);
   dealii::BlockVector<double> scattered(1, num_dofs);
+  source = 1.2345;
   scattering_block.vmult(scattered, source);
   for (int i = 0; i < num_dofs; ++i) {
     ASSERT_DOUBLE_EQ(scattered.block(0)[i], cross_section*source.block(0)[i]);
