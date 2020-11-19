@@ -156,6 +156,7 @@ if __name__ == '__main__':
                                       markevery=2, alpha=0.8)
             if j > 0:
                 ymin = min(ymin, ymin0)
+                ymin = max(ymin, 1e-6)
                 ymax = max(ymax, ymax0)
             plt.ylim(ymin, ymax)
             if j > 0:
@@ -177,9 +178,9 @@ if __name__ == '__main__':
                 plt.title(fancy[fuel])
             handles = plt.gca().get_legend_handles_labels()
             if j == ncols - 1:
-                plt.setp(axij.get_yticklabels(), visible=False)
+                plt.setp(axij.get_yticklabels(which='both'), visible=False)
                 right_yticks()
-                plt.setp(axij.get_yticklabels(), visible=False)
+                plt.setp(axij.get_yticklabels(which='both'), visible=False)
     # plt.gca().autoscale(True, axis='x', tight=True)
     # plt.tight_layout(pad=0.2)
     plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=0.5, 
