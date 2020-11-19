@@ -21,7 +21,7 @@ TEST_P(CathalauMmsTest, FullOrder) {
 
 TEST_P(CathalauMmsTest, Pgd) {
   double factor = dealii::numbers::PI_2 / this->pitch;
-  MmsTest<dim_, qdim_>::TestPgd(4, 50, 2 * factor);
+  MmsTest<dim_, qdim_>::TestPgd(4, 50, 2 * factor, 1e-8);
 }
 
 INSTANTIATE_TEST_CASE_P(FEDegree, CathalauMmsTest, ::testing::Range(0, 3));

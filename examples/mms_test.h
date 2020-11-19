@@ -163,16 +163,18 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
       dealii::BlockVector<double> uncollided(source.get_block_indices());
       dealii::BlockVector<double> flux(source.get_block_indices());
       problem.sweep_source(uncollided, source);
-      dealii::ReductionControl control(max_iters, 1e-10, tol);
-      dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
-          dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
+      dealii::SolverControl control(max_iters, tol);
+      dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
       solver.connect([](const unsigned int iteration,
                         const double check_value,
                         const dealii::BlockVector<double>&) {
         std::cout << iteration << ": " << check_value << std::endl;
         return dealii::SolverControl::success;
       });
-      dealii::PreconditionIdentity preconditioner;
+      dealii::ReductionControl control_wg(500, tol*1e-2, 1e-2);
+      dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg,
+          dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(32));
+      FixedSourceGS preconditioner(problem.fixed_source, solver_wg);
       std::cout << "running full-order: cycle " << cycle << std::endl;
       solver.solve(problem.fixed_source, flux, uncollided, preconditioner);
       // Plot solution
@@ -223,7 +225,8 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
     this->WriteConvergenceTable(convergence_table);
   }
 
-  void TestPgd(const int num_cycles, const int max_iters, const double period) {
+  void TestPgd(const int num_cycles, const int max_iters, const double period,
+               const double tol) {
     const int num_groups = this->mgxs->total.size();
     const int num_materials = this->mgxs->total[0].size();
     std::vector<std::vector<dealii::BlockVector<double>>> boundary_conditions(
@@ -289,8 +292,8 @@ class MmsTest : virtual public ExampleTest<dim, qdim> {
         for (int k = 0; k < max_iters; ++k) {
           double residual = nonlinear_gs.step(dealii::BlockVector<double>(),
                                               dealii::BlockVector<double>());
-          // if (residual < tol)
-          //   break;
+          if (residual < tol)
+            break;
         }
         nonlinear_gs.finalize();
         // if (m > 0)
