@@ -47,6 +47,14 @@ class FixedSource {
    */
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
+  /**
+   * Number of rows.
+   */
+  int m() const;
+  /**
+   * Number of columns.
+   */
+  int n() const;
   //! Diagonal within-group blocks, \f$A_{WG,g}\f$
   const std::vector<WithinGroup<dim, qdim>> &within_groups;
   //! Moment to discrete operator, \f$M\f$

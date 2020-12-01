@@ -6,6 +6,8 @@
 #include <deal.II/lac/solver_richardson.h>
 #include <deal.II/lac/eigen.h>
 #include <deal.II/lac/vector_memory.h>
+#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/slepc_solver.h>
 
 #include "base/mgxs.h"
 #include "mesh/mesh.h"
@@ -51,7 +53,14 @@ TEST(SoodTest, PuAOneGroupIsotropicSlab) {
   dealii::BlockVector<double> flux(1, quadrature.size()*dof_handler.n_dofs());
   flux = 1;
   solver_k.solve(k, fission_source, flux);
-  ASSERT_NEAR(k, 1, 1e-5);  // within one pcm of criticality
+  EXPECT_NEAR(k, 1, 1e-5);  // within one pcm of criticality
+  // works with SLEPc?
+  std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+  eigenvectors.emplace_back(MPI_COMM_WORLD, flux.size(), flux.size());
+  std::vector<double> eigenvalues = {0.5};
+  dealii::SLEPcWrappers::SolverKrylovSchur eigensolver(control);
+  eigensolver.solve(fission_source, eigenvalues, eigenvectors, 1);
+  EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
 }
 
 }  // namespace

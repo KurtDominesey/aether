@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 2.8.12)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PETSC_PKG REQUIRED IMPORTED_TARGET PETSc)
+pkg_check_modules(SLEPC_PKG REQUIRED IMPORTED_TARGET SLEPc)
+
 find_package(deal.II 9.0.0 QUIET
   HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR}
   )
@@ -12,6 +16,9 @@ IF(NOT ${deal.II_FOUND})
     "You may want to either pass a flag -DDEAL_II_DIR=/path/to/deal.II to cmake\n"
     "or set an environment variable \"DEAL_II_DIR\" that contains this path."
     )
+ENDIF()
+IF(NOT ${DEAL_II_WITH_PETSC})
+  MESSAGE(FATAL_ERROR "No PETSc")
 ENDIF()
 
 DEAL_II_INITIALIZE_CACHED_VARIABLES()

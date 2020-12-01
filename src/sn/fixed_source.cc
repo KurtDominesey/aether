@@ -50,6 +50,16 @@ void FixedSource<dim, qdim>::vmult(
   }
 }
 
+template <int dim, int qdim>
+int FixedSource<dim, qdim>::m() const {
+  return within_groups.size() * within_groups[0].transport.transport.m();
+}
+
+template <int dim, int qdim>
+int FixedSource<dim, qdim>::n() const {
+  return m();
+}
+
 template class FixedSource<1>;
 template class FixedSource<2>;
 template class FixedSource<3>;

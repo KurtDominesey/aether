@@ -136,6 +136,16 @@ class Transport {
    */ 
   int n_block_rows() const;
 
+  /**
+   * Number of rows.
+   */
+  int m() const;
+
+  /**
+   * Number of columns.
+   */
+  int n() const;
+
   dealii::BlockIndices get_block_indices() const;
 
   //! Cached cell matrices
