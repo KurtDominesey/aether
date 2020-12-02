@@ -47,16 +47,18 @@ class SoodTest : public testing::Test {
         dof_handler, quadrature, mgxs, boundary_conditions);
     dealii::ReductionControl control(100, 1e-10, 1e-4);
     dealii::SolverGMRES<dealii::BlockVector<double>> solver(control);
-    FissionSource fission_source(problem.fixed_source, problem.fission, solver, 
-                                dealii::PreconditionIdentity());
+    PETScWrappers::FissionSource fission_source(
+        problem.fixed_source, problem.fission, solver, 
+        dealii::PreconditionIdentity());
     dealii::SolverControl control_k(100, 1e-8);
     const int size = dof_handler.n_dofs() * quadrature.size();
     this->Solve(fission_source, control_k, num_groups, size);
   }
   // this is ugly, but we can't override the Solve method if it's a template
   using FissionSourceInst = 
-      FissionSource<1, 1, dealii::SolverGMRES<dealii::BlockVector<double>>, 
-                          dealii::PreconditionIdentity>;
+      PETScWrappers::FissionSource<1, 1, 
+        dealii::SolverGMRES<dealii::BlockVector<double>>, 
+        dealii::PreconditionIdentity>;
   virtual void Solve(FissionSourceInst &matrix, 
                      dealii::SolverControl &control, int num_groups, int size) {
     dealii::GrowingVectorMemory<dealii::BlockVector<double>> memory;
