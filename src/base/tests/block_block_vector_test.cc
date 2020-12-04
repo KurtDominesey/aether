@@ -43,13 +43,16 @@ TYPED_TEST(BlockBlockVectorTest, Assign) {
     EXPECT_EQ(vector[i], 0);
   Number value = 3.14;
   vector = value;
+  for (int i = 0; i < vector.size(); ++i) {
+    EXPECT_EQ(vector[i], value);
+    vector[i] = i;
+  }
   BlockBlockVector<Number> copied(vector);
   BlockBlockVector<Number> assigned;
   assigned = vector;
   for (int i = 0; i < vector.size(); ++i) {
-    EXPECT_EQ(vector[i], value);
-    EXPECT_EQ(copied[i], value);
-    EXPECT_EQ(assigned[i], value);
+    EXPECT_EQ(copied[i], i);
+    EXPECT_EQ(assigned[i], i);
   }
   EXPECT_EQ(copied, vector);
   EXPECT_EQ(assigned, vector);
