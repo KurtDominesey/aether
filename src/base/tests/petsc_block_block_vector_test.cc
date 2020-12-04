@@ -16,18 +16,14 @@ TEST(PETScBlockBlockVectorTest, Init) {
   EXPECT_EQ(vector.get_block_indices().size(), n_blocks);
   EXPECT_EQ(vector.get_block_indices().total_size(), vector.size());
   for (int b = 0; b < n_blocks; ++b) {
-    auto& block = vector.block(b);
+    dealii::PETScWrappers::MPI::BlockVector& block = vector.block(b);
     EXPECT_EQ(block.n_blocks(), n_subblocks);
     EXPECT_EQ(block.size(), n_subblocks*block_size);
     EXPECT_EQ(block.get_block_indices().size(), n_subblocks);
     EXPECT_EQ(block.get_block_indices().total_size(), block.size());
-    EXPECT_NE(dynamic_cast<dealii::PETScWrappers::MPI::BlockVector*>(&block), 
-              nullptr);
     for (int s = 0; s < n_subblocks; ++s) {
-      auto& subblock = block.block(s);
+      dealii::PETScWrappers::MPI::Vector& subblock = block.block(s);
       EXPECT_EQ(subblock.size(), block_size);
-      EXPECT_NE(dynamic_cast<dealii::PETScWrappers::MPI::Vector*>(&subblock), 
-                nullptr);
     }
   }
 }
