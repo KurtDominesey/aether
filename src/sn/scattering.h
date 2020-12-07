@@ -39,15 +39,6 @@ class Scattering {
              const std::vector<double> &cross_sections) const;
 
   /**
-   * Apply the transpose of the linear operator (not implemented)
-   * 
-   * @param dst Destination vector.
-   * @param src Source vector.
-   */
-  void Tvmult(dealii::BlockVector<double> &dst,
-              const dealii::BlockVector<double> &src) const;
-
-  /**
    * Add the linear operator.
    * 
    * @param dst Destination vector.
