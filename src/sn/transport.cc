@@ -212,8 +212,9 @@ void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
 }
 
 template <int dim, int qdim>
-void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
-                                 const dealii::BlockVector<double> &src,
+template <class Vector>
+void Transport<dim, qdim>::vmult(dealii::BlockVectorBase<Vector> &dst,
+                                 const dealii::BlockVectorBase<Vector> &src,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
                                      &boundary_conditions) const {
@@ -234,9 +235,10 @@ void Transport<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
 }
 
 template <int dim, int qdim>
+template <class Vector>
 void Transport<dim, qdim>::vmult_octant(
-    int oct, dealii::BlockVector<double> &dst,
-    const dealii::BlockVector<double> &src,
+    int oct, dealii::BlockVectorBase<Vector> &dst,
+    const dealii::BlockVectorBase<Vector> &src,
     const std::vector<double> &cross_sections,
     const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
   const std::vector<int> &octant_to_global = octants_to_global[oct];
@@ -379,6 +381,39 @@ int Transport<dim, qdim>::n() const {
 template class Transport<1>;
 template class Transport<2>;
 template class Transport<3>;
+
+// Vector is dealii::Vector<double>
+template void Transport<1>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&, 
+    const dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const std::vector<double>&, 
+    const std::vector<dealii::BlockVector<double>>&) const;
+template void Transport<2>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&, 
+    const dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const std::vector<double>&, 
+    const std::vector<dealii::BlockVector<double>>&) const;
+template void Transport<3>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&, 
+    const dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const std::vector<double>&, 
+    const std::vector<dealii::BlockVector<double>>&) const;
+// Vector is dealii::PETScWrappers::VectorBase
+template void Transport<1>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const std::vector<double>&, 
+    const std::vector<dealii::BlockVector<double>>&) const;
+template void Transport<2>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const std::vector<double>&, 
+    const std::vector<dealii::BlockVector<double>>&) const;
+template void Transport<3>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const std::vector<double>&, 
+    const std::vector<dealii::BlockVector<double>>&) const;
 
 template struct CellMatrices<1>;
 template struct CellMatrices<2>;

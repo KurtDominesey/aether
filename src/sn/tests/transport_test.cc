@@ -5,6 +5,7 @@
 #include <deal.II/base/convergence_table.h>
 #include <deal.II/base/function_lib.h>
 
+#include "base/petsc_block_vector.h"
 #include "sn/quadrature.h"
 #include "sn/quadrature_lib.h"
 #include "sn/transport.h"
@@ -170,7 +171,8 @@ class Transported : public dealii::Function<dim> {
 template <typename T>
 class TransportMmsTest : public ::testing::Test {
  protected:
-  static const int dim = T::value;
+  using BlockVectorType = typename T::second_type;
+  static const int dim = T::first_type::value;
   static const int qdim = dim == 1 ? 1 : 2;
   void SetUp() override {
     dealii::FE_DGQ<dim> fe(1);
@@ -252,16 +254,19 @@ class TransportMmsTest : public ::testing::Test {
   dealii::Triangulation<dim> mesh;
   QPglc<dim, qdim> quadrature;
   dealii::DoFHandler<dim> dof_handler;
-  dealii::BlockVector<double> source;
-  dealii::BlockVector<double> flux;
+  BlockVectorType source;
+  BlockVectorType flux;
   std::vector<dealii::BlockVector<double>> boundary_conditions;
   double cross_section;
 };
 
-using Dimensions =
-    ::testing::Types< std::integral_constant<int, 1>,
-                      std::integral_constant<int, 2>,
-                      std::integral_constant<int, 3>  >;
+using Dimensions = ::testing::Types<
+    std::pair< std::integral_constant<int, 1>, dealii::BlockVector<double> >,
+    std::pair< std::integral_constant<int, 2>, dealii::BlockVector<double> >,
+    std::pair< std::integral_constant<int, 3>, dealii::BlockVector<double> >,
+    std::pair< std::integral_constant<int, 1>, PETScWrappers::MPI::BlockVector >,
+    std::pair< std::integral_constant<int, 2>, PETScWrappers::MPI::BlockVector >,
+    std::pair< std::integral_constant<int, 3>, PETScWrappers::MPI::BlockVector > >;
 TYPED_TEST_CASE(TransportMmsTest, Dimensions);
 
 TYPED_TEST(TransportMmsTest, VacuumCosine) {
@@ -369,8 +374,10 @@ TYPED_TEST(TransportMmsTest, ReflectedOnceCosine) {
   this->Test(solution, 2);
 }
 
+using OneD = 
+    std::pair<std::integral_constant<int, 1>, dealii::BlockVector<double> >;
 class TransportMms1DTest
-    : public TransportMmsTest<std::integral_constant<int, 1>>,
+    : public TransportMmsTest<OneD>,
       public ::testing::WithParamInterface<int> {
  protected:
   void SetUp() override {

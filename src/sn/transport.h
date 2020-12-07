@@ -120,8 +120,9 @@ class Transport {
    * @param cross_sections Total material cross_sections.
    * @param boundary_conditions Values of \f$\psi_\text{inc}\f$ by boundary id.
    */
-  void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src,
+  template <class Vector>
+  void vmult(dealii::BlockVectorBase<Vector> &dst,
+             const dealii::BlockVectorBase<Vector> &src,
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>> 
                  &boundary_conditions) const;
@@ -167,8 +168,9 @@ class Transport {
    * @param cross_sections Total material cross_sections.
    * @param boundary_conditions Values of \f$\psi_\text{inc}\f$ by boundary id.
    */
-  void vmult_octant(int oct, dealii::BlockVector<double> &dst,
-                    const dealii::BlockVector<double> &src,
+  template <class Vector>
+  void vmult_octant(int oct, dealii::BlockVectorBase<Vector> &dst,
+                    const dealii::BlockVectorBase<Vector> &src,
                     const std::vector<double> &cross_sections,
                     const std::vector<dealii::BlockVector<double>>
                         &boundary_conditions) const;
