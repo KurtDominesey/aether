@@ -277,7 +277,7 @@ TYPED_TEST(TransportMmsTest, VacuumCosine) {
 
 TYPED_TEST(TransportMmsTest, ReflectedInlineCosine) {
   static const int dim = this->dim;
-  int num_cells = 18;
+  int num_cells = 8;
   std::vector<unsigned int> num_cells_by_dim(dim, num_cells);
   num_cells_by_dim.back() /= 2;
   if (dim == 1)
@@ -318,7 +318,7 @@ TYPED_TEST(TransportMmsTest, ReflectedInlineCosine) {
 
 TYPED_TEST(TransportMmsTest, ReflectedOnceCosine) {
   static const int dim = this->dim;
-  int num_cells = 18;
+  int num_cells = 8;
   std::vector<unsigned int> num_cells_by_dim(dim, num_cells);
   num_cells_by_dim.back() /= 2;
   if (dim == 1)
