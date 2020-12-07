@@ -2,6 +2,7 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
 
+#include "base/petsc_block_vector.h"
 #include "sn/scattering.h"
 #include "sn/scattering_block.h"
 #include "gtest/gtest.h"
@@ -10,7 +11,14 @@ namespace aether::sn {
 
 namespace {
 
-TEST(ScatteringTest, OneMaterialIsotropic) {
+template <class BlockVectorType>
+class ScatteringTest : public ::testing::Test {};
+
+using BlockVectorTypes = ::testing::Types<
+    dealii::BlockVector<double>, PETScWrappers::MPI::BlockVector >;
+TYPED_TEST_CASE(ScatteringTest, BlockVectorTypes);
+
+TYPED_TEST(ScatteringTest, OneMaterialIsotropic) {
   const int dim = 3;
   dealii::FE_DGQ<dim> fe(2);
   dealii::Triangulation<dim> mesh;
@@ -22,8 +30,8 @@ TEST(ScatteringTest, OneMaterialIsotropic) {
   int num_dofs = dof_handler.n_dofs();
   Scattering<dim> scattering(dof_handler);
   ScatteringBlock<dim> scattering_block(scattering, cross_sections);
-  dealii::BlockVector<double> source(1, num_dofs);
-  dealii::BlockVector<double> scattered(1, num_dofs);
+  TypeParam source(1, num_dofs);
+  TypeParam scattered(1, num_dofs);
   source = 1.2345;
   scattering_block.vmult(scattered, source);
   for (int i = 0; i < num_dofs; ++i) {

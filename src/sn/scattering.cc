@@ -31,18 +31,20 @@ void Scattering<dim>::vmult_add(
 }
 
 template <int dim>
+template <class Vector>
 void Scattering<dim>::vmult(
-    dealii::BlockVector<double> &dst,
-    const dealii::BlockVector<double> &src,
+    dealii::BlockVectorBase<Vector> &dst,
+    const dealii::BlockVectorBase<Vector> &src,
     const std::vector<double> &cross_sections) const {
   dst = 0;
   vmult_add(dst, src, cross_sections);
 }
 
 template <int dim>
+template <class Vector>
 void Scattering<dim>::vmult_add(
-    dealii::BlockVector<double> &dst,
-    const dealii::BlockVector<double> &src,
+    dealii::BlockVectorBase<Vector> &dst,
+    const dealii::BlockVectorBase<Vector> &src,
     const std::vector<double> &cross_sections) const {
   const int num_ell = 1;
   const int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
@@ -65,5 +67,32 @@ void Scattering<dim>::vmult_add(
 template class Scattering<1>;
 template class Scattering<2>;
 template class Scattering<3>;
+
+// Vector is dealii::Vector<double>
+template void Scattering<1>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const std::vector<double>&) const;
+template void Scattering<2>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const std::vector<double>&) const;
+template void Scattering<3>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const std::vector<double>&) const;
+// Vector is dealii::PETScWrappers::MPI::Vector
+template void Scattering<1>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const std::vector<double>&) const;
+template void Scattering<2>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const std::vector<double>&) const;
+template void Scattering<3>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const std::vector<double>&) const;
 
 }  // namespace aether::sn

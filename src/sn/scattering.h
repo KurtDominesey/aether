@@ -5,6 +5,7 @@
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
+#include <deal.II/lac/petsc_vector.h>
 
 namespace aether::sn {
 
@@ -34,8 +35,9 @@ class Scattering {
    * @param dst Destination vector.
    * @param src Source vector.
    */
-  void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src,
+  template <class Vector>
+  void vmult(dealii::BlockVectorBase<Vector> &dst,
+             const dealii::BlockVectorBase<Vector> &src,
              const std::vector<double> &cross_sections) const;
 
   /**
@@ -54,8 +56,9 @@ class Scattering {
    * @param dst Destination vector.
    * @param src Source vector.
    */
-  void vmult_add(dealii::BlockVector<double> &dst,
-                 const dealii::BlockVector<double> &src,
+  template <class Vector>
+  void vmult_add(dealii::BlockVectorBase<Vector> &dst,
+                 const dealii::BlockVectorBase<Vector> &src,
                  const std::vector<double> &cross_sections) const;
 
  protected:
