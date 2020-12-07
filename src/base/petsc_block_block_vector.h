@@ -1,11 +1,10 @@
 #ifndef AETHER_PETSC_BLOCK_BLOCK_VECTOR_H_
 #define AETHER_PETSC_BLOCK_BLOCK_VECTOR_H_
 
-#include <deal.II/lac/petsc_block_vector.h>
+#include "base/petsc_block_vector.h"
 
 namespace aether::PETScWrappers::MPI {
 
-using BlockVector = dealii::PETScWrappers::MPI::BlockVector;
 class BlockBlockVector : public dealii::BlockVectorBase<BlockVector> {
  public:
   /**
