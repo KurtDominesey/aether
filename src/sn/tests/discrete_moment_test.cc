@@ -42,7 +42,7 @@ TYPED_TEST(DiscreteToMomentDimTest, IsotropicD2M) {
   BlockVector discrete(this->quadrature.size(), num_dofs);
   BlockVector moments(num_moments, num_dofs);
   discrete = dealii::numbers::PI;
-  moments = std::nan("a");
+  moments = 123;
   this->d2m->vmult(moments, discrete);
   double tol = 1e-14;
   for (int i = 0; i < num_dofs; ++i) {
