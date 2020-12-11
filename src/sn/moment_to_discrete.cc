@@ -21,9 +21,10 @@ void MomentToDiscrete<dim, qdim>::vmult(dealii::Vector<double> &dst,
 }
 
 template <int dim, int qdim>
-void MomentToDiscrete<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
-                                        const dealii::BlockVector<double> &src) 
-                                        const {
+template <class Vector>
+void MomentToDiscrete<dim, qdim>::vmult(
+    dealii::BlockVectorBase<Vector> &dst,
+    const dealii::BlockVectorBase<Vector> &src) const {
   dst = 0;
   vmult_add(dst, src);
 }
@@ -43,9 +44,10 @@ void MomentToDiscrete<dim, qdim>::vmult_add(dealii::Vector<double> &dst,
 }
 
 template <int dim, int qdim>
+template <class Vector>
 void MomentToDiscrete<dim, qdim>::vmult_add(
-    dealii::BlockVector<double> &dst, const dealii::BlockVector<double> &src) 
-    const {
+    dealii::BlockVectorBase<Vector> &dst, 
+    const dealii::BlockVectorBase<Vector> &src) const {
   int num_ordinates = dst.n_blocks();
   int num_moments = src.n_blocks();
   Assert(num_moments == 1, dealii::ExcNotImplemented());
@@ -65,5 +67,26 @@ void MomentToDiscrete<dim, qdim>::vmult_add(
 template class MomentToDiscrete<1>;
 template class MomentToDiscrete<2>;
 template class MomentToDiscrete<3>;
+
+// Block type is dealii::Vector<double>
+template void MomentToDiscrete<1>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const dealii::BlockVectorBase<dealii::Vector<double>>&) const;
+template void MomentToDiscrete<2>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const dealii::BlockVectorBase<dealii::Vector<double>>&) const;
+template void MomentToDiscrete<3>::vmult<dealii::Vector<double>>(
+    dealii::BlockVectorBase<dealii::Vector<double>>&,
+    const dealii::BlockVectorBase<dealii::Vector<double>>&) const;
+// Block type is dealii::PETScWrappers::MPI::Vector
+template void MomentToDiscrete<1>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&) const;
+template void MomentToDiscrete<2>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&) const;
+template void MomentToDiscrete<3>::vmult<dealii::PETScWrappers::MPI::Vector>(
+    dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
+    const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&) const;
 
 }  // namespace aether::sn

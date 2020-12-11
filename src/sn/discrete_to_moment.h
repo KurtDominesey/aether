@@ -2,7 +2,9 @@
 #define AETHER_SN_DISCRETE_TO_MOMENT_H_
 
 #include <deal.II/base/quadrature.h>
+#include <deal.II/lac/block_vector_base.h>
 #include <deal.II/lac/block_vector.h>
+#include <deal.II/lac/petsc_vector.h>
 
 #include "sn/quadrature.h"
 #include "sn/spherical_harmonics.h"
@@ -31,8 +33,9 @@ class DiscreteToMoment {
   /**
    * Matrix-vector multiplication.
    */
-  void vmult(dealii::BlockVector<double> &dst, 
-             const dealii::BlockVector<double> &src) const;
+  template <class Vector>
+  void vmult(dealii::BlockVectorBase<Vector> &dst, 
+             const dealii::BlockVectorBase<Vector> &src) const;
   /**
    * Adding matrix-vector multiplication.
    */
@@ -41,8 +44,9 @@ class DiscreteToMoment {
   /**
    * Adding matrix-vector multiplication.
    */
-  void vmult_add(dealii::BlockVector<double> &dst, 
-                 const dealii::BlockVector<double> &src) const;
+  template <class Vector>
+  void vmult_add(dealii::BlockVectorBase<Vector> &dst, 
+                 const dealii::BlockVectorBase<Vector> &src) const;
   /**
    * Number of block rows (moments) for a given Legendre `order`.
    * 
