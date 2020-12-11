@@ -65,10 +65,8 @@ TYPED_TEST_CASE(DiscreteMomentTest, BlockVectorTypes);
 TYPED_TEST(DiscreteMomentTest, IsotropicD2M) {
   const int dim = 2;
   const int qdim = 2;
-  int num_ords_qdim = 4;
-  int num_ords = std::pow(num_ords_qdim, qdim);
-  dealii::QGauss<qdim> q_gauss(num_ords_qdim);
-  QAngle<dim, qdim> quadrature(q_gauss);
+  QPglc<dim, qdim> quadrature(2, 2);
+  const int num_ords = quadrature.size();
   DiscreteToMoment<dim, qdim> d2m(quadrature);
   int num_dofs = 16;
   TypeParam discrete(num_ords, num_dofs);
@@ -84,10 +82,8 @@ TYPED_TEST(DiscreteMomentTest, IsotropicD2M) {
 TYPED_TEST(DiscreteMomentTest, IsotropicM2D) {
   const int dim = 2;
   const int qdim = 2;
-  int num_ords_qdim = 4;
-  int num_ords = std::pow(num_ords_qdim, qdim);
-  dealii::QGauss<qdim> q_gauss(num_ords_qdim);
-  QAngle<dim, qdim> quadrature(q_gauss);
+  QPglc<dim, qdim> quadrature(2, 2);
+  const int num_ords = quadrature.size();
   MomentToDiscrete<dim, qdim> m2d(quadrature);
   int num_dofs = 16;
   TypeParam zeroth(1, num_dofs);
