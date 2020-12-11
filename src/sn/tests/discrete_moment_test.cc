@@ -1,5 +1,6 @@
 #include <deal.II/base/quadrature_lib.h>
 
+#include "base/petsc_block_vector.h"
 #include "sn/discrete_to_moment.h"
 #include "sn/moment_to_discrete.h"
 #include "sn/quadrature_lib.h"
@@ -12,7 +13,7 @@ namespace {
 template <typename T>
 class DiscreteToMomentDimTest : public ::testing::Test {
  protected:
-  static const int dim = T::value;
+  static const int dim = T::first_type::value;
   void SetUp() override {
     if (dim == 1)
       quadrature = QPglc<dim>(4);
@@ -24,18 +25,22 @@ class DiscreteToMomentDimTest : public ::testing::Test {
   std::unique_ptr<DiscreteToMoment<dim>> d2m;
 };
 
-using Dims =
-    ::testing::Types< std::integral_constant<int, 1>,
-                      std::integral_constant<int, 2>,
-                      std::integral_constant<int, 3> >;
+using Dims = ::testing::Types<
+    std::pair< std::integral_constant<int, 1>, dealii::BlockVector<double> >,
+    std::pair< std::integral_constant<int, 2>, dealii::BlockVector<double> >,
+    std::pair< std::integral_constant<int, 3>, dealii::BlockVector<double> >,
+    std::pair< std::integral_constant<int, 1>, PETScWrappers::MPI::BlockVector >,
+    std::pair< std::integral_constant<int, 2>, PETScWrappers::MPI::BlockVector >,
+    std::pair< std::integral_constant<int, 3>, PETScWrappers::MPI::BlockVector > >;
 TYPED_TEST_CASE(DiscreteToMomentDimTest, Dims);
 
 TYPED_TEST(DiscreteToMomentDimTest, IsotropicD2M) {
+  using BlockVector = typename TypeParam::second_type;
   const int order = 1;
   const int num_dofs = 16;
   const int num_moments = this->d2m->n_block_rows(order);
-  dealii::BlockVector<double> discrete(this->quadrature.size(), num_dofs);
-  dealii::BlockVector<double> moments(num_moments, num_dofs);
+  BlockVector discrete(this->quadrature.size(), num_dofs);
+  BlockVector moments(num_moments, num_dofs);
   discrete = dealii::numbers::PI;
   moments = std::nan("a");
   this->d2m->vmult(moments, discrete);
@@ -50,7 +55,14 @@ TYPED_TEST(DiscreteToMomentDimTest, IsotropicD2M) {
   }
 }
 
-TEST(DiscreteMomentTest, IsotropicD2M) {
+template <class BlockVectorType>
+class DiscreteMomentTest : public ::testing::Test {};
+
+using BlockVectorTypes = ::testing::Types<dealii::BlockVector<double>, 
+                                          PETScWrappers::MPI::BlockVector >;
+TYPED_TEST_CASE(DiscreteMomentTest, BlockVectorTypes);
+
+TYPED_TEST(DiscreteMomentTest, IsotropicD2M) {
   const int dim = 2;
   const int qdim = 2;
   int num_ords_qdim = 4;
@@ -59,8 +71,8 @@ TEST(DiscreteMomentTest, IsotropicD2M) {
   QAngle<dim, qdim> quadrature(q_gauss);
   DiscreteToMoment<dim, qdim> d2m(quadrature);
   int num_dofs = 16;
-  dealii::BlockVector<double> discrete(num_ords, num_dofs);
-  dealii::BlockVector<double> zeroth(1, num_dofs);
+  TypeParam discrete(num_ords, num_dofs);
+  TypeParam zeroth(1, num_dofs);
   discrete = dealii::numbers::PI;
   d2m.vmult(zeroth, discrete);
   for (int ord = 0; ord < num_ords; ++ord) {
@@ -69,7 +81,7 @@ TEST(DiscreteMomentTest, IsotropicD2M) {
   }
 }
 
-TEST(DiscreteMomentTest, IsotropicM2D) {
+TYPED_TEST(DiscreteMomentTest, IsotropicM2D) {
   const int dim = 2;
   const int qdim = 2;
   int num_ords_qdim = 4;
@@ -78,8 +90,8 @@ TEST(DiscreteMomentTest, IsotropicM2D) {
   QAngle<dim, qdim> quadrature(q_gauss);
   MomentToDiscrete<dim, qdim> m2d(quadrature);
   int num_dofs = 16;
-  dealii::BlockVector<double> zeroth(1, num_dofs);
-  dealii::BlockVector<double> discrete(num_ords, num_dofs);
+  TypeParam zeroth(1, num_dofs);
+  TypeParam discrete(num_ords, num_dofs);
   zeroth = dealii::numbers::PI;
   m2d.vmult(discrete, zeroth);
   for (int ord = 0; ord < num_ords; ++ord)
