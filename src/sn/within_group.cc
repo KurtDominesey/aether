@@ -39,15 +39,40 @@ template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(
     dealii::BlockVector<double> &flux,
     const dealii::BlockVector<double> &src) const {
-  AssertDimension(src.n_blocks(), flux.n_blocks());
-  AssertDimension(src.size(), flux.size());
-  // resize intermediate storage (could be cached in non-const method)
-  // TODO: use GrowingVectorMemory
   const int num_dofs = src.block(0).size();
   dealii::BlockVector<double> src_m(1, num_dofs);
   dealii::BlockVector<double> scattered_m(1, num_dofs);
   dealii::BlockVector<double> scattered(src.n_blocks(), num_dofs);
   dealii::BlockVector<double> transported(src.n_blocks(), num_dofs);
+  vmult(flux, src, src_m, scattered_m, scattered, transported);
+}
+
+template <int dim, int qdim>
+void WithinGroup<dim, qdim>::vmult(
+      dealii::PETScWrappers::MPI::BlockVector &flux,
+      const dealii::PETScWrappers::MPI::BlockVector &src) const {
+  const MPI_Comm& communicator = src.get_mpi_communicator();
+  const int size = src.block(0).size();
+  const int local_size = src.block(0).local_size();
+  using BlockVector = dealii::PETScWrappers::MPI::BlockVector;
+  BlockVector src_m(1, communicator, size, local_size);
+  BlockVector scattered_m(1, communicator, size, local_size);
+  BlockVector scattered(src.n_blocks(), communicator, size, local_size);
+  BlockVector transported(src.n_blocks(), communicator, size, local_size);
+  vmult(flux, src, src_m, scattered_m, scattered, transported);
+}
+
+template <int dim, int qdim>
+template <class Vector>
+void WithinGroup<dim, qdim>::vmult(
+    dealii::BlockVectorBase<Vector> &flux,
+    const dealii::BlockVectorBase<Vector> &src,
+    dealii::BlockVectorBase<Vector> &src_m,
+    dealii::BlockVectorBase<Vector> &scattered_m,
+    dealii::BlockVectorBase<Vector> &scattered,
+    dealii::BlockVectorBase<Vector> &transported) const {
+  AssertDimension(src.n_blocks(), flux.n_blocks());
+  AssertDimension(src.size(), flux.size());
   // apply the linear operator
   d2m.vmult(src_m, src);
   scattering.vmult(scattered_m, src_m);

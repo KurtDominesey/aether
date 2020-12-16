@@ -1,6 +1,10 @@
 #ifndef AETHER_SN_WITHIN_GROUP_H_
 #define AETHER_SN_WITHIN_GROUP_H_
 
+#include <deal.II/lac/block_vector_base.h>
+#include <deal.II/lac/block_vector.h>
+#include <deal.II/lac/petsc_block_vector.h>
+
 #include "transport_block.h"
 #include "scattering_block.h"
 #include "moment_to_discrete.h"
@@ -41,12 +45,29 @@ class WithinGroup {
    */
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
+  /**
+   * Matrix-vector multplication by within-group operator.
+   */
+  void vmult(dealii::PETScWrappers::MPI::BlockVector &dst,
+             const dealii::PETScWrappers::MPI::BlockVector &src) const;
   //! Group transport block, \f$\underline{L}_g^{-1}(\overline{L}_g+B)\f$.
   const TransportBlock<dim, qdim> &transport;
   //! Within-group scattering block, \f$\Sigma_{s,g\rightarrow g}\f$.
   const ScatteringBlock<dim> &scattering;
 
  protected:
+  /**
+   * Matrix-vector multiplication by within-group operator.
+   * 
+   * Arguments besides @p dst and @p src are temporary vectors.
+   */
+  template <class Vector>
+  void vmult(dealii::BlockVectorBase<Vector> &flux,
+             const dealii::BlockVectorBase<Vector> &src,
+             dealii::BlockVectorBase<Vector> &src_m,
+             dealii::BlockVectorBase<Vector> &scattered_m,
+             dealii::BlockVectorBase<Vector> &scattered,
+             dealii::BlockVectorBase<Vector> &transported) const;
   //! Moment to discrete operator, \f$M\f$.
   const MomentToDiscrete<dim, qdim> &m2d;
   //! Discrete to moment operator, \f$D\f$.
