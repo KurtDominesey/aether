@@ -8,8 +8,10 @@
 #include <deal.II/lac/vector_memory.h>
 #include <deal.II/lac/petsc_vector.h>
 #include <deal.II/lac/slepc_solver.h>
+#include <deal.II/lac/petsc_precondition.h>
 
 #include "base/mgxs.h"
+#include "base/petsc_block_block_wrapper.h"
 #include "mesh/mesh.h"
 #include "sn/quadrature_lib.h"
 #include "sn/fission_problem.h"
@@ -101,6 +103,48 @@ TYPED_TEST(SoodSLEPcTest, PuAOneGroupIsotropicSlab) {
   std::vector<double> eigenvalues = {0.5};
   TypeParam eigensolver(control);
   eigensolver.solve(fission_source, eigenvalues, eigenvectors, 1);
+  EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
+}
+
+TYPED_TEST(SoodSLEPcTest, PuAOneGroupIsotropicSlabGeneralized) {
+  const int num_groups = this->mgxs->total.size();
+  ::aether::PETScWrappers::BlockBlockWrapper fixed_source(
+      num_groups, this->quadrature.size(), MPI_COMM_WORLD, 
+      this->dof_handler.n_dofs(), this->dof_handler.n_dofs(),
+      this->problem->fixed_source);
+  ::aether::PETScWrappers::BlockBlockWrapper fission(
+      num_groups, this->quadrature.size(), MPI_COMM_WORLD, 
+      this->dof_handler.n_dofs(), this->dof_handler.n_dofs(),
+      this->problem->fission);
+  dealii::SolverControl control(100, 1e-8);
+  const int size = 
+      this->dof_handler.n_dofs() * this->quadrature.size() * num_groups;
+  std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+  eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+  eigenvectors[0] = 1;
+  std::vector<double> eigenvalues = {0.5};
+  TypeParam eigensolver(control);
+  eigensolver.set_initial_space(eigenvectors);
+  bool is_davidson = 
+      dynamic_cast<dealii::SLEPcWrappers::SolverGeneralizedDavidson*>
+      (&eigensolver) != nullptr ||
+      dynamic_cast<dealii::SLEPcWrappers::SolverJacobiDavidson*>
+      (&eigensolver) != nullptr;
+  if (is_davidson) {
+    eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+  } else {
+    dealii::SLEPcWrappers::TransformationShiftInvert shift_invert(
+        MPI_COMM_WORLD,
+        dealii::SLEPcWrappers::TransformationShiftInvert::AdditionalData(0.9));
+    shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
+    dealii::ReductionControl control_inv(100, 1e-10, 1e-4);
+    dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
+    dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source);
+    solver_inv.initialize(preconditioner);
+    shift_invert.set_solver(solver_inv);
+    eigensolver.set_transformation(shift_invert);
+    eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+  }
   EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
 }
 
