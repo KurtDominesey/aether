@@ -12,8 +12,7 @@ namespace aether::PETScWrappers::MPI {
  * Allows for easier testing in serial, because the block vector type can be
  * templated.
  */
-class BlockVector : virtual public dealii::PETScWrappers::MPI::BlockVector,
-                    virtual public dealii::PETScWrappers::VectorBase {
+class BlockVector : public dealii::PETScWrappers::MPI::BlockVector {
  public:
   using BaseClass = dealii::PETScWrappers::MPI::BlockVector;
   using BlockType = BaseClass::BlockType;
@@ -29,8 +28,6 @@ class BlockVector : virtual public dealii::PETScWrappers::MPI::BlockVector,
   using size_type       = BaseClass::size_type;
   using iterator        = BaseClass::iterator;
   using const_iterator  = BaseClass::const_iterator;
-  
-  using real_type       = BlockType::real_type;
 
   using BaseClass::BlockVector;
   BlockVector(const unsigned int n_blocks, const size_type block_size);
@@ -42,13 +39,6 @@ class BlockVector : virtual public dealii::PETScWrappers::MPI::BlockVector,
               const bool omit_zeroing_entries = false);
   void reinit(const std::vector<size_type> &block_sizes,
               const bool omit_zeroing_entries = false);
-  // Have to override these to prevent ambiguities
-  const MPI_Comm& get_mpi_communicator() const override;
-  std::size_t size() const;
-  void compress(dealii::VectorOperation::values operation);
-  value_type operator()(size_type i) const;
-  reference operator()(size_type i);
-  bool operator==(const dealii::PETScWrappers::VectorBase& other) const;
 };
 
 inline BlockVector::BlockVector(const unsigned int n_blocks, 
@@ -79,34 +69,6 @@ inline void BlockVector::reinit(const std::vector<size_type> &block_sizes,
                                 const bool omit_zeroing_entries) {
   BaseClass::reinit(block_sizes, MPI_COMM_WORLD, block_sizes, 
                     omit_zeroing_entries);
-}
-
-inline const MPI_Comm& BlockVector::get_mpi_communicator() const {
-  return this->block(0).get_mpi_communicator();
-}
-
-inline std::size_t BlockVector::size() const {
-  return BaseClass::size();
-}
-
-inline void BlockVector::compress(dealii::VectorOperation::values operation) {
-  BaseClass::compress(operation);
-}
-
-inline BlockVector::value_type BlockVector::operator()(size_type i) const {
-  return BaseClass::operator()(i);
-}
-
-inline BlockVector::reference BlockVector::operator()(size_type i) {
-  return BaseClass::operator()(i);
-}
-
-inline bool BlockVector::operator==(
-    const dealii::PETScWrappers::VectorBase& other) const {
-  auto other_b = dynamic_cast<const BaseClass*>(&other);
-  if (other_b != nullptr)
-    return BaseClass::operator==(*other_b);
-  return dealii::PETScWrappers::VectorBase::operator==(other);
 }
 
 }  // namespace aether::PETScWrappers::MPI 
