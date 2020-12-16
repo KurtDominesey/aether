@@ -212,6 +212,36 @@ void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::vmult(dealii::PETScWrappers::MPI::Vector &dst,
+                                 const dealii::PETScWrappers::MPI::Vector &src,
+                                 const std::vector<double> &cross_sections,
+                                 const std::vector<dealii::BlockVector<double>>
+                                     &boundary_conditions) const {
+  dealii::PETScWrappers::MPI::BlockVector dst_b(quadrature.size(), 
+                                                dst.get_mpi_communicator(), 
+                                                dof_handler.n_dofs(),
+                                                dof_handler.n_dofs());
+  dealii::PETScWrappers::MPI::BlockVector src_b(quadrature.size(),
+                                                src.get_mpi_communicator(),
+                                                dof_handler.n_dofs(),
+                                                dof_handler.n_dofs());
+  for (int n = 0; n < quadrature.size(); ++n) {
+    int nn = n * dof_handler.n_dofs();
+    for (int i = 0; i < dof_handler.n_dofs(); ++i) {
+      dst_b.block(n)[i] = dst[nn+i];
+      src_b.block(n)[i] = src[nn+i];
+    }
+  }
+  vmult(dst_b, src_b, cross_sections, boundary_conditions);
+  for (int n = 0; n < quadrature.size(); ++n) {
+    int nn = n * dof_handler.n_dofs();
+    for (int i = 0; i < dof_handler.n_dofs(); ++i) {
+      dst[nn+i] = dst_b.block(n)[i];
+    }
+  }
+}
+
+template <int dim, int qdim>
 template <class Vector>
 void Transport<dim, qdim>::vmult(dealii::BlockVectorBase<Vector> &dst,
                                  const dealii::BlockVectorBase<Vector> &src,

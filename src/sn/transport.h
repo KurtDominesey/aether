@@ -5,6 +5,8 @@
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
+#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/fe/fe_update_flags.h>
 #include <deal.II/fe/fe_values.h>
 
@@ -108,6 +110,20 @@ class Transport {
    */
   void vmult(dealii::Vector<double> &dst, 
              const dealii::Vector<double> &src,
+             const std::vector<double> &cross_sections,
+             const std::vector<dealii::BlockVector<double>>
+                 &boundary_conditions) const;
+
+  /**
+   * Compute \f$L^{-1}q\f$.
+   * 
+   * @param dst Destination vector.
+   * @param src Source vector (\f$q\f$).
+   * @param cross_sections Total material cross_sections.
+   * @param boundary_conditions Values of \f$\psi_\text{inc}\f$ by boundary id.
+   */
+  void vmult(dealii::PETScWrappers::MPI::Vector &dst, 
+             const dealii::PETScWrappers::MPI::Vector &src,
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>>
                  &boundary_conditions) const;
