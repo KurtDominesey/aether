@@ -37,7 +37,9 @@ int QPglc<dim, qdim>::reflected_index(
     int n_azim  = n / q_polar.size();
     Assert(n == (n_azim * q_polar.size() + n_polar), dealii::ExcInvalidState());
     // only works for extruded geometry in 3D
-    int n_polar_refl = dim == 2 ? n_polar : (q_polar.size() - 1 - n_polar);
+    int n_polar_refl = n_polar;
+    if (dim == 3 && ordinate_refl[2] == -ordinate[2])
+      n_polar_refl = q_polar.size() - 1 - n_polar;
     double polar_refl = 2 * q_polar.point(n_polar)[0] - 1;
     double proj = std::sqrt(1-std::pow(polar_refl, 2));
     // acos returns azimuthal angle in [0, pi], upper half of unit disk
