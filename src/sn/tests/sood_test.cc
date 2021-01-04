@@ -156,6 +156,127 @@ class TakedaOneTest : public CriticalityTest<3> {
   }
 };
 
+class TakedaTwoTest : public CriticalityTest<3> {
+ protected:
+  static const int dim = 3;
+  void SetUp() override {
+    // set up materials
+    const int num_groups = 4;
+    // core, radial blanket, axial blanket, control rod (cr), cr position (crp)
+    const int num_materials = 5;
+    std::vector<double> chi = {0.583319, 0.405450, 0.011231, 0};
+    std::vector<std::vector<double>> total = {
+        {1.14568e-1, 2.05177e-1, 3.29381e-1, 3.89810e-1},  // core
+        {1.19648e-1, 2.42195e-1, 3.56476e-1, 3.79433e-1},  // radial blanket
+        {1.16493e-1, 2.20521e-1, 3.44544e-1, 3.88356e-1},  // axial blanket
+        {1.84333e-1, 3.66121e-1, 6.15527e-1, 1.09486e+0},  // control rod (cr)
+        {6.58979e-2, 1.09810e-1, 1.86765e-1, 2.09933e-1}   // cr position (crp)
+    };
+    std::vector<std::vector<double>> nu_fission = {
+        {2.06063e-2, 6.10571e-3, 6.91403e-3, 2.60689e-2},
+        {1.89496e-2, 1.75265e-4, 2.06978e-4, 1.13451e-3},
+        {1.31770e-2, 1.26026e-4, 1.52380e-4, 7.87302e-4},
+        {0,          0,          0,          0},
+        {0,          0,          0,          0}
+    };
+    std::vector<std::vector<std::vector<double>>> scatter(num_materials,
+        std::vector<std::vector<double>>(num_groups, 
+          std::vector<double>(num_groups)));
+    scatter[0] = {  // core
+        {7.04326e-2, 0,          0,          0},
+        {3.47967e-2, 1.95443e-1, 0,          0},
+        {1.88282e-3, 6.20863e-3, 3.20586e-1, 0},
+        {0,          7.07208e-7, 9.92975e-4, 3.62360e-1}
+    };
+    scatter[1] = {  // radial blanket
+        {6.91158e-2, 0,          0,          0},
+        {4.04132e-2, 2.30626e-1, 0,          0},
+        {2.68621e-3, 9.57027e-3, 3.48414e-1, 0},
+        {0,          1.99571e-7, 1.27195e-3, 3.63631e-1}
+    };
+    scatter[2] = {  // axial blanket
+        {7.16044e-2, 0,          0,          0},
+        {3.73170e-2, 2.10436e-1, 0,          0},
+        {2.21707e-3, 8.59855e-3, 3.37506e-1, 0},
+        {0,          6.68299e-7, 1.68530e-3, 3.74886e-1}
+    };
+    scatter[3] = {  // control rod
+        {1.34373e-1, 0,          0,          0},
+        {4.37775e-2, 3.18582e-1, 0,          0},
+        {2.06054e-4, 2.98432e-2, 5.19591e-1, 0},
+        {0,          8.71188e-7, 7.66209e-3, 6.18265e-1}
+    };
+    scatter[4] = {  // control rod position
+        {4.74407e-2, 0,          0,          0},
+        {1.76894e-2, 1.06142e-1, 0,          0},
+        {4.57012e-4, 3.55466e-3, 1.85304e-1, 0},
+        {0,          1.77599e-7, 1.01280e-3, 2.08858e-1}
+    };
+    mgxs = std::make_unique<Mgxs>(num_groups, num_materials, 1);
+    for (int j = 0; j < num_materials; ++j) {
+      for (int g = 0; g < num_groups; ++g) {
+        mgxs->total[g][j] = total[j][g];
+        mgxs->nu_fission[g][j] = nu_fission[j][g];
+        mgxs->chi[g][j] = j <= 2 ? chi[g] : 0;
+        for (int gp = 0; gp < num_groups; ++gp)
+          mgxs->scatter[g][gp][j] = scatter[j][g][gp];
+      }
+    }
+    // set up mesh
+    dealii::GridGenerator::subdivided_hyper_rectangle(mesh, {14, 14, 30}, 
+        dealii::Point<dim>(0, 0, 0), dealii::Point<dim>(70, 70, 150), true);
+    for (auto &cell : mesh.active_cell_iterators()) {
+      const dealii::Point<dim> &center = cell->center();
+      // precedence: in_rod, in_radial_blanket, in_axial_blanket
+      bool in_rod = (center[0] > 35 && center[0] < 45) && center[1] < 5;
+      bool in_radial_blanket = 
+          center[0] > 55 || center[1] > 55 ||  // outside core
+          (center[0] > 50 && center[0] < 55 && center[1] > 15) ||  // last row
+          (center[1] > 50 && center[1] < 55 && center[0] > 15) ||  // last col
+          (center[0] > 45 && center[0] < 50 && center[1] > 30) ||  // second row
+          (center[1] > 45 && center[1] < 50 && center[0] > 30) ||  // second col
+          (center[0] > 40 && center[0] < 45 && center[1] > 40) ||  // third row
+          (center[1] > 40 && center[1] < 45 && center[0] > 40);    // third col
+      bool in_axial_blanket = center[2] < 20 || center[2] > 130;
+      if (in_rod)
+        cell->set_material_id(center[2] > 75 ? 3 : 4);
+      else if (in_radial_blanket)
+        cell->set_material_id(1);
+      else if (in_axial_blanket)
+        cell->set_material_id(2);
+      else
+        cell->set_material_id(0);  // core
+      for (int f = 0; f < dealii::GeometryInfo<dim>::faces_per_cell; ++f) {
+        // replace interior x-y (0, 2) with reflecting
+        // replace exterior x-y (1, 3) and z (4, 5) with vacuum (0)
+        dealii::types::boundary_id b = cell->face(f)->boundary_id();
+        if (b == 0 || b == 2)
+          cell->face(f)->set_boundary_id(types::reflecting_boundary_id);
+        else if (b == 1 || b == 3 || b == 4 || b == 5)
+          cell->face(f)->set_boundary_id(0);
+        else
+          AssertThrow(b == dealii::numbers::internal_face_boundary_id, 
+                      dealii::ExcInvalidState());
+      }
+    }
+    // write out the mesh
+    dealii::GridOut grid_out;
+    std::ofstream vtk_out("takeda2.vtk");
+    grid_out.write_vtk(mesh, vtk_out);
+    // set up finite elements and quadrature
+    dealii::FE_DGP<dim> fe(1);
+    dof_handler.initialize(mesh, fe);
+    quadrature = std::make_unique<QPglc<dim>>(2, 2);
+    // set up (vacuum) boundary conditions
+    boundary_conditions.resize(num_groups,
+        std::vector<dealii::BlockVector<double>>(1, 
+          dealii::BlockVector<double>(quadrature->size(), fe.dofs_per_cell)));
+    // set up the fission problem
+    problem = std::make_unique<FissionProblem<dim>>(
+        dof_handler, *quadrature, *mgxs, boundary_conditions);
+  }
+};
+
 TEST_F(TakedaOneTest, PuAOneGroupIsotropicSlab) {
   const int num_groups = this->mgxs->total.size();
   // dealii::ReductionControl control_wg(100, 1e-10, 1e-2);
