@@ -39,7 +39,7 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
     const int num_groups = std::stoi(num_groups_str);
     const std::string filename = 
         "/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/" 
-        + materials[2] + "/" + "mgxs-" + group_structure + ".h5";
+        + materials[2] + "-v2/" + "mgxs-" + group_structure + ".h5";
     mgxs = std::make_unique<Mgxs>(num_groups, materials.size(), 1);
     read_mgxs(*mgxs, filename, "294K", materials, true);
     // smear void gaps
