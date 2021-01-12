@@ -106,6 +106,8 @@ def logticks(axis):
     locmin = axis.get_minor_locator()
     locs = locmaj()
     numdecs = math.log10(locs[-1]/locs[0])
+    numdecs *= 2  # not sure why this is necessary
+    # but otherwise there are missing major ticks
     locmaj.set_params(numdecs=numdecs, numticks=numdecs)
     subs = np.arange(1, 10)
     locmin.set_params(subs=subs, numdecs=numdecs, numticks=len(subs)*numdecs)

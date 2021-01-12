@@ -96,7 +96,7 @@ if __name__ == '__main__':
         if fuel == 'uo2':
             plt.ylim((0.13840961451559552, 212.35687351752452))
         elif fuel == 'mox43':
-            plt.ylim((0.1427661768889807, 210.44607035951424))
+            plt.ylim((0.13876892923741585, 210.717451356888))
     else:
         print(plt.xlim())
         print(plt.ylim())

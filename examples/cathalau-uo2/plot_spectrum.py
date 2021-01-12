@@ -12,7 +12,7 @@ import openmc.mgxs
 
 def plot_spectrum(filename, savename, fuel, **kwargs):
     folder = '/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/'
-    file = h5py.File(folder + fuel + '/mgxs-uncorrected-SHEM-361.h5', 'r')
+    file = h5py.File(folder + fuel + '-v2/mgxs-uncorrected-SHEM-361.h5', 'r')
     materials = ['void', 'water', 'uo2']
     table = np.genfromtxt(filename, names=True)
     xdata = openmc.mgxs.GROUP_STRUCTURES['SHEM-361'][::-1]
@@ -55,7 +55,7 @@ def plot_spectrum(filename, savename, fuel, **kwargs):
         if name != 'openmc':
             ydata = table[name]
         else:
-            sp = h5py.File(folder + 'statepoint.4000 - Copy.h5', 'r')
+            sp = h5py.File(folder + 'uo2-v2/statepoint.4000.h5', 'r')
             tally = sp['tallies']['tally 1057']['results']  # 1057, 1070
             ydata = tally[361:(361+361), 0, 0]  # fuel
             # ydata = tally[361:(361+361), 1, 0] / ydata

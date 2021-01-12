@@ -13,7 +13,7 @@ JCP = True
 def plot_all(loc, fuels):
     # fuels are columns
     # group structures are rows
-    base = loc + '/{fuel}/mgxs-uncorrected-{group_structure}.h5'
+    base = loc + '/{fuel}-v2/mgxs-uncorrected-{group_structure}.h5'
     group_structures = ['CASMO-70', 'XMAS-172', 'SHEM-361']
     nrows = len(group_structures)
     ncols = len(fuels)
