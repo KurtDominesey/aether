@@ -19,3 +19,4 @@ callgrind.out.*
 *.h5
 *.pyc
 *.pgf
+*.vtk
