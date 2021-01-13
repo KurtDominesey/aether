@@ -5,12 +5,21 @@
 
 #include <deal.II/base/hdf5.h>
 #include <deal.II/lac/solver_relaxation.h>
+#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/slepc_solver.h>
+#include <deal.II/lac/eigen.h>
 
 #include "example_test.h"
 
+#include "base/petsc_block_block_wrapper.h"
 #include "base/stagnation_control.h"
 #include "base/lapack_full_matrix.h"
 #include "sn/fixed_source_problem.h"
+#include "sn/fission_problem.h"
+#include "sn/fission_source.h"
+#include "pgd/sn/inner_products.h"
+#include "pgd/sn/fission_source_p.h"
+#include "pgd/sn/energy_mg_fiss.h"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -76,6 +85,73 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     }
     if (history_data != nullptr)
       *history_data = control.get_history_data();
+  }
+
+  template <class TransportType>
+  void RunFullOrderCriticality(
+      dealii::BlockVector<double> &flux,
+      const dealii::BlockVector<double> &source,
+      const FissionProblem<dim, qdim, TransportType> &problem,
+      const int max_iters, const double tol,
+      std::vector<double> *history_data = nullptr) {
+    const bool use_slepc = true;
+    dealii::SolverControl control(max_iters, tol);
+    control.enable_history_data();
+    if (use_slepc) {
+      const int num_groups = mgxs->total.size();
+      ::aether::PETScWrappers::BlockBlockWrapper fixed_source(
+          num_groups, quadrature.size(), MPI_COMM_WORLD, 
+          dof_handler.n_dofs(), dof_handler.n_dofs(), problem.fixed_source);
+      ::aether::PETScWrappers::BlockBlockWrapper fission(
+          num_groups, quadrature.size(), MPI_COMM_WORLD, 
+          dof_handler.n_dofs(), dof_handler.n_dofs(), problem.fission);
+      const int size = dof_handler.n_dofs() * quadrature.size() * num_groups;
+      std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+      eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+      eigenvectors[0] = 1;
+      // for (int i = 0; i < size; ++i)
+      //   eigenvectors[0][i] = uncollided[i];
+      eigenvectors[0] /= eigenvectors[0].l2_norm();
+      std::vector<double> eigenvalues = {1.0};
+      dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
+      eigensolver.set_initial_space(eigenvectors);
+      try {
+        eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+      } catch (dealii::SolverControl::NoConvergence &failure) {
+        failure.print_info(std::cout);
+      }
+      if (history_data != nullptr)
+        *history_data = control.get_history_data();
+      for (int i = 0; i < size; ++i)
+        flux[i] = eigenvectors[0][i];
+      std::cout << "EIGENVALUE: " << std::setprecision(10) 
+                << eigenvalues[0] << std::endl;
+    } else {
+      // dealii::BlockVector<double> uncollided(source.get_block_indices());
+      // problem.sweep_source(uncollided, source);
+      dealii::ReductionControl control_wg(100, 1e-10, 1e-2);
+      dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+      FixedSourceGS preconditioner(problem.fixed_source, solver_wg);
+      // dealii::SolverControl control_fs(1, std::numeric_limits<double>::infinity);
+      dealii::IterationNumberControl control_fs(1, 0);
+      dealii::SolverRichardson<dealii::BlockVector<double>> solver_fs(control_fs);
+      solver_fs.connect([](const unsigned int iteration,
+                        const double check_value,
+                        const dealii::BlockVector<double>&) {
+        std::cout << iteration << ": " << check_value << std::endl;
+        return dealii::SolverControl::success;
+      });
+      FissionSource fission_source(problem.fixed_source, problem.fission, 
+                                   solver_fs, preconditioner);
+      dealii::GrowingVectorMemory<dealii::BlockVector<double>> memory;
+      dealii::EigenPower<dealii::BlockVector<double>> eigensolver(control, 
+                                                                  memory);
+      double k = 1.0;
+      flux = 1;
+      flux /= flux.l2_norm();
+      eigensolver.solve(k, fission_source, flux);
+      std::cout << "k-eigenvalue: " << std::setprecision(10) << k << std::endl;
+    }
   }
 
   void RunPgd(pgd::sn::NonlinearGS &nonlinear_gs, const int num_modes,
@@ -485,7 +561,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                const double tol_fullorder,
                const bool do_update,
                const bool precomputed_full=true,
-               const bool precomputed_pgd=true) {
+               const bool precomputed_pgd=true,
+               const bool do_eigenvalue=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -506,7 +583,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int j = 0; j < num_sources; ++j)
         source_full.block(g).add(
             sources_energy[j][g], sources_spaceangle[j].block(0));
-    FixedSourceProblem<dim, qdim> problem_full(
+    FissionProblem<dim, qdim> problem_full(
         dof_handler, quadrature, *mgxs, boundary_conditions);
     const std::string filename_full = this->GetTestName() + "_full.h5";
     namespace HDF5 = dealii::HDF5;
@@ -516,8 +593,13 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     } else {
       std::vector<double> history_data;
       // run problem
-      RunFullOrder(flux_full, source_full, problem_full, 
-                   max_iters_fullorder, tol_fullorder, &history_data);
+      if (do_eigenvalue) {
+        // RunFullOrderCriticality(flux_full, source_full, problem_full, 
+        //     max_iters_fullorder, tol_fullorder, &history_data);
+      } else {
+        RunFullOrder(flux_full, source_full, problem_full, 
+                    max_iters_fullorder, tol_fullorder, &history_data);
+      }
       this->WriteFlux(flux_full, history_data, filename_full);
     }
     this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
@@ -539,14 +621,44 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     for (int j = 0; j < num_materials; ++j) {
       mgxs_one.total[0][j] = 1;
       mgxs_one.scatter[0][0][j] = 1;
+      mgxs_one.chi[0][j] = 1;
+      mgxs_one.nu_fission[0][j] = 1;
+      mgxs_pseudo.chi[0][j] = 1;
     }
     using TransportType = pgd::sn::Transport<dim, qdim>;
     using TransportBlockType = pgd::sn::TransportBlock<dim, qdim>;
-    FixedSourceProblem<dim, qdim, TransportType, TransportBlockType> problem(
+    FissionProblem<dim, qdim, TransportType, TransportBlockType> problem(
         dof_handler, quadrature, mgxs_pseudo, boundary_conditions_one);
     pgd::sn::FixedSourceP fixed_source_p(
         problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
     pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
+    pgd::sn::FissionSourceP fission_source_p(
+      problem.fixed_source, problem.fission, mgxs_pseudo, mgxs_one);
+    pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
+    if (do_eigenvalue) {
+      double k0 = 0;
+      double k1 = 1;
+      std::vector<pgd::sn::InnerProducts> coefficients;
+      coefficients.emplace_back(num_materials, 1);
+      std::vector<double> _;
+      fission_source_p.enrich(0);
+      energy_fiss.enrich(0);
+      while (std::abs(k1 - k0) > 1e-6) {
+      // for (int i = 0; i < 100; ++i) {
+        coefficients[0] = 0;
+        fission_source_p.get_inner_products(coefficients, _);
+        for (int j = 0; j < num_materials; ++j)
+          coefficients[0].fission[j] = coefficients[0].scattering[j][0];
+        double foo = energy_fiss.step_eigenvalue(coefficients[0]);
+        std::cout << "k-energy: " << foo << std::endl;
+        coefficients[0] = 0;
+        energy_fiss.get_inner_products(coefficients, _);
+        k0 = k1;
+        k1 = fission_source_p.step_eigenvalue(coefficients[0]);
+        std::cout << "k-spaceangle: " << k1 << std::endl;
+      }
+      return;
+    }
     const std::string filename_pgd = this->GetTestName() + "_pgd.h5";
     if (precomputed_pgd) {
       // read from file

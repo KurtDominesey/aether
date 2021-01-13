@@ -341,6 +341,10 @@ void EnergyMgFull::get_inner_products_x(
       inner_products_x.collision[j] += 
           mode_row[g] * mgxs.total[g][j] * right[g];
       for (int gp = 0; gp < mgxs.scatter[g].size(); ++gp) {
+        inner_products_x.fission[j] += mode_row[g] 
+                                       * mgxs.chi[g][j]
+                                       * mgxs.nu_fission[gp][j]
+                                       * right[gp];
         for (int ell = 0; ell < 1; ++ell) {
           inner_products_x.scattering[j][ell] +=
               mode_row[g] 

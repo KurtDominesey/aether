@@ -10,13 +10,16 @@ namespace aether::pgd::sn {
 struct InnerProducts {
   InnerProducts(int num_materials, int num_legendre)
       : collision(num_materials),
+        fission(num_materials),
         scattering(std::valarray<double>(num_legendre), num_materials) {};
   double streaming;
   std::valarray<double> collision;
+  std::valarray<double> fission;
   std::valarray<std::valarray<double>> scattering;
   InnerProducts& operator=(const double &value) {
     streaming = value;
     collision = value;
+    fission = value;
     for (int material = 0; material < scattering.size(); ++material)
       scattering[material] = value;
     return *this;
@@ -24,6 +27,7 @@ struct InnerProducts {
   InnerProducts& operator*=(const double &value) {
     streaming *= value;
     collision *= value;
+    fission *= value;
     for (int material = 0; material < scattering.size(); ++material)
       scattering[material] *= value;
     return *this;
@@ -32,6 +36,7 @@ struct InnerProducts {
     streaming *= other.streaming;
     collision *= other.collision;
     scattering *= other.scattering;
+    fission *= other.fission;
     return *this;
   }
   double eval() const {
