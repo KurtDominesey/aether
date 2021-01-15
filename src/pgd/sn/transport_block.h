@@ -13,7 +13,11 @@ class TransportBlock : public aether::sn::TransportBlock<dim, qdim> {
   template <typename VectorType>
   void stream(VectorType &dst, const VectorType &src) const;
   template <typename VectorType>
+  void stream_add(VectorType &dst, const VectorType &src) const;
+  template <typename VectorType>
   void collide(VectorType &dst, const VectorType &src) const;
+  template <typename VectorType>
+  void collide_add(VectorType &dst, const VectorType &src) const;
 };
 
 template <int dim, int qdim>
@@ -27,11 +31,29 @@ void TransportBlock<dim, qdim>::stream(VectorType &dst,
 
 template <int dim, int qdim>
 template <typename VectorType>
+void TransportBlock<dim, qdim>::stream_add(VectorType &dst,
+                                       const VectorType &src) const {
+  const Transport<dim, qdim> &transport =
+      dynamic_cast<const Transport<dim, qdim>&>(this->transport);
+  transport.stream_add(dst, src, this->boundary_conditions);
+}
+
+template <int dim, int qdim>
+template <typename VectorType>
 void TransportBlock<dim, qdim>::collide(VectorType &dst,
                                         const VectorType &src) const {
   const Transport<dim, qdim> &transport =
       dynamic_cast<const Transport<dim, qdim>&>(this->transport);
-  transport.collide(dst, src);
+  transport.collide(dst, src, this->cross_sections);
+}
+
+template <int dim, int qdim>
+template <typename VectorType>
+void TransportBlock<dim, qdim>::collide_add(VectorType &dst,
+                                            const VectorType &src) const {
+  const Transport<dim, qdim> &transport =
+      dynamic_cast<const Transport<dim, qdim>&>(this->transport);
+  transport.collide_add(dst, src, this->cross_sections);
 }
 
 template class TransportBlock<1>;
