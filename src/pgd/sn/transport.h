@@ -34,6 +34,18 @@ class Transport : public aether::sn::Transport<dim, qdim> {
                    const dealii::Vector<double> &src) const;
   void collide_add(dealii::BlockVector<double> &dst,
                    const dealii::BlockVector<double> &src) const;
+  void collide(dealii::Vector<double> &dst,
+               const dealii::Vector<double> &src,
+               const std::vector<double> &cross_sections) const;
+  void collide(dealii::BlockVector<double> &dst,
+               const dealii::BlockVector<double> &src,
+               const std::vector<double> &cross_sections) const;
+  void collide_add(dealii::Vector<double> &dst,
+                   const dealii::Vector<double> &src,
+                   const std::vector<double> &cross_sections) const;
+  void collide_add(dealii::BlockVector<double> &dst,
+                   const dealii::BlockVector<double> &src,
+                   const std::vector<double> &cross_sections) const;
   void collide_ordinate(dealii::Vector<double> &dst,
                         const dealii::Vector<double> &src) const;
   double inner_product(const dealii::Vector<double> &left,

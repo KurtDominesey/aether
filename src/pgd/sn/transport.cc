@@ -55,6 +55,35 @@ void Transport<dim, qdim>::collide_add(
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::collide(
+      dealii::Vector<double> &dst,
+      const dealii::Vector<double> &src,
+      const std::vector<double> &cross_sections) const {
+  dealii::BlockVector<double> dst_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  dealii::BlockVector<double> src_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  src_b = src;
+  collide(dst_b, src_b, cross_sections);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::collide_add(
+    dealii::Vector<double> &dst, 
+    const dealii::Vector<double> &src,
+    const std::vector<double> &cross_sections) const {
+  dealii::BlockVector<double> dst_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  dealii::BlockVector<double> src_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  dst_b = dst;
+  src_b = src;
+  collide_add(dst_b, src_b, cross_sections);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void Transport<dim, qdim>::stream(
     dealii::BlockVector<double> &dst,
     const dealii::BlockVector<double> &src,
@@ -172,6 +201,42 @@ void Transport<dim, qdim>::collide_add(dealii::BlockVector<double> &dst,
       for (int i = 0; i < mass.n(); ++i) {
         for (int j = 0; j < mass.m(); ++j) {
           dst.block(n)[dof_indices[i]] += mass[i][j] * 
+                                          src.block(n)[dof_indices[j]];
+        }
+      }
+    }
+  }
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::collide(dealii::BlockVector<double> &dst,
+                                   const dealii::BlockVector<double> &src,
+                                   const std::vector<double> &cross_sections) 
+                                   const {
+  dst = 0;
+  collide_add(dst, src, cross_sections);
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::collide_add(dealii::BlockVector<double> &dst,
+                                       const dealii::BlockVector<double> &src,
+                                       const std::vector<double> &cross_sections) 
+                                       const {
+  std::vector<dealii::types::global_dof_index> dof_indices(
+      this->dof_handler.get_fe().dofs_per_cell);
+  using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
+  int c = 0;
+  for (ActiveCell cell = this->dof_handler.begin_active();
+       cell != this->dof_handler.end(); ++cell, ++c) {
+    if (!cell->is_locally_owned())
+      continue;
+    const dealii::FullMatrix<double> &mass= this->cell_matrices[c].mass;
+    const double cross_section = cross_sections[cell->material_id()];
+    cell->get_dof_indices(dof_indices);
+    for (int n = 0; n < this->quadrature.size(); ++n) {
+      for (int i = 0; i < mass.n(); ++i) {
+        for (int j = 0; j < mass.m(); ++j) {
+          dst.block(n)[dof_indices[i]] += cross_section * mass[i][j] * 
                                           src.block(n)[dof_indices[j]];
         }
       }
