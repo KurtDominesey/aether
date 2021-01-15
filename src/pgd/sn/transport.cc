@@ -16,6 +16,20 @@ void Transport<dim, qdim>::stream(
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::stream_add(
+    dealii::Vector<double> &dst, const dealii::Vector<double> &src,
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+  dealii::BlockVector<double> dst_b(this->quadrature.size(),
+                                    this->dof_handler.n_dofs());
+  dealii::BlockVector<double> src_b(this->quadrature.size(),
+                                    this->dof_handler.n_dofs());
+  dst_b = dst;
+  src_b = src;
+  stream_add(dst_b, src_b, boundary_conditions);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void Transport<dim, qdim>::collide(dealii::Vector<double> &dst,
                                    const dealii::Vector<double> &src) const {
   dealii::BlockVector<double> dst_b(this->quadrature.size(), 
@@ -28,7 +42,29 @@ void Transport<dim, qdim>::collide(dealii::Vector<double> &dst,
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::collide_add(
+    dealii::Vector<double> &dst, const dealii::Vector<double> &src) const {
+  dealii::BlockVector<double> dst_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  dealii::BlockVector<double> src_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  dst_b = dst;
+  src_b = src;
+  collide_add(dst_b, src_b);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void Transport<dim, qdim>::stream(
+    dealii::BlockVector<double> &dst,
+    const dealii::BlockVector<double> &src,
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+  dst = 0;
+  stream_add(dst, src, boundary_conditions);
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::stream_add(
     dealii::BlockVector<double> &dst,
     const dealii::BlockVector<double> &src,
     const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
@@ -114,6 +150,14 @@ template <int dim, int qdim>
 void Transport<dim, qdim>::collide(dealii::BlockVector<double> &dst,
                                    const dealii::BlockVector<double> &src) 
                                    const {
+  dst = 0;
+  collide_add(dst, src);
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::collide_add(dealii::BlockVector<double> &dst,
+                                       const dealii::BlockVector<double> &src) 
+                                       const {
   std::vector<dealii::types::global_dof_index> dof_indices(
       this->dof_handler.get_fe().dofs_per_cell);
   using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
@@ -126,7 +170,6 @@ void Transport<dim, qdim>::collide(dealii::BlockVector<double> &dst,
     cell->get_dof_indices(dof_indices);
     for (int n = 0; n < this->quadrature.size(); ++n) {
       for (int i = 0; i < mass.n(); ++i) {
-        dst.block(n)[dof_indices[i]] = 0;
         for (int j = 0; j < mass.m(); ++j) {
           dst.block(n)[dof_indices[i]] += mass[i][j] * 
                                           src.block(n)[dof_indices[j]];
