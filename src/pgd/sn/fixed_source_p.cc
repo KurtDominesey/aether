@@ -145,6 +145,9 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
                                                     * scattering_c;
     }
   }
+  for (int j = 0; j < inner_products.scattering.size(); ++j) {
+    inner_products.fission[j] = inner_products.scattering[j][0];
+  }
 }
 
 template <int dim, int qdim>

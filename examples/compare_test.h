@@ -20,6 +20,7 @@
 #include "pgd/sn/inner_products.h"
 #include "pgd/sn/fission_source_p.h"
 #include "pgd/sn/energy_mg_fiss.h"
+#include "pgd/sn/eigen_gs.h"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -635,30 +636,6 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     pgd::sn::FissionSourceP fission_source_p(
       problem.fixed_source, problem.fission, mgxs_pseudo, mgxs_one);
     pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
-    if (do_eigenvalue) {
-      double k0 = 0;
-      double k1 = 1;
-      std::vector<pgd::sn::InnerProducts> coefficients;
-      coefficients.emplace_back(num_materials, 1);
-      std::vector<double> _;
-      fission_source_p.enrich(0);
-      energy_fiss.enrich(0);
-      while (std::abs(k1 - k0) > 1e-6) {
-      // for (int i = 0; i < 100; ++i) {
-        coefficients[0] = 0;
-        fission_source_p.get_inner_products(coefficients, _);
-        for (int j = 0; j < num_materials; ++j)
-          coefficients[0].fission[j] = coefficients[0].scattering[j][0];
-        double foo = energy_fiss.step_eigenvalue(coefficients[0]);
-        std::cout << "k-energy: " << foo << std::endl;
-        coefficients[0] = 0;
-        energy_fiss.get_inner_products(coefficients, _);
-        k0 = k1;
-        k1 = fission_source_p.step_eigenvalue(coefficients[0]);
-        std::cout << "k-spaceangle: " << k1 << std::endl;
-      }
-      return;
-    }
     const std::string filename_pgd = this->GetTestName() + "_pgd.h5";
     if (precomputed_pgd) {
       // read from file
@@ -674,15 +651,24 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       }
     } else {
       // run pgd
-      std::vector<pgd::sn::LinearInterface*> linear_ops = 
-          {&energy_mg, &fixed_source_p};
-      pgd::sn::NonlinearGS nonlinear_gs(
-          linear_ops, num_materials, 1, num_sources);
+      std::vector<pgd::sn::LinearInterface*> linear_ops;
+      std::unique_ptr<pgd::sn::NonlinearGS> nonlinear_gs;
+      if (do_eigenvalue) {
+        linear_ops = {&energy_fiss, &fission_source_p};
+        nonlinear_gs =
+            std::make_unique<pgd::sn::EigenGS>(linear_ops, num_materials, 1);
+        auto eigen_gs = dynamic_cast<pgd::sn::EigenGS*>(nonlinear_gs.get());
+        eigen_gs->initialize_guess();
+      } else {
+        linear_ops = {&energy_mg, &fixed_source_p};
+        nonlinear_gs = std::make_unique<pgd::sn::NonlinearGS>(
+            linear_ops, num_materials, 1, num_sources);
+      }
       std::vector<int> unconverged;
       std::vector<double> residuals;
       std::cout << "run pgd\n";
-      RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-            do_update, unconverged, residuals);
+      RunPgd(*nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
+             do_update, unconverged, residuals);
       std::cout << "done running pgd\n";
       std::ofstream unconverged_txt;
       unconverged_txt.open(this->GetTestName()+"_unconverged.txt", 

@@ -12,7 +12,7 @@ FissionSourceP<dim, qdim>::FissionSourceP(
 
 template <int dim, int qdim>
 double FissionSourceP<dim, qdim>::step_eigenvalue(InnerProducts &coefficients) {
-  this->set_cross_sections(coefficients);
+  FixedSourceP<dim, qdim>::set_cross_sections(coefficients);
   for (int j = 0; j < coefficients.fission.size(); ++j) {
     this->mgxs_pseudo.nu_fission[0][j] = 
         coefficients.fission[j] / coefficients.streaming;
@@ -47,7 +47,68 @@ double FissionSourceP<dim, qdim>::step_eigenvalue(InnerProducts &coefficients) {
   }
   for (int i = 0; i < eigenvectors[0].size(); ++i)
     this->caches.back().mode[i] = eigenvectors[0][i];
+  this->eigenvalue = eigenvalues[0];
   return eigenvalues[0];
+}
+
+template <int dim, int qdim>
+void FissionSourceP<dim, qdim>::set_cross_sections(
+    const InnerProducts &coefficients) {
+  FixedSourceP<dim, qdim>::set_cross_sections(coefficients);
+  const int num_groups = this->mgxs.total.size();
+  const int num_materials = this->mgxs.total[0].size();
+  for (int g = 0; g < num_groups; ++g) {
+    for (int gp = 0; gp < num_groups; ++gp) {
+      for (int j = 0; j < num_materials; ++j) {
+        this->mgxs_pseudo.scatter[g][gp][j] += this->mgxs.chi[g][j]
+                                               * this->mgxs.nu_fission[gp][j]
+                                               * coefficients.fission[j]
+                                               / this->eigenvalue
+                                               / coefficients.streaming;
+      }
+    }
+  }
+}
+
+template <int dim, int qdim>
+void FissionSourceP<dim, qdim>::subtract_modes_from_source(
+    dealii::BlockVector<double> &source,
+    std::vector<InnerProducts> coefficients) {
+  FixedSourceP<dim, qdim>::subtract_modes_from_source(source, coefficients);
+  const int num_groups = this->fixed_source.within_groups.size();
+  const auto &transport = 
+      this->fixed_source.within_groups[0].transport.transport;
+  std::vector<dealii::types::global_dof_index> dof_indices(
+      transport.dof_handler.get_fe().dofs_per_cell);
+  for (int m = 0; m < this->caches.size() - 1; ++m) {
+    dealii::Vector<double> produced(transport.dof_handler.n_dofs());
+    for (int gp = 0; gp < num_groups; ++gp) {
+      for (auto cell = transport.dof_handler.begin_active();
+           cell != transport.dof_handler.end(); ++cell) {
+        cell->get_dof_indices(dof_indices);
+        int material = cell->material_id();
+        for (int i = 0; i < dof_indices.size(); ++i) {
+          produced[dof_indices[i]] -= 
+              this->mgxs.nu_fission[gp][material] 
+              * coefficients[m].fission[material]
+              * this->caches[m].moments.block(gp)[dof_indices[i]];
+        }
+      }
+    }
+    for (int g = 0; g < num_groups; ++g) {
+      dealii::Vector<double> emitted(produced);
+      for (auto cell = transport.dof_handler.begin_active();
+           cell != transport.dof_handler.end(); ++cell) {
+        cell->get_dof_indices(dof_indices);
+        int material = cell->material_id();
+        for (int i = 0; i < dof_indices.size(); ++i) {
+          emitted[dof_indices[i]] *= this->mgxs.chi[g][material] 
+                                     / this->eigenvalue;
+        }
+      }
+      this->fixed_source.m2d.vmult_add(source.block(g), emitted);
+    }
+  }
 }
 
 template class FissionSourceP<1>;

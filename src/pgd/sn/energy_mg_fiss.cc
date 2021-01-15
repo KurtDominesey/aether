@@ -71,18 +71,23 @@ double EnergyMgFiss::update(
   // dealii::SparseMatrix<double> fission_sp(pattern_fission);
   // slowing_sp.copy_from(slowing);
   // fission_sp.copy_from(fission);
-  dealii::IterationNumberControl control(50, 1e-6);
+  dealii::IterationNumberControl control(500, 1e-6);
   dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
-  eigensolver.set_initial_space(eigenvectors);
+  if (eigenvectors[0].l2_norm() > 0)
+    eigensolver.set_initial_space(eigenvectors);
   std::vector<double> eigenvalues;
   eigensolver.solve(fission, slowing, eigenvalues, eigenvectors);
   if (eigenvalues[0] < 0) {
     eigenvalues[0] *= -1;
     eigenvectors[0] *= -1;
   }
-  for (int i = 0; i < eigenvectors[0].size(); ++i)
-    modes.back()[i] = eigenvectors[0][i];
+  for (int m = 0, i = 0; m < this->modes.size(); ++m) {
+    for (int g = 0; g < num_groups; ++g, ++i) {
+      modes[m][g] = eigenvectors[0][i];
+    }
+  }
   std::cout << "k-updatestep: " << eigenvalues[0] << "\n";
+  this->eigenvalue = eigenvalues[0];
   return eigenvalues[0];
 }
 
@@ -90,6 +95,40 @@ void EnergyMgFiss::update(
     std::vector<std::vector<InnerProducts>> coefficients_x,
     std::vector<std::vector<double>> coefficients_b) {
   update(coefficients_x);
+}
+
+void EnergyMgFiss::set_matrix(InnerProducts coefficients) {
+  EnergyMgFull::set_matrix(coefficients);
+  const int num_groups = this->mgxs.total.size();
+  for (int g = 0; g < num_groups; ++g) {
+    for (int gp = 0; gp < num_groups; ++gp) {
+      for (int j = 0; j < this->mgxs.total[g].size(); ++j) {
+        this->matrix[g][gp] += this->mgxs.chi[g][j]
+                               * this->mgxs.nu_fission[gp][j]
+                               * coefficients.fission[j]
+                               / this->eigenvalue;
+      }
+    }
+  }
+}
+
+void EnergyMgFiss::set_source(std::vector<double> coefficients_b, 
+                              std::vector<InnerProducts> coefficients_x) {
+  EnergyMgFull::set_source(coefficients_b, coefficients_x);
+  AssertDimension(coefficients_x.size(), modes.size() - 1);
+  for (int m = 0; m < coefficients_x.size(); ++m) {
+    for (int g = 0; g < this->mgxs.total.size(); ++g) {
+      for (int gp = 0; gp < this->mgxs.total.size(); ++gp) {
+        for (int j = 0; j < this->mgxs.total[g].size(); ++j) {
+          source[g] -= this->mgxs.chi[g][j]
+                        * this->mgxs.nu_fission[gp][j]
+                        * coefficients_x[m].fission[j]
+                        * modes[m][gp]
+                        / this->eigenvalue;
+        }
+      }
+    }
+  }
 }
 
 }

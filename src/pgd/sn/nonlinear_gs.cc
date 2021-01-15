@@ -438,7 +438,21 @@ void NonlinearGS::finalize() {
   }
 }
 
-void NonlinearGS::update() {
+void NonlinearGS::unfinalize() {
+  const int num_modes = inner_products_x[0].size();
+  for (int i = 0; i < linear_ops.size(); ++i) {
+    inner_products_all_x[i].pop_back();
+    inner_products_all_b[i].pop_back();
+    AssertDimension(inner_products_all_x[i].size(), num_modes-1);
+    AssertDimension(inner_products_all_b[i].size(), num_modes-1);
+    for (int m_row = 0; m_row < num_modes - 1; ++m_row) {
+      inner_products_all_x[i][m_row].pop_back();
+      AssertDimension(inner_products_all_x[i][m_row].size(), num_modes-1);
+    }
+  }
+}
+
+double NonlinearGS::update() {
   const int num_modes = inner_products_x[0].size();
   const int num_sources = inner_products_b[0].size();
   for (int i = 0; i < linear_ops.size(); ++i) {
@@ -461,6 +475,7 @@ void NonlinearGS::update() {
     }
     updatable->update(coefficients_x, coefficients_b);
   }
+  return 0;
 }
 
 void NonlinearGS::reweight() {

@@ -22,13 +22,14 @@ class NonlinearGS {
               const dealii::BlockVector<double> b,
               const bool should_normalize = true,
               const bool should_line_search = false);
-  void update();
+  virtual double update();
   void reweight();
   void vmult(dealii::BlockVector<double> dst,
              const dealii::BlockVector<double> src);
   void enrich();
   void set_inner_products();
   void finalize();
+  void unfinalize();
   std::vector<std::vector<InnerProducts>> inner_products_x;
   std::vector<std::vector<double>> inner_products_b;
   std::vector<std::vector<std::vector<InnerProducts>>> inner_products_all_x;

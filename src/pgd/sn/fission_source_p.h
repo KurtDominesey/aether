@@ -5,6 +5,7 @@
 #include <deal.II/lac/slepc_solver.h>
 
 #include "pgd/sn/fixed_source_p.h"
+#include "pgd/sn/eigen_interface.h"
 #include "sn/fixed_source.h"
 #include "sn/fission.h"
 #include "base/petsc_block_block_wrapper.h"
@@ -12,7 +13,7 @@
 namespace aether::pgd::sn {
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
-class FissionSourceP : public FixedSourceP<dim, qdim> {
+class FissionSourceP : public FixedSourceP<dim, qdim>, public EigenInterface {
  public:
   std::vector<dealii::BlockVector<double>> zero_sources;
   FissionSourceP(aether::sn::FixedSource<dim, qdim> &fixed_source,
@@ -25,6 +26,11 @@ class FissionSourceP : public FixedSourceP<dim, qdim> {
   //             std::vector<double> coefficients_b,
   //             double omega = 1.0);
  aether::sn::Fission<dim, qdim> &fission;
+ protected:
+  void set_cross_sections(const InnerProducts &coefficients_x) override;
+  void subtract_modes_from_source(
+      dealii::BlockVector<double> &source,
+      std::vector<InnerProducts> coefficients_x) override;
 };
 
 }  // namespace aether::pgd::sn

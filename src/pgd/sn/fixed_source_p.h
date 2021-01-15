@@ -81,13 +81,14 @@ class FixedSourceP : public LinearInterface {
   const Mgxs &mgxs;
   Mgxs &mgxs_pseudo;
   void set_last_cache();
-  void set_cross_sections(const InnerProducts &coefficients_x);
+  virtual void set_cross_sections(const InnerProducts &coefficients_x);
   void get_source(dealii::BlockVector<double> &source,
                   const std::vector<InnerProducts> &coefficients_x,
                   const std::vector<double> &coefficients_b,
                   double denominator);
-  void subtract_modes_from_source(dealii::BlockVector<double> &source,
-                                  std::vector<InnerProducts> coefficients_x);
+  virtual void subtract_modes_from_source(
+      dealii::BlockVector<double> &source,
+      std::vector<InnerProducts> coefficients_x);
   void get_inner_products_x(std::vector<InnerProducts> &inner_products,
                             const int m_row, const int m_col_start);
   void get_inner_products_b(std::vector<double> &inner_products, 

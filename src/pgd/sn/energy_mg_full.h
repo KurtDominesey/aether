@@ -65,9 +65,9 @@ class EnergyMgFull : public LinearUpdatableInterface {
  protected:
   dealii::FullMatrix<double> matrix;
   dealii::Vector<double> source;
-  void set_matrix(InnerProducts coefficients_x);
-  void set_source(std::vector<double> coefficients_b, 
-                  std::vector<InnerProducts> coefficients_x);
+  virtual void set_matrix(InnerProducts coefficients_x);
+  virtual void set_source(std::vector<double> coefficients_b, 
+                          std::vector<InnerProducts> coefficients_x);
 };
 
 }
