@@ -52,7 +52,7 @@ TEST_P(PgdTransport1DTest, VoidSource) {
   dealii::BlockVector<double> flux_streamed(flux.get_block_indices());
   dealii::BlockVector<double> source_collided(flux.get_block_indices());
   transport.stream(flux_streamed, flux, boundary_conditions);
-  transport.collide(source_collided, source);
+  transport.vmult_mass(source_collided, source);
   for (int n = 0; n < quadrature.size(); ++n) {
     double sum_flux_streamed = 0;
     double sum_source_collided = 0;
@@ -92,7 +92,7 @@ TEST_P(PgdTransport1DTest, Attenuation) {
     dealii::BlockVector<double> streamed(flux.get_block_indices());
     dealii::BlockVector<double> collided(flux.get_block_indices());
     transport.stream(streamed, flux, boundary_conditions);
-    transport.collide(collided, flux);
+    transport.vmult_mass(collided, flux);
     for (int n = 0; n < quadrature.size(); ++n) {
       double sum_streamed = 0;
       double sum_collided = 0;

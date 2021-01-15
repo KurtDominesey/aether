@@ -179,7 +179,7 @@ void FixedSourceP<dim, qdim>::get_inner_products_b(
       dealii::BlockVector<double> collided_g(transport.get_block_indices());
       mode_g = left.block(g);
       source_g = sources[i].block(g);
-      transport.collide(collided_g, source_g);
+      transport.vmult_mass(collided_g, source_g);
       for (int n = 0; n < transport.quadrature.size(); ++n)
         inner_products[i] += transport.quadrature.weight(n) 
                              * (mode_g.block(n) * collided_g.block(n));
