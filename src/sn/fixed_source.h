@@ -8,6 +8,7 @@
 
 namespace aether::pgd::sn {
 template <int dim, int qdim> class FixedSourceP;
+template <int dim, int qdim> class FixedSourceS;
 }
 
 namespace aether::sn {
@@ -70,6 +71,7 @@ class FixedSource {
   //! Discrete to moment operator, \f$D\f$
   const DiscreteToMoment<dim, qdim> &d2m;
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
+  friend class aether::pgd::sn::FixedSourceS<dim, qdim>;
   template <class SolverType, int dimm, int qdimm>
   friend class FixedSourceGS;
 };

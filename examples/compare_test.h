@@ -21,6 +21,7 @@
 #include "pgd/sn/fission_source_p.h"
 #include "pgd/sn/energy_mg_fiss.h"
 #include "pgd/sn/eigen_gs.h"
+#include "pgd/sn/fixed_source_s_problem.h"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -690,6 +691,53 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
     for (int m = 0; m < num_modes; ++m)
       modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
+    if (true) {
+      const int num_modes_s = num_modes;
+      pgd::sn::FixedSourceSProblem<dim, qdim> subspace_problem(
+          dof_handler, quadrature, mgxs_one, boundary_conditions, num_modes_s);
+      std::vector<std::vector<pgd::sn::InnerProducts>> inner_products_x( 
+          num_modes_s, std::vector<pgd::sn::InnerProducts>(
+            num_modes_s, pgd::sn::InnerProducts(num_materials, 1)));
+      std::vector<std::vector<double>> inner_products_b(num_modes_s,
+          std::vector<double>(num_sources));
+      for (int m = 0; m < num_modes_s; ++m) {
+        energy_mg.get_inner_products(
+            inner_products_x[m], inner_products_b[m], m, 0);
+      }
+      dealii::BlockVector<double> modes(
+          num_modes_s, quadrature.size()*dof_handler.n_dofs());
+      dealii::BlockVector<double> operated(modes);
+      dealii::BlockVector<double> source(modes);
+      dealii::BlockVector<double> uncollided(modes);
+      dealii::Vector<double> scratch(source.block(0));
+      dealii::Vector<double> dual(source.block(0));
+      for (int m = 0; m < num_modes_s; ++m) {
+        modes.block(m) = fixed_source_p.caches[m].mode.block(0);
+        for (int s = 0; s < num_sources; ++s) {
+          scratch = sources_spaceangle[s];
+          problem.transport.vmult_mass(dual, scratch);
+          source.block(m).add(inner_products_b[m][s], dual);
+        }
+      }
+      subspace_problem.set_cross_sections(inner_products_x);
+      // subspace_problem.sweep_source(uncollided, source);
+      // dealii::IterationNumberControl control(5, 1e-10);
+      // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+      // solver.connect([](const unsigned int iteration,
+      //                   const double check_value,
+      //                   const dealii::BlockVector<double>&) {
+      //   std::cout << iteration << ": " << check_value << std::endl;
+      //   return dealii::SolverControl::success;
+      // });
+      // solver.solve(subspace_problem.fixed_source_s, modes, source, 
+      //              dealii::PreconditionIdentity());
+      subspace_problem.fixed_source_s.vmult(operated, modes);
+      std::cout << "operated: " << operated.l2_norm() << std::endl;
+      std::cout << "source: " << source.l2_norm() << std::endl;
+      source -= operated;
+      std::cout << "residual: " << source.l2_norm() << std::endl;
+      return;
+    }
     dealii::ConvergenceTable table;
     std::vector<double> l2_errors_svd_d(num_svecs+1);
     std::vector<double> l2_errors_svd_m(num_svecs+1);
