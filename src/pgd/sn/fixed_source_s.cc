@@ -24,10 +24,8 @@ void FixedSourceS<dim, qdim>::vmult(
   AssertDimension(dst.block(0).size(), num_ordinates*num_dofs);
   dealii::BlockVector<double> src_lm(num_modes*num_groups, num_dofs);
   dealii::Vector<double> transferred_lm(num_dofs);
-  dealii::Vector<double> transferred(num_ordinates*num_dofs);
-  dealii::Vector<double> transferred_dual(num_ordinates*num_dofs);
-  dealii::Vector<double> transported(num_ordinates*num_dofs);
   dealii::Vector<double> streamed(num_ordinates*num_dofs);
+  dealii::Vector<double> collided(num_ordinates*num_dofs);
   dst = 0;
   dealii::Vector<double> src_dual_mg(src.block(0).size());
   for (int m = 0, mg = 0; m < num_modes; ++m) {
@@ -38,7 +36,8 @@ void FixedSourceS<dim, qdim>::vmult(
   for (int m = 0, mg = 0; m < num_modes; ++m) {
     for (int g = 0; g < num_groups; ++g, ++mg) {
       transferred_lm = 0;
-      transferred = 0;
+      streamed = 0;
+      collided = 0;
       for (int mp = 0; mp < num_modes; ++mp) {
         int mpg = mp * num_groups + g;
         for (int down = 0; down < blocks[m][mp].upscattering[g].size(); ++down)
@@ -49,20 +48,21 @@ void FixedSourceS<dim, qdim>::vmult(
               transferred_lm, src_lm.block(mpg-1-up));
         blocks[m][mp].within_groups[g].scattering.vmult_add(
             transferred_lm, src_lm.block(mpg));
-        
-        const auto &transport = dynamic_cast<const TransportBlock<dim, qdim>&>(
-            blocks[m][mp].within_groups[g].transport);
-        streamed = 0;
-        transport.stream(streamed, src.block(mpg));
-        streamed *= streaming[m][mp];
-        transport.collide_add(streamed, src.block(mpg));
-        dst.block(mg) += streamed;
+        streamed.add(streaming[m][mp], src.block(mpg));
+        const auto &transport_block = 
+            dynamic_cast<const TransportBlock<dim, qdim>&>(
+              blocks[m][mp].within_groups[g].transport);
+        transport_block.collide_add(collided, src.block(mpg));
       }
-      m2d.vmult(transferred, transferred_lm);
-      const auto &transport = dynamic_cast<const Transport<dim, qdim>&>(
-          blocks[m][m].within_groups[g].transport.transport);
-      transport.vmult_mass(transferred_dual, transferred);
-      dst.block(mg) -= transferred_dual;
+      const auto &transport_block = 
+          dynamic_cast<const TransportBlock<dim, qdim>&>(
+              blocks[m][m].within_groups[g].transport);
+      transport_block.stream_add(dst.block(mg), streamed);
+      transferred_lm *= -1;
+      m2d.vmult_add(collided, transferred_lm);
+      const auto &transport = 
+          dynamic_cast<const Transport<dim, qdim>&>(transport_block.transport);
+      transport.vmult_mass_add(dst.block(mg), collided);
     }
   }
 }
