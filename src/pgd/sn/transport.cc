@@ -230,15 +230,12 @@ void Transport<dim, qdim>::collide_add(dealii::BlockVector<double> &dst,
        cell != this->dof_handler.end(); ++cell, ++c) {
     if (!cell->is_locally_owned())
       continue;
-    const dealii::FullMatrix<double> &mass= this->cell_matrices[c].mass;
     const double cross_section = cross_sections[cell->material_id()];
     cell->get_dof_indices(dof_indices);
     for (int n = 0; n < this->quadrature.size(); ++n) {
-      for (int i = 0; i < mass.n(); ++i) {
-        for (int j = 0; j < mass.m(); ++j) {
-          dst.block(n)[dof_indices[i]] += cross_section * mass[i][j] * 
-                                          src.block(n)[dof_indices[j]];
-        }
+      for (int i = 0; i < dof_indices.size(); ++i) {
+        dst.block(n)[dof_indices[i]] += 
+            cross_section * src.block(n)[dof_indices[i]];
       }
     }
   }
