@@ -9,6 +9,7 @@
 namespace aether::pgd::sn {
 template <int dim, int qdim> class FixedSourceP;
 template <int dim, int qdim> class FixedSourceS;
+template <int dim, int qdim> class FixedSourceSGS;
 }
 
 namespace aether::sn {
@@ -72,6 +73,7 @@ class FixedSource {
   const DiscreteToMoment<dim, qdim> &d2m;
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
   friend class aether::pgd::sn::FixedSourceS<dim, qdim>;
+  friend class aether::pgd::sn::FixedSourceSGS<dim, qdim>;
   template <class SolverType, int dimm, int qdimm>
   friend class FixedSourceGS;
 };

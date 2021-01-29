@@ -14,6 +14,7 @@
 #include "pgd/sn/transport.h"
 #include "pgd/sn/transport_block.h"
 #include "pgd/sn/fixed_source_s.h"
+#include "pgd/sn/fixed_source_s_gs.h"
 
 namespace aether::pgd::sn {
 
@@ -60,6 +61,7 @@ class FixedSourceSProblem {
 
  public:
   FixedSourceS<dim, qdim> fixed_source_s;
+  FixedSourceSGS<dim, qdim> fixed_source_s_gs;
 };
 
 }  // namespace aether::pgd::sn
