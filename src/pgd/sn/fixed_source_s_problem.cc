@@ -66,13 +66,9 @@ void FixedSourceSProblem<dim, qdim>::set_cross_sections(
         for (int j = 0; j < num_materials; ++j) {
           mgxs_pseudo.total[g][j] = 
               mgxs.total[g][j] * coefficients[m][mp].collision[j];
-          // if (m == mp)
-          //   mgxs_pseudo.total[g][j] /= coefficients[m][mp].streaming;
           for (int gp = 0; gp < num_groups; ++gp) {
             mgxs_pseudo.scatter[g][gp][j] = 
                 mgxs.scatter[g][gp][j] * coefficients[m][mp].scattering[j][0];
-            // if (m == mp)
-            //   mgxs_pseudo.scatter[g][gp][j] /= coefficients[m][mp].streaming;
           }
         }
       }
