@@ -8,13 +8,15 @@
 #include "sn/emission.h"
 #include "sn/production.h"
 #include "sn/discrete_to_moment.h"
+#include "pgd/sn/transport.h"
 
 namespace aether::pgd::sn {
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FissionS {
  public:
-  FissionS(const aether::sn::MomentToDiscrete<dim, qdim> &m2d,
+  FissionS(const Transport<dim, qdim> &transport,
+           const aether::sn::MomentToDiscrete<dim, qdim> &m2d,
            const std::vector<std::vector<aether::sn::Emission<dim>>> &emission,
            const std::vector<std::vector<aether::sn::Production<dim>>> &production,
            const aether::sn::DiscreteToMoment<dim, qdim> &d2m);
@@ -22,6 +24,7 @@ class FissionS {
              const dealii::BlockVector<double> &src) const;
   
  protected:
+  const Transport<dim, qdim> &transport;
   const aether::sn::MomentToDiscrete<dim, qdim> &m2d;
   const std::vector<std::vector<aether::sn::Emission<dim>>> &emission;
   const std::vector<std::vector<aether::sn::Production<dim>>> &production;

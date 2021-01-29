@@ -14,7 +14,7 @@ FissionSProblem<dim, qdim>::FissionSProblem(
                                      num_modes),
       emission(num_modes),
       production(num_modes),
-      fission_s(this->m2d, emission, production, this->d2m) {
+      fission_s(this->transport, this->m2d, emission, production, this->d2m) {
   const int num_groups = mgxs.total.size();
   const int num_materials = mgxs.total[0].size();
   for (int m = 0; m < num_modes; ++m) {
