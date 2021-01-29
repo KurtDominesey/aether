@@ -65,20 +65,16 @@ void FixedSourceSGS<dim, qdim>::vmult(
   dealii::BlockVector<double> dst_lm(num_modes*num_groups, num_dofs);
   dealii::Vector<double> uncollided(num_qdofs);
   dealii::Vector<double> operated(num_qdofs);
-  dealii::Vector<double> instream(num_qdofs);
   dealii::Vector<double> streamed(num_qdofs);
-  dealii::Vector<double> collided(num_qdofs);
+  dealii::Vector<double> mass_inv(num_qdofs);
   dealii::Vector<double> scattered(num_dofs);
   dealii::IterationNumberControl control(10, 0);
   dealii::SolverRichardson<dealii::Vector<double>> solver(control);
   for (int m = 0, mg = 0; m < num_modes; ++m) {
     for (int g = 0; g < num_groups; ++g, ++mg) {
       operated = 0;
-      instream = 0;
       scattered = 0;
-      collided = 0;
       streamed = 0;
-      uncollided = 0;
       for (int mp = 0; mp <= m; ++mp) {
         int mpg = mp * num_groups + g;
         for (int up = 0; up < blocks[m][mp].downscattering[g].size(); ++up)
@@ -91,28 +87,27 @@ void FixedSourceSGS<dim, qdim>::vmult(
               scattered, dst_lm.block(mpg+1+down));
         blocks[m][mp].within_groups[g].scattering.vmult_add(
             scattered, dst_lm.block(mpg));
-        instream.add(streaming[m][mp], dst.block(mpg));
+        streamed.add(streaming[m][mp], dst.block(mpg));
         const auto &transport_block = 
             dynamic_cast<const TransportBlock<dim, qdim>&>(
               blocks[m][mp].within_groups[g].transport);
-        transport_block.collide_add(collided, dst.block(mpg));
+        transport_block.collide_add(operated, dst.block(mpg));
       }
       scattered *= -1;
-      m2d.vmult_add(collided, scattered);
+      m2d.vmult_add(operated, scattered);
       const auto &transport_block = 
           dynamic_cast<const TransportBlock<dim, qdim>&>(
               blocks[m][m].within_groups[g].transport);
-      transport_block.stream_add(operated, instream);
+      mass_inv = src.block(mg);
+      streamed *= -1;
+      transport_block.stream_add(mass_inv, streamed);
       const auto &transport = 
           dynamic_cast<const Transport<dim, qdim>&>(transport_block.transport);
-      transport.vmult_mass_add(operated, collided);
+      transport.vmult_mass_inv(mass_inv);
       operated *= -1;
-      operated += src.block(mg);
-      transport.vmult_mass_inv(operated);
+      operated += mass_inv;
       uncollided = 0;
       within_groups[m][g].transport.vmult(uncollided, operated);
-      // uncollided *= -1;
-      // uncollided += src.block(mg);
       uncollided /= streaming[m][m];
       solver.solve(within_groups[m][g], dst.block(mg), uncollided,
                    dealii::PreconditionIdentity());
