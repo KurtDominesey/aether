@@ -28,6 +28,8 @@ struct Mgxs {
         nu_fission(num_groups, std::vector<double>(num_materials)),
         scatter(num_groups, std::vector<std::vector<double>>(
                 num_groups, std::vector<double>(num_materials*num_legendre))) {}
+  //! Deep-copy operator
+  Mgxs& operator=(const Mgxs& other);
   //! Group boundaries in eV (electron volts).
   std::vector<double> group_structure;
   //! Total cross-sections by group and material.

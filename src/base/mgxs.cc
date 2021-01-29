@@ -2,6 +2,14 @@
 
 namespace aether {
 
+Mgxs& Mgxs::operator=(const Mgxs &other) {
+  group_structure = other.group_structure;
+  total = other.total;
+  chi = other.chi;
+  nu_fission = other.nu_fission;
+  scatter = other.scatter;
+}
+
 Mgxs read_mgxs(
     const std::string &filename, 
     const std::string &temperature,
