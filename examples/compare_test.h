@@ -8,10 +8,13 @@
 #include <deal.II/lac/petsc_vector.h>
 #include <deal.II/lac/slepc_solver.h>
 #include <deal.II/lac/eigen.h>
+#include <deal.II/lac/vector_operation.h>
+#include <deal.II/lac/petsc_precondition.h>
 
 #include "example_test.h"
 
 #include "base/petsc_block_block_wrapper.h"
+#include "base/petsc_block_wrapper.h"
 #include "base/stagnation_control.h"
 #include "base/lapack_full_matrix.h"
 #include "sn/fixed_source_problem.h"
@@ -22,6 +25,7 @@
 #include "pgd/sn/energy_mg_fiss.h"
 #include "pgd/sn/eigen_gs.h"
 #include "pgd/sn/fixed_source_s_problem.h"
+#include "pgd/sn/fission_s_problem.h"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -693,7 +697,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
     if (true) {
       const int num_modes_s = num_modes;
-      pgd::sn::FixedSourceSProblem<dim, qdim> subspace_problem(
+      pgd::sn::FissionSProblem<dim, qdim> subspace_problem(
           dof_handler, quadrature, mgxs_one, boundary_conditions, num_modes_s);
       std::vector<std::vector<pgd::sn::InnerProducts>> inner_products_x( 
           num_modes_s, std::vector<pgd::sn::InnerProducts>(
@@ -708,7 +712,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           num_modes_s, quadrature.size()*dof_handler.n_dofs());
       dealii::BlockVector<double> operated(modes);
       dealii::BlockVector<double> source(modes);
-      dealii::BlockVector<double> uncollided(modes);
+      dealii::BlockVector<double> ax(modes);
+      dealii::BlockVector<double> bx(modes);
       dealii::Vector<double> scratch(source.block(0));
       dealii::Vector<double> dual(source.block(0));
       for (int m = 0; m < num_modes_s; ++m) {
@@ -720,22 +725,71 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         }
       }
       subspace_problem.set_cross_sections(inner_products_x);
-      // subspace_problem.sweep_source(uncollided, source);
-      // dealii::IterationNumberControl control(5, 1e-10);
-      // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
-      // solver.connect([](const unsigned int iteration,
-      //                   const double check_value,
-      //                   const dealii::BlockVector<double>&) {
-      //   std::cout << iteration << ": " << check_value << std::endl;
-      //   return dealii::SolverControl::success;
-      // });
-      // solver.solve(subspace_problem.fixed_source_s, modes, source, 
-      //              dealii::PreconditionIdentity());
-      subspace_problem.fixed_source_s.vmult(operated, modes);
-      std::cout << "operated: " << operated.l2_norm() << std::endl;
-      std::cout << "source: " << source.l2_norm() << std::endl;
-      source -= operated;
-      std::cout << "residual: " << source.l2_norm() << std::endl;
+      if (true) {
+        dealii::IterationNumberControl control(10, 1e-6);
+        dealii::SolverGMRES<dealii::BlockVector<double>> solver(control);
+        solver.connect([](const unsigned int iteration,
+                          const double check_value,
+                          const dealii::BlockVector<double>&) {
+          std::cout << iteration << ": " << check_value << std::endl;
+          return dealii::SolverControl::success;
+        });
+        std::cout << "modes: " << modes.l2_norm() << std::endl;
+        solver.solve(subspace_problem.fixed_source_s, modes, source, 
+                     subspace_problem.fixed_source_s_gs
+                    //  dealii::PreconditionIdentity()
+                     );
+        std::cout << "modes: " << modes.l2_norm() << std::endl;
+        subspace_problem.fixed_source_s.vmult(operated, modes);
+        std::cout << "operated: " << operated.l2_norm() << std::endl;
+        std::cout << "source: " << source.l2_norm() << std::endl;
+        source -= operated;
+        std::cout << "source: " << source.l2_norm() << std::endl;
+      } else {
+        subspace_problem.fixed_source_s.vmult(bx, modes);
+        subspace_problem.fission_s.vmult(ax, modes);
+        const double rayleigh = (modes * ax) / (modes * bx);
+        std::cout << "rayleigh quotient: " << rayleigh << std::endl;
+        const int num_qdofs = quadrature.size() * dof_handler.n_dofs();
+        ::aether::PETScWrappers::BlockWrapper fixed_source_s(
+            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs,
+            subspace_problem.fixed_source_s);
+        ::aether::PETScWrappers::BlockWrapper fission_s(
+            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs, 
+            subspace_problem.fission_s);
+        const int size = num_modes_s * num_qdofs;
+        std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+        eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+        eigenvectors[0].compress(dealii::VectorOperation::insert);
+        const double norm = modes.l2_norm();
+        for (int i = 0; i < size; ++i)
+          eigenvectors[0][i] = modes[i] / norm;
+        eigenvectors[0].compress(dealii::VectorOperation::insert);
+        std::vector<double> eigenvalues = {1.0};
+        dealii::IterationNumberControl control(500, 1e-3);
+        dealii::SLEPcWrappers::SolverKrylovSchur eigensolver(control);
+        eigensolver.set_initial_space(eigenvectors);
+        eigensolver.set_target_eigenvalue(rayleigh);
+        // shift and invert
+        using Shift 
+            = dealii::SLEPcWrappers::TransformationShiftInvert::AdditionalData;
+        dealii::SLEPcWrappers::TransformationShiftInvert shift_invert(
+            MPI_COMM_WORLD, Shift(rayleigh));
+        shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
+        dealii::IterationNumberControl control_inv(10, 1e-6);
+        dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
+        dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source_s);
+        solver_inv.initialize(preconditioner);
+        shift_invert.set_solver(solver_inv);
+        eigensolver.set_transformation(shift_invert);
+        try {
+          std::cout << "to solve\n";
+          eigensolver.solve(fission_s, fixed_source_s, eigenvalues, eigenvectors);
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+        }
+        std::cout << "k-eigenvalue: " << eigenvalues[0] << std::endl;
+      }
       return;
     }
     dealii::ConvergenceTable table;
