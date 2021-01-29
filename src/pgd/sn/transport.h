@@ -34,6 +34,8 @@ class Transport : public aether::sn::Transport<dim, qdim> {
                       const dealii::Vector<double> &src) const;
   void vmult_mass_add(dealii::BlockVector<double> &dst,
                       const dealii::BlockVector<double> &src) const;
+  void vmult_mass_inv(dealii::Vector<double> &dst) const;
+  void vmult_mass_inv(dealii::BlockVector<double> &dst) const;
   void collide(dealii::Vector<double> &dst,
                const dealii::Vector<double> &src,
                const std::vector<double> &cross_sections) const;

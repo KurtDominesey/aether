@@ -55,6 +55,15 @@ void Transport<dim, qdim>::vmult_mass_add(
 }
 
 template <int dim, int qdim>
+void Transport<dim, qdim>::vmult_mass_inv(dealii::Vector<double> &dst) const {
+  dealii::BlockVector<double> dst_b(this->quadrature.size(), 
+                                    this->dof_handler.n_dofs());
+  dst_b = dst;
+  vmult_mass_inv(dst_b);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void Transport<dim, qdim>::collide(
       dealii::Vector<double> &dst,
       const dealii::Vector<double> &src,
@@ -202,6 +211,35 @@ void Transport<dim, qdim>::vmult_mass_add(
         for (int j = 0; j < mass.m(); ++j) {
           dst.block(n)[dof_indices[i]] += mass[i][j] * 
                                           src.block(n)[dof_indices[j]];
+        }
+      }
+    }
+  }
+}
+
+template <int dim, int qdim>
+void Transport<dim, qdim>::vmult_mass_inv(
+    dealii::BlockVector<double> &dst) const {
+  std::vector<dealii::types::global_dof_index> dof_indices(
+      this->dof_handler.get_fe().dofs_per_cell);
+  using ActiveCell = typename dealii::DoFHandler<dim>::active_cell_iterator;
+  int c = 0;
+  dealii::Vector<double> src_cell(dof_indices.size());
+  for (ActiveCell cell = this->dof_handler.begin_active();
+       cell != this->dof_handler.end(); ++cell, ++c) {
+    if (!cell->is_locally_owned())
+      continue;
+    dealii::FullMatrix<double> mass_inv(this->cell_matrices[c].mass);
+    mass_inv.gauss_jordan();
+    cell->get_dof_indices(dof_indices);
+    for (int n = 0; n < this->quadrature.size(); ++n) {
+      for (int i = 0; i < dof_indices.size(); ++i) {
+        src_cell[i] = dst.block(n)[dof_indices[i]];
+        dst.block(n)[dof_indices[i]] = 0;
+      }
+      for (int i = 0; i < mass_inv.n(); ++i) {
+        for (int j = 0; j < mass_inv.m(); ++j) {
+          dst.block(n)[dof_indices[i]] += mass_inv[i][j] * src_cell[j];
         }
       }
     }
