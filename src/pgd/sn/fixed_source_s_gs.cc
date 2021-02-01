@@ -6,24 +6,47 @@ template <int dim, int qdim>
 FixedSourceSGS<dim, qdim>::FixedSourceSGS(
     const Transport<dim, qdim> &transport,
     const aether::sn::Scattering<dim> &scattering,
-    const aether::sn::MomentToDiscrete<dim, qdim> &m2d,
-    const aether::sn::DiscreteToMoment<dim, qdim> &d2m,
-    const std::vector<std::vector<aether::sn::FixedSource<dim, qdim>>> &blocks,
+    aether::sn::MomentToDiscrete<dim, qdim> &m2d,
+    aether::sn::DiscreteToMoment<dim, qdim> &d2m,
     const std::vector<std::vector<double>> &streaming,
     const Mgxs &mgxs,
     const std::vector<std::vector<dealii::BlockVector<double>>>
       &boundary_conditions) 
-    : m2d(m2d), d2m(d2m), blocks(blocks), streaming(streaming), 
-      within_groups(blocks.size()), mgxs_wg(blocks.size(), mgxs) {
-  const int num_modes = mgxs_wg.size();
-  const int num_groups = mgxs_wg[0].total.size();
+    : m2d(m2d), 
+      d2m(d2m), 
+      streaming(streaming),
+      within_groups(streaming.size()),
+      downscattering(streaming.size()),
+      upscattering(streaming.size()),
+      mgxs_pseudos(streaming.size()),
+      blocks(streaming.size()) {
+  const int num_modes = streaming.size();
+  const int num_groups = mgxs.total.size();
   for (int m = 0; m < num_modes; ++m) {
-    for (int g = 0; g < num_groups; ++g) {
-      auto transport_wg = std::make_shared<TransportBlock<dim, qdim>>(
-          transport, mgxs_wg[m].total[g], boundary_conditions[g]);
-      auto scattering_wg = std::make_shared<aether::sn::ScatteringBlock<dim>>(
-          scattering, mgxs_wg[m].scatter[g][g]);
-      within_groups[m].emplace_back(transport_wg, m2d, scattering_wg, d2m);
+    within_groups[m].resize(m+1);
+    downscattering[m] = std::vector<ScatteringTriangle>(m+1, 
+        ScatteringTriangle(mgxs.total.size()));
+    upscattering[m] = std::vector<ScatteringTriangle>(m+1, 
+        ScatteringTriangle(mgxs.total.size()));
+    mgxs_pseudos[m].resize(m+1, mgxs);
+    for (int mp = 0; mp <= m; ++mp) {
+      for (int g = 0; g < num_groups; ++g) {
+        auto transport_wg = std::make_shared<TransportBlock<dim, qdim>>(
+            transport, mgxs_pseudos[m][mp].total[g], boundary_conditions[g]);
+        auto scattering_wg = std::make_shared<aether::sn::ScatteringBlock<dim>>(
+            scattering, mgxs_pseudos[m][mp].scatter[g][g]);
+        within_groups[m][mp].emplace_back(transport_wg, m2d, scattering_wg, d2m);
+        for (int gp = g - 1; gp >= 0; --gp)  // from g' to g
+          downscattering[m][mp][g].emplace_back(
+              scattering, mgxs_pseudos[m][mp].scatter[g][gp]);
+        if (mp == m)
+          continue;  // no upscattering in diagonal blocks
+        for (int gp = g + 1; gp < num_groups; ++gp)  // from g' to g
+          upscattering[m][mp][g].emplace_back(
+              scattering, mgxs_pseudos[m][mp].scatter[g][gp]);
+      }
+      blocks[m].emplace_back(within_groups[m][mp], downscattering[m][mp], 
+                             upscattering[m][mp], m2d, d2m);
     }
   }
 }
@@ -35,15 +58,16 @@ void FixedSourceSGS<dim, qdim>::set_cross_sections(
   const int num_groups = mgxs[0][0].total.size();
   const int num_materials = mgxs[0][0].total[0].size();
   for (int m = 0; m < num_modes; ++m) {
-    mgxs_wg[m] = mgxs[m][m];
+    for (int mp = 0; mp <= m; ++mp)
+      mgxs_pseudos[m][mp] = mgxs[m][mp];
     for (int g = 0; g < num_groups; ++g) {
       for (int j = 0; j < num_materials; ++j) {
-        AssertThrow(mgxs_wg[m].total[g][j] == mgxs[m][m].total[g][j],
+        AssertThrow(mgxs_pseudos[m][m].total[g][j] == mgxs[m][m].total[g][j],
                     dealii::ExcInvalidState());
-        AssertThrow(mgxs_wg[m].scatter[g][g][j] == mgxs[m][m].scatter[g][g][j],
+        AssertThrow(mgxs_pseudos[m][m].scatter[g][g][j] == mgxs[m][m].scatter[g][g][j],
                     dealii::ExcInvalidState());
-        mgxs_wg[m].total[g][j] /= streaming[m][m];
-        mgxs_wg[m].scatter[g][g][j] /= streaming[m][m];
+        mgxs_pseudos[m][m].total[g][j] /= streaming[m][m];
+        mgxs_pseudos[m][m].scatter[g][g][j] /= streaming[m][m];
       }
     }
   }
@@ -107,9 +131,9 @@ void FixedSourceSGS<dim, qdim>::vmult(
       operated *= -1;
       operated += mass_inv;
       uncollided = 0;
-      within_groups[m][g].transport.vmult(uncollided, operated);
+      blocks[m][m].within_groups[g].transport.vmult(uncollided, operated);
       uncollided /= streaming[m][m];
-      solver.solve(within_groups[m][g], dst.block(mg), uncollided,
+      solver.solve(blocks[m][m].within_groups[g], dst.block(mg), uncollided,
                    dealii::PreconditionIdentity());
       d2m.vmult(dst_lm.block(mg), dst.block(mg));
     }
