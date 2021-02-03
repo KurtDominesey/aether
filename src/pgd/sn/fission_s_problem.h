@@ -3,6 +3,7 @@
 
 #include "pgd/sn/fixed_source_s_problem.h"
 #include "pgd/sn/fission_s.h"
+#include "pgd/sn/fission_s_gs.h"
 
 namespace aether::pgd::sn {
 
@@ -32,6 +33,7 @@ class FissionSProblem : public FixedSourceSProblem<dim, qdim> {
 
  public:
   FissionS<dim, qdim> fission_s;
+  FissionSGS<dim, qdim> fission_s_gs;
 };
 
 }

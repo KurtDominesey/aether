@@ -14,7 +14,9 @@ FissionSProblem<dim, qdim>::FissionSProblem(
                                      num_modes),
       emission(num_modes),
       production(num_modes),
-      fission_s(this->transport, this->m2d, emission, production, this->d2m) {
+      fission_s(this->transport, this->m2d, emission, production, this->d2m),
+      fission_s_gs(this->transport, this->scattering, this->m2d, this->d2m,
+                   this->fixed_source_s.streaming, mgxs, boundary_conditions) {
   const int num_groups = mgxs.total.size();
   const int num_materials = mgxs.total[0].size();
   for (int m = 0; m < num_modes; ++m) {
@@ -47,6 +49,7 @@ void FissionSProblem<dim, qdim>::set_cross_sections(
       }
     }
   }
+  fission_s_gs.set_cross_sections(this->mgxs_pseudos);
 }
 
 template class FissionSProblem<1>;
