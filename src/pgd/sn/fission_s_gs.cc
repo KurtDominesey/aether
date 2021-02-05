@@ -8,6 +8,7 @@ void FissionSGS<dim, qdim>::vmult(
     const dealii::BlockVector<double> &src) const {
   AssertThrow(shifted, dealii::ExcMessage("Shift not set"))
   FixedSourceSGS<dim, qdim>::vmult(dst, src);
+  dst /= shift;
 }
 
 template <int dim, int qdim>
