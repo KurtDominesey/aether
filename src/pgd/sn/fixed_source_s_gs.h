@@ -34,7 +34,11 @@ class FixedSourceSGS {
         &boundary_conditions);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
+  void vmult_jacobi(dealii::BlockVector<double> &dst,
+                    const dealii::BlockVector<double> &src) const;
   void set_cross_sections(const std::vector<std::vector<Mgxs>> &mgxs);
+  bool use_jacobi = false;
+
  protected:
   //! Moment to discrete operator, \f$M\f$
   aether::sn::MomentToDiscrete<dim, qdim> &m2d;

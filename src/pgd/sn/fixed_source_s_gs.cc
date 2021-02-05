@@ -77,6 +77,10 @@ template <int dim, int qdim>
 void FixedSourceSGS<dim, qdim>::vmult(
     dealii::BlockVector<double> &dst, 
     const dealii::BlockVector<double> &src) const {
+  if (use_jacobi) {
+    vmult_jacobi(dst, src);
+    return;
+  }
   const int num_modes = blocks.size();
   const int num_groups = dst.n_blocks() / num_modes;
   AssertDimension(dst.n_blocks(), src.n_blocks());
@@ -136,6 +140,38 @@ void FixedSourceSGS<dim, qdim>::vmult(
       solver.solve(blocks[m][m].within_groups[g], dst.block(mg), uncollided,
                    dealii::PreconditionIdentity());
       d2m.vmult(dst_lm.block(mg), dst.block(mg));
+    }
+  }
+}
+
+template <int dim, int qdim>
+void FixedSourceSGS<dim, qdim>::vmult_jacobi(
+    dealii::BlockVector<double> &dst, 
+    const dealii::BlockVector<double> &src) const {
+  const int num_modes = blocks.size();
+  const int num_groups = dst.n_blocks() / num_modes;
+  AssertDimension(dst.n_blocks(), src.n_blocks());
+  AssertDimension(dst.n_blocks(), num_modes*num_groups);
+  AssertDimension(dst.block(0).size(), src.block(0).size());
+  const int size = dst.block(0).size();
+  dealii::Vector<double> mass_inv(size);
+  dealii::Vector<double> uncollided(size);
+  dealii::IterationNumberControl control(5, 0);
+  dealii::SolverRichardson<dealii::Vector<double>> solver(control);
+  for (int m = 0, mg = 0; m < num_modes; ++m) {
+    for (int g = 0; g < num_groups; ++g, ++mg) {
+      const auto &transport_block = 
+          dynamic_cast<const TransportBlock<dim, qdim>&>(
+              blocks[m][m].within_groups[g].transport);
+      const auto &transport = 
+          dynamic_cast<const Transport<dim, qdim>&>(transport_block.transport);
+      mass_inv = src.block(mg);
+      transport.vmult_mass_inv(mass_inv);
+      uncollided = 0;
+      blocks[m][m].within_groups[g].transport.vmult(uncollided, mass_inv);
+      uncollided /= streaming[m][m];
+      solver.solve(blocks[m][m].within_groups[g], dst.block(mg), uncollided,
+                   dealii::PreconditionIdentity());
     }
   }
 }
