@@ -26,7 +26,7 @@ FixedSourceSProblem<dim, qdim>::FixedSourceSProblem(
       mgxs_pseudos(num_modes,
         std::vector<Mgxs>(num_modes, mgxs)),
       blocks(num_modes),
-      fixed_source_s(blocks, m2d, d2m),
+      fixed_source_s(blocks, m2d, d2m, mgxs),
       fixed_source_s_gs(transport, scattering, m2d, d2m, 
                         fixed_source_s.streaming, mgxs, boundary_conditions) {
   const int num_groups = mgxs.total.size();

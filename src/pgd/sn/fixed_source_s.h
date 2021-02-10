@@ -16,7 +16,8 @@ class FixedSourceS {
   FixedSourceS(
       const std::vector<std::vector<aether::sn::FixedSource<dim, qdim>>> &blocks,
       const aether::sn::MomentToDiscrete<dim, qdim> &m2d,
-      const aether::sn::DiscreteToMoment<dim, qdim> &d2m);
+      const aether::sn::DiscreteToMoment<dim, qdim> &d2m,
+      const Mgxs &mgxs);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   void get_inner_products_lhs(
@@ -33,6 +34,8 @@ class FixedSourceS {
   const aether::sn::MomentToDiscrete<dim, qdim> &m2d;
   //! Discrete to moment operator, \f$D\f$
   const aether::sn::DiscreteToMoment<dim, qdim> &d2m;
+  //! Multigroup cross-sections for computing inner products
+  const Mgxs &mgxs;
 };
 
 }

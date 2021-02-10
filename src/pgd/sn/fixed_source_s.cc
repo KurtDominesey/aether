@@ -6,8 +6,9 @@ template <int dim, int qdim>
 FixedSourceS<dim, qdim>::FixedSourceS(
     const std::vector<std::vector<aether::sn::FixedSource<dim, qdim>>> &blocks,
     const aether::sn::MomentToDiscrete<dim, qdim> &m2d,
-    const aether::sn::DiscreteToMoment<dim, qdim> &d2m)
-    : blocks(blocks), m2d(m2d), d2m(d2m), 
+    const aether::sn::DiscreteToMoment<dim, qdim> &d2m,
+    const Mgxs &mgxs)
+    : blocks(blocks), m2d(m2d), d2m(d2m), mgxs(mgxs),
       streaming(blocks.size(), std::vector<double>(blocks.size())) {}
 
 template <int dim, int qdim>
@@ -74,12 +75,80 @@ void FixedSourceS<dim, qdim>::get_inner_products_lhs(
   const int num_modes = inner_products.size();
   const int num_groups = modes.n_blocks() / num_modes;
   AssertDimension(modes.n_blocks(), num_modes*num_groups);
-  dealii::Vector<double> scratch(modes.block(0).size());
-  dealii::Vector<double> scattered;
-  for (int m = 0; m < num_modes; ++m) {
-    for (int mp = 0; mp < num_modes; ++m) {
-      for (int g = 0; g < num_groups; ++g) {
-        
+  const int num_ordinates = d2m.n_block_cols();
+  const int num_dofs = modes.block(0).size() / num_ordinates;
+  AssertDimension(modes.block(0).size(), num_ordinates*num_dofs);
+  AssertDimension(modes.block(0).size(), src.block(0).size());
+  std::cout << "num_ordinates: " << num_ordinates << "\n";
+  std::cout << "num_dofs: " << num_dofs << "\n";
+  std::cout << "num_groups: " << num_groups << "\n";
+  std::cout << "num_modes: " << num_modes << "\n";
+  dealii::BlockVector<double> streamed(modes);
+  dealii::BlockVector<double> modes_lm(modes.n_blocks(), num_dofs);
+  dealii::BlockVector<double> scattered(modes);
+  for (int m = 0, mg = 0; m < num_modes; ++m) {
+    for (int g = 0; g < num_groups; ++g, ++mg) {
+      const auto &transport = dynamic_cast<const TransportBlock<dim, qdim>&>(
+          blocks[m][m].within_groups[g].transport);
+      transport.stream(streamed.block(mg), modes.block(mg));
+      d2m.vmult(modes_lm.block(mg), modes.block(mg));
+      m2d.vmult(scattered.block(mg), modes_lm.block(mg));
+    }
+    for (int mp = 0; mp < num_modes; ++mp)
+      inner_products[m][mp] = 0;
+  }
+  const auto &transport = dynamic_cast<const Transport<dim, qdim>&>(
+      blocks[0][0].within_groups[0].transport.transport);
+  std::vector<dealii::types::global_dof_index> dof_indices(
+      transport.dof_handler.get_fe().dofs_per_cell);
+  unsigned int c = 0;
+  using Cell = typename dealii::DoFHandler<dim>::active_cell_iterator;
+  for (Cell cell = transport.dof_handler.begin_active();
+       cell != transport.dof_handler.end(); ++cell, ++c) {
+    if (!cell->is_locally_owned())
+      continue;
+    const dealii::FullMatrix<double> &mass = transport.cell_matrices[c].mass;
+    cell->get_dof_indices(dof_indices);
+    int matl = cell->material_id();
+    for (int m = 0, mg = 0; m < num_modes; ++m) {
+      for (int g = 0; g < num_groups; ++g, ++mg) {
+        for (int mp = 0; mp < num_modes; ++mp) {
+          int mpg = mp * num_groups + g;
+          for (int n = 0; n < transport.quadrature.size(); ++n) {
+            double wn = transport.quadrature.weight(n);
+            int nn = n * num_dofs;
+            for (int i = 0; i < dof_indices.size(); ++i) {
+              inner_products[m][mp].streaming += 
+                  modes.block(mg)[nn+dof_indices[i]] *
+                  streamed.block(mpg)[nn+dof_indices[i]] *
+                  wn;
+              for (int j = 0; j < dof_indices.size(); ++j) {
+                inner_products[m][mp].collision[matl] += 
+                    mgxs.total[g][matl] *
+                    modes.block(mg)[nn+dof_indices[i]] *
+                    mass[i][j] *
+                    modes.block(mpg)[nn+dof_indices[j]] *
+                    wn;
+                for (int gp = 0; gp < num_groups; ++gp) {
+                  int mpgp = mp * num_groups + gp;
+                  inner_products[m][mp].scattering[matl][0] -=
+                      mgxs.scatter[g][gp][matl] *
+                      modes.block(mg)[nn+dof_indices[i]] *
+                      mass[i][j] *
+                      scattered.block(mpgp)[nn+dof_indices[j]] *
+                      wn;
+                  inner_products[m][mp].fission[matl] +=
+                      mgxs.chi[g][matl] *
+                      modes.block(mg)[nn+dof_indices[i]] *
+                      mass[i][j] *
+                      mgxs.nu_fission[gp][matl] *
+                      scattered.block(mpgp)[nn+dof_indices[j]] *
+                      wn;
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
