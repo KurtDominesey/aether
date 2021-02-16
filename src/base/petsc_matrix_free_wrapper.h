@@ -6,13 +6,13 @@
 namespace aether::PETScWrappers {
 
 template <class MatrixType>
-class MatrixFreeWrapper : public MatrixFree {
+class MatrixFreeWrapperBase : public MatrixFree {
  public:
-  MatrixFreeWrapper(const MPI_Comm& communicator, 
-                    const unsigned int m, const unsigned int n, 
-                    const unsigned int local_rows, 
-                    const unsigned int local_columns,
-                    const MatrixType& matrix);
+  MatrixFreeWrapperBase(const MPI_Comm& communicator, 
+                        const unsigned int m, const unsigned int n, 
+                        const unsigned int local_rows, 
+                        const unsigned int local_columns,
+                        const MatrixType& matrix);
   template <class VectorType>
   void vmult(VectorType &dst, const VectorType &src) const;
   void vmult(dealii::PETScWrappers::VectorBase &dst,
@@ -22,7 +22,7 @@ class MatrixFreeWrapper : public MatrixFree {
 };
 
 template <class MatrixType>
-MatrixFreeWrapper<MatrixType>::MatrixFreeWrapper(
+MatrixFreeWrapperBase<MatrixType>::MatrixFreeWrapperBase(
     const MPI_Comm& communicator, const unsigned int m, const unsigned int n,
     const unsigned int local_rows, const unsigned int local_columns, 
     const MatrixType& matrix)
@@ -31,8 +31,8 @@ MatrixFreeWrapper<MatrixType>::MatrixFreeWrapper(
 
 template <class MatrixType>
 template <class VectorType>
-void MatrixFreeWrapper<MatrixType>::vmult(VectorType &dst, 
-                                          const VectorType &src) const {
+void MatrixFreeWrapperBase<MatrixType>::vmult(VectorType &dst, 
+                                              const VectorType &src) const {
   matrix.vmult(dst, src);
 }
 

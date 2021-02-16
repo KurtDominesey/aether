@@ -9,12 +9,12 @@
 namespace aether::PETScWrappers {
 
 template <class MatrixType>
-class BlockWrapper : public MatrixFreeWrapper<MatrixType> {
+class BlockWrapper : public MatrixFreeWrapperBase<MatrixType> {
  public:
   BlockWrapper(const int num_blocks, const MPI_Comm& communicator, 
                const int block_size, const int local_size,
                const MatrixType& matrix);
-  using MatrixFreeWrapper<MatrixType>::vmult;
+  using MatrixFreeWrapperBase<MatrixType>::vmult;
   void vmult(dealii::PETScWrappers::VectorBase &dst,
              const dealii::PETScWrappers::VectorBase &src) const;
 
@@ -31,12 +31,12 @@ BlockWrapper<MatrixType>::BlockWrapper(const int num_blocks,
                                        const int block_size,
                                        const int local_size,
                                        const MatrixType& matrix)
-    : MatrixFreeWrapper<MatrixType>(communicator,
-                                    num_blocks*block_size,
-                                    num_blocks*block_size,
-                                    num_blocks*local_size,
-                                    num_blocks*local_size,
-                                    matrix),
+    : MatrixFreeWrapperBase<MatrixType>(communicator,
+                                        num_blocks*block_size,
+                                        num_blocks*block_size,
+                                        num_blocks*local_size,
+                                        num_blocks*local_size,
+                                        matrix),
       num_blocks(num_blocks), communicator(communicator), 
       block_size(block_size), local_size(local_size) {}
 

@@ -8,7 +8,7 @@
 namespace aether::PETScWrappers {
 
 template <class MatrixType>
-class BlockBlockWrapper : public MatrixFreeWrapper<MatrixType> {
+class BlockBlockWrapper : public MatrixFreeWrapperBase<MatrixType> {
  public:
   BlockBlockWrapper(const int num_blocks, 
                     const int num_subblocks, 
@@ -16,7 +16,7 @@ class BlockBlockWrapper : public MatrixFreeWrapper<MatrixType> {
                     const int block_size, 
                     const int local_size,
                     const MatrixType& matrix);
-  using MatrixFreeWrapper<MatrixType>::vmult;
+  using MatrixFreeWrapperBase<MatrixType>::vmult;
   void vmult(dealii::PETScWrappers::VectorBase &dst,
              const dealii::PETScWrappers::VectorBase &src) const;
  protected:
@@ -34,12 +34,12 @@ BlockBlockWrapper<MatrixType>::BlockBlockWrapper(const int num_blocks,
                                                  const int block_size,
                                                  const int local_size,
                                                  const MatrixType& matrix)
-  : MatrixFreeWrapper<MatrixType>(communicator, 
-                                  num_blocks*num_subblocks*block_size, 
-                                  num_blocks*num_subblocks*block_size,
-                                  num_blocks*num_subblocks*local_size,
-                                  num_blocks*num_subblocks*local_size,
-                                  matrix),
+  : MatrixFreeWrapperBase<MatrixType>(communicator, 
+                                      num_blocks*num_subblocks*block_size, 
+                                      num_blocks*num_subblocks*block_size,
+                                      num_blocks*num_subblocks*local_size,
+                                      num_blocks*num_subblocks*local_size,
+                                      matrix),
     num_blocks(num_blocks), num_subblocks(num_subblocks), 
     communicator(communicator), block_size(block_size), local_size(local_size)
     {}
