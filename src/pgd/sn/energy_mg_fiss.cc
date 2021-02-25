@@ -14,7 +14,7 @@ double EnergyMgFiss::step_eigenvalue(InnerProducts &coefficients) {
 }
 
 double EnergyMgFiss::update(
-    std::vector<std::vector<InnerProducts>> &coefficients) {
+    std::vector<std::vector<InnerProducts>> &coefficients, const double tol) {
   AssertDimension(coefficients.size(), modes.size());
   const int num_groups = modes[0].size();
   const int size = modes.size() * num_groups;
@@ -61,6 +61,13 @@ double EnergyMgFiss::update(
     }
   }
   eigenvectors[0].compress(dealii::VectorOperation::add);
+  dealii::PETScWrappers::MPI::Vector ax(eigenvectors[0]);
+  dealii::PETScWrappers::MPI::Vector bx(eigenvectors[0]);
+  fission.vmult(ax, eigenvectors[0]);
+  slowing.vmult(bx, eigenvectors[0]);
+  double rayleigh = (eigenvectors[0] * ax) / (eigenvectors[0] * bx);
+  std::cout << "rayleigh-e: " << rayleigh << "\n";
+  // rayleigh = 0;  // !!
   // eigenvectors[0].compress(dealii::VectorOperation::unknown);
   // make matrices sparse
   // dealii::SparsityPattern pattern_slowing;
@@ -71,24 +78,80 @@ double EnergyMgFiss::update(
   // dealii::SparseMatrix<double> fission_sp(pattern_fission);
   // slowing_sp.copy_from(slowing);
   // fission_sp.copy_from(fission);
-  dealii::IterationNumberControl control(500, 1e-6);
-  dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
+  dealii::SolverControl control(10, std::clamp(tol, 1e-5, 1e-3));
+  // dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
+  dealii::SLEPcWrappers::SolverJacobiDavidson eigensolver(control);
+  eigensolver.set_target_eigenvalue(rayleigh/*+1e-2*/);
+  eigensolver.set_which_eigenpairs(EPS_LARGEST_MAGNITUDE);
   if (eigenvectors[0].l2_norm() > 0)
     eigensolver.set_initial_space(eigenvectors);
-  std::vector<double> eigenvalues;
-  eigensolver.solve(fission, slowing, eigenvalues, eigenvectors);
-  if (eigenvalues[0] < 0) {
-    eigenvalues[0] *= -1;
-    eigenvectors[0] *= -1;
-  }
-  for (int m = 0, i = 0; m < this->modes.size(); ++m) {
-    for (int g = 0; g < num_groups; ++g, ++i) {
-      modes[m][g] = eigenvectors[0][i];
+  // set preconditioner
+  bool use_pc = false;
+  if (use_pc) {
+    // dealii::PETScWrappers::FullMatrix shifted(size, size);
+    // shifted.add(1, fission);
+    // shifted.add(-rayleigh, slowing);
+    dealii::PETScWrappers::SparseMatrix shifted(size, size, size);
+    dealii::FullMatrix<double> shifted_full(size);
+    for (int i = 0; i < size; ++i) {
+      for (int j = 0; j < size; ++j) {
+        shifted.set(i, j, fission.el(i, j) - rayleigh * slowing.el(i, j));
+        shifted_full(i, j) = fission.el(i, j) - rayleigh * slowing.el(i, j);
+      }
     }
+    shifted.compress(dealii::VectorOperation::insert);
+    std::cout << "shifted it\n";
+    dealii::PETScWrappers::PreconditionSOR preconditioner(shifted);
+    // try dealii operators
+    dealii::SparsityPattern pattern;
+    pattern.copy_from(shifted_full);
+    dealii::SparseMatrix<double> shifted_sparse(pattern);
+    shifted_sparse.copy_from(shifted_full);
+    using BlockSOR = dealii::PreconditionBlockSOR<dealii::SparseMatrix<double>>;
+    BlockSOR shifted_gs;
+    shifted_gs.initialize(shifted_sparse, BlockSOR::AdditionalData(num_groups));
+    aether::PETScWrappers::MatrixFreeWrapper<BlockSOR> shifted_gs_mf(
+        MPI_COMM_WORLD, size, size, size, size, shifted_gs);
+    aether::PETScWrappers::PreconditionerShell shifted_gs_pc(shifted_gs_mf);
+    // dealii::SolverControl control_dummy(1, 0);
+    // dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
+    dealii::ReductionControl control_pc(3, 1e-6, 1e-3);
+    dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
+    solver_pc.initialize(shifted_gs_pc);
+    // solver_pc.initialize(preconditioner);
+    aether::SLEPcWrappers::TransformationPreconditioner stprecond(
+        MPI_COMM_WORLD, shifted_gs_mf);
+    // aether::SLEPcWrappers::TransformationPreconditioner stprecond(
+    //     MPI_COMM_WORLD, shifted);
+    stprecond.set_matrix_mode(ST_MATMODE_SHELL);
+    stprecond.set_solver(solver_pc);
+    eigensolver.set_transformation(stprecond);
   }
-  std::cout << "k-updatestep: " << eigenvalues[0] << "\n";
-  this->eigenvalue = eigenvalues[0];
-  return eigenvalues[0];
+  // solve eigenproblem
+  std::vector<double> eigenvalues;
+  try {
+    eigensolver.solve(fission, slowing, eigenvalues, eigenvectors);
+    if (eigenvalues[0] < 0) {
+      eigenvalues[0] *= -1;
+      eigenvectors[0] *= -1;
+    }
+    for (int m = 0, i = 0; m < this->modes.size(); ++m) {
+      for (int g = 0; g < num_groups; ++g, ++i) {
+        modes[m][g] = eigenvectors[0][i];
+      }
+    }
+    std::cout << "k-updatestep: " << eigenvalues[0] << "\n";
+    this->eigenvalue = eigenvalues[0];
+    return eigenvalues[0];
+  } catch (...) {
+    std::cout << "failed\n";
+    for (int m = 0, i = 0; m < this->modes.size(); ++m) {
+      for (int g = 0; g < num_groups; ++g, ++i) {
+        modes[m][g] = eigenvectors[0][i];
+      }
+    }
+    return 0;
+  }
 }
 
 void EnergyMgFiss::update(
