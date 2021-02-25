@@ -44,6 +44,11 @@ class FixedSourceSProblem {
   void sweep_source(dealii::BlockVector<double> &dst, 
                     const dealii::BlockVector<double> &src) const;
 
+  /**
+   * L2 norm of modes.
+   */
+  double l2_norm(const dealii::BlockVector<double> &modes) const;
+
  protected:
   Transport<dim, qdim> transport;
   aether::sn::Scattering<dim> scattering;

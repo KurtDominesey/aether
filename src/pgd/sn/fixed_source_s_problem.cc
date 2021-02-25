@@ -91,6 +91,15 @@ void FixedSourceSProblem<dim, qdim>::sweep_source(
   }
 }
 
+template <int dim, int qdim>
+double FixedSourceSProblem<dim, qdim>::l2_norm(
+    const dealii::BlockVector<double> &modes) const {
+  double square = 0;
+  for (int b = 0; b < modes.n_blocks(); ++b)
+    square += transport.inner_product(modes.block(b), modes.block(b));
+  return std::sqrt(square);
+}
+
 template class FixedSourceSProblem<1>;
 template class FixedSourceSProblem<2>;
 template class FixedSourceSProblem<3>;
