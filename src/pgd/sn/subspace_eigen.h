@@ -11,7 +11,8 @@ class SubspaceEigen {
  public:
   double virtual step(
       dealii::BlockVector<double> &modes,
-      const std::vector<std::vector<InnerProducts>> &coefficients) = 0;
+      const std::vector<std::vector<InnerProducts>> &coefficients,
+      const double shift) = 0;
   void virtual get_inner_products(
       const dealii::BlockVector<double> &modes,
       std::vector<std::vector<InnerProducts>> &inner_products) = 0;
