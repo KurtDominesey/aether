@@ -33,6 +33,7 @@ void FissionS<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
       d2m.vmult(src_lm.block(mg), src.block(mg));
     }
   }
+  dst = 0;
   for (int m = 0; m < num_modes; ++m) {
     emitted = 0;
     for (int mp = 0; mp < num_modes; ++mp) {
