@@ -49,8 +49,9 @@ class FixedSourceSProblem {
    */
   double l2_norm(const dealii::BlockVector<double> &modes) const;
 
- protected:
   Transport<dim, qdim> transport;
+
+ protected:
   aether::sn::Scattering<dim> scattering;
   aether::sn::MomentToDiscrete<dim, qdim> m2d;
   aether::sn::DiscreteToMoment<dim, qdim> d2m;
