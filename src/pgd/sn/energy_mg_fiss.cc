@@ -78,7 +78,8 @@ double EnergyMgFiss::update(
   // dealii::SparseMatrix<double> fission_sp(pattern_fission);
   // slowing_sp.copy_from(slowing);
   // fission_sp.copy_from(fission);
-  dealii::SolverControl control(10, std::clamp(tol, 1e-5, 1e-3));
+  // dealii::SolverControl control(10, std::clamp(tol, 1e-5, 1e-3));
+  dealii::SolverControl control(10, 1e-5);
   // dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
   dealii::SLEPcWrappers::SolverJacobiDavidson eigensolver(control);
   eigensolver.set_target_eigenvalue(rayleigh/*+1e-2*/);
@@ -192,6 +193,193 @@ void EnergyMgFiss::set_source(std::vector<double> coefficients_b,
       }
     }
   }
+}
+
+void EnergyMgFiss::residual(
+    dealii::Vector<double> &residual,
+    const dealii::Vector<double> &modes_,
+    const double k_eigenvalue,
+    const std::vector<std::vector<InnerProducts>> &coefficients) {
+  const int num_modes = coefficients.size();
+  AssertDimension(num_modes, coefficients[0].size());
+  const int num_groups = residual.size() / num_modes;
+  AssertDimension(residual.size(), modes_.size())
+  dealii::FullMatrix<double> a_minus_kb(residual.size());
+  set_fixed_k_matrix(a_minus_kb, k_eigenvalue, coefficients);
+  a_minus_kb.vmult(residual, modes_);
+}
+
+void EnergyMgFiss::solve_fixed_k(
+    dealii::Vector<double> &dst,
+    const dealii::Vector<double> &src,
+    const double k_eigenvalue,
+    const std::vector<std::vector<InnerProducts>> &coefficients) {
+  const int num_modes = coefficients.size();
+  AssertDimension(num_modes, coefficients[0].size());
+  const int num_groups = dst.size() / num_modes;
+  AssertDimension(dst.size(), src.size());
+  dealii::FullMatrix<double> a_minus_kb(dst.size());
+  set_fixed_k_matrix(a_minus_kb, k_eigenvalue, coefficients);
+  const int last = dst.size() - 1;
+  a_minus_kb.set(last, last, 1);
+  dealii::IterationNumberControl control(50, 1e-6);
+  dealii::SolverGMRES<dealii::Vector<double>> solver(control);
+  // set up preconditioner
+  dealii::SparsityPattern pattern;
+  pattern.copy_from(a_minus_kb);
+  dealii::SparseMatrix<double> a_minus_kb_sp(pattern);
+  a_minus_kb_sp.copy_from(a_minus_kb);
+  // dealii::PreconditionBlockSOR<dealii::SparseMatrix<double>> preconditioner;
+  dealii::PreconditionSOR<dealii::SparseMatrix<double>> preconditioner;
+  preconditioner.initialize(a_minus_kb_sp/*,
+      dealii::PreconditionBlock<dealii::SparseMatrix<double>>::AdditionalData(
+        num_groups)*/);
+  // set up normality condition
+  // (after setting up preconditioner, because of the zero diagonal)
+  a_minus_kb.set(last, last, 0);
+  for (int m = 0; m < num_modes; ++m)
+    for (int g = 0; g < num_groups; ++g)
+      a_minus_kb.set(last, m*num_groups+g, 1e2*2*modes[m][g]);
+  // if (true) {  // the smart way
+  // for (int m_row = 0; m_row < num_modes; ++m_row) {
+  //   int mm_row = m_row * num_groups;
+  //   for (int m_col = 0; m_col < num_modes; ++m_col) {
+  //     int mm_col = m_col * num_groups;
+  //     for (int g = 0; g < num_groups; ++g) {
+  //       a_minus_kb.add(mm_row+g, last,
+  //           -1 * coefficients[m_row][m_col].streaming * modes[m_col][g]);
+  //       for (int j = 0; j < mgxs.total[g].size(); ++j) {
+  //         a_minus_kb.add(mm_row+g, last, 
+  //             -1 * coefficients[m_row][m_col].collision[j] 
+  //             * mgxs.total[g][j]
+  //             * modes[m_col][g]);
+  //         for (int gp = 0; gp < num_groups; ++gp) {
+  //           for (int ell = 0; ell < 1; ++ell) {
+  //             a_minus_kb.add(mm_row+g, last, 
+  //                            -1 * coefficients[m_row][m_col].scattering[j][ell] 
+  //                            * mgxs.scatter[g][gp][j]
+  //                            * modes[m_col][gp]);
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+  // } else {  // the other way
+  const int size = num_modes * num_groups;
+  dealii::FullMatrix<double> slowing(size, size);
+  for (int m_row = 0; m_row < modes.size(); ++m_row) {
+    int mm_row = m_row * num_groups;
+    for (int m_col = 0; m_col < modes.size(); ++m_col) {
+      int mm_col = m_col * num_groups;
+      for (int g = 0; g < num_groups; ++g) {
+        slowing.set(mm_row+g, mm_col+g, coefficients[m_row][m_col].streaming);
+        for (int j = 0; j < mgxs.total[g].size(); ++j) {
+          slowing.set(mm_row+g, mm_col+g,
+              coefficients[m_row][m_col].collision[j] * mgxs.total[g][j]);
+          for (int gp = 0; gp < num_groups; ++gp) {
+            for (int ell = 0; ell < 1; ++ell) {
+              slowing.set(mm_row+g, mm_col+gp, 
+                          coefficients[m_row][m_col].scattering[j][ell] 
+                          * mgxs.scatter[g][gp][j]);
+            }
+          }
+        }
+      }
+    }
+  }
+  dealii::Vector<double> bx(size);
+  dealii::Vector<double> modes_all(size);
+  for (int m = 0; m < num_modes; ++m)
+    for (int g = 0; g < num_groups; ++g)
+      modes_all[m*num_groups+g] = this->modes[m][g];
+  slowing.vmult(bx, modes_all);
+  for (int i = 0; i < size; ++i) {
+    const double diff = std::abs(a_minus_kb(i, last) + bx[i]);
+    // std::cout << a_minus_kb(i, last) << ", " << bx[i] << "\n";
+    // AssertThrow(diff < 1e-12, dealii::ExcMessage(
+    //   std::to_string(a_minus_kb(i, last))+"!="+std::to_string(-bx[i])));
+    a_minus_kb.set(i, last, -bx[i]);
+  }
+  // }
+  // solve
+  // dst = 1;
+  // dst /= dst.l2_norm();
+  // dst *= src.l2_norm();
+  dst = 0;
+  // solver.connect([](const unsigned int iteration,
+  //                   const double check_value,
+  //                   const dealii::Vector<double>&) {
+  //   // std::cout << iteration << ": " << check_value << std::endl;
+  //   return dealii::SolverControl::success;
+  // });
+  solver.solve(a_minus_kb, dst, src, preconditioner);
+}
+
+// void EnergyMgFiss::solve_fixed_k_(
+//     dealii::Vector<double> &dst,
+//     const dealii::Vector<double> &src,
+//     const double k_eigenvalue,
+//     const std::vector<std::vector<InnerProducts>> &coefficients) {
+//   const int num_modes = this->modes.size();
+//   const int num_groups = dst.size() / num_modes;
+//   AssertDimension(dst.size(), num_groups*num_modes);
+//   AssertDimension(dst.size(), src.size());
+//   for (int m = 0; m < num_modes; ++m) {
+//     for (int g = 0; g < num_groups; ++g) {
+//       this->modes[m][g] = src[m*num_groups+g];
+//     }
+//   }
+// }
+
+void EnergyMgFiss::set_fixed_k_matrix(
+    dealii::FullMatrix<double> &a_minus_kb, const double k_eigenvalue,
+    const std::vector<std::vector<InnerProducts>> &coefficients) {
+  const int num_modes = coefficients.size();
+  AssertDimension(num_modes, coefficients[0].size());
+  const int num_groups = a_minus_kb.m() / num_modes;
+  for (int m_row = 0; m_row < num_modes; ++m_row) {
+    int mm_row = m_row * num_groups;
+    for (int m_col = 0; m_col < num_modes; ++m_col) {
+      int mm_col = m_col * num_groups;
+      for (int g = 0; g < num_groups; ++g) {
+        a_minus_kb.add(mm_row+g, mm_col+g,
+                       -k_eigenvalue * coefficients[m_row][m_col].streaming);
+        for (int j = 0; j < mgxs.total[g].size(); ++j) {
+          a_minus_kb.add(mm_row+g, mm_col+g, 
+              -k_eigenvalue * coefficients[m_row][m_col].collision[j] 
+              * mgxs.total[g][j]);
+          for (int gp = 0; gp < num_groups; ++gp) {
+            for (int ell = 0; ell < 1; ++ell) {
+              a_minus_kb.add(mm_row+g, mm_col+gp, 
+                             -k_eigenvalue
+                             * coefficients[m_row][m_col].scattering[j][ell] 
+                             * mgxs.scatter[g][gp][j]);
+            }
+            a_minus_kb.add(mm_row+g, mm_col+gp,
+                           mgxs.chi[g][j] 
+                           * coefficients[m_row][m_col].fission[j] 
+                           * mgxs.nu_fission[gp][j]);
+          }
+        }
+      }
+    }
+  }
+}
+
+void EnergyMgFiss::get_inner_products(
+    const dealii::Vector<double> &modes_,
+    std::vector<std::vector<InnerProducts>> &inner_products) {
+  const int num_modes = inner_products.size();
+  AssertDimension(num_modes, inner_products[0].size());
+  const int num_groups = modes_.size() / num_modes;
+  modes.resize(num_modes);
+  for (int m = 0; m < num_modes; ++m)
+    for (int g = 0; g < num_groups; ++g)
+      modes[m][g] = modes_[m*num_groups+g];
+  std::vector<double> _;
+  for (int m = 0; m < num_modes; ++m)
+    this->get_inner_products(inner_products[m], _, m, 0);
 }
 
 }
