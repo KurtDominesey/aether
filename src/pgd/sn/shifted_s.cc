@@ -12,8 +12,10 @@ template <int dim, int qdim>
 void ShiftedS<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                 const dealii::BlockVector<double> &src) const {
   dealii::BlockVector<double> tmp(dst);
-  fixed_source_s.vmult(dst, src);
-  fission_s.vmult(tmp, src);
+  dst = 0;
+  tmp = 0;
+  fission_s.vmult(dst, src);
+  fixed_source_s.vmult(tmp, src);
   dst.add(-shift, tmp);
 }
 
