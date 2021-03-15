@@ -9,12 +9,17 @@ namespace aether::pgd::sn {
 
 class SubspaceEigen {
  public:
-  double virtual step(
-      dealii::BlockVector<double> &modes,
-      const std::vector<std::vector<InnerProducts>> &coefficients,
-      const double shift) = 0;
+  void virtual residual(
+      dealii::Vector<double> &residual,
+      const dealii::Vector<double> &modes,
+      const double k_eigenvalue,
+      const std::vector<std::vector<InnerProducts>> &coefficients) = 0;
+//   double virtual step(
+//       dealii::BlockVector<double> &modes,
+//       const std::vector<std::vector<InnerProducts>> &coefficients,
+//       const double shift) = 0;
   void virtual get_inner_products(
-      const dealii::BlockVector<double> &modes,
+      const dealii::Vector<double> &modes,
       std::vector<std::vector<InnerProducts>> &inner_products) = 0;
 };
 
