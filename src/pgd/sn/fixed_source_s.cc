@@ -94,10 +94,6 @@ void FixedSourceS<dim, qdim>::get_inner_products_lhs(
   const int num_dofs = modes.block(0).size() / num_ordinates;
   AssertDimension(modes.block(0).size(), num_ordinates*num_dofs);
   AssertDimension(modes.block(0).size(), src.block(0).size());
-  std::cout << "num_ordinates: " << num_ordinates << "\n";
-  std::cout << "num_dofs: " << num_dofs << "\n";
-  std::cout << "num_groups: " << num_groups << "\n";
-  std::cout << "num_modes: " << num_modes << "\n";
   dealii::BlockVector<double> streamed(modes);
   dealii::BlockVector<double> modes_lm(modes.n_blocks(), num_dofs);
   dealii::BlockVector<double> scattered(modes);
