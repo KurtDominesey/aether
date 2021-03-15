@@ -58,9 +58,9 @@ double FissionSProblem<dim, qdim>::step(
     const std::vector<std::vector<InnerProducts>> &coefficients,
     const double shift) {
   set_cross_sections(coefficients);
-  // if (shift == 0)
-  return step_power_shift(modes, shift);
-  // return step_gd(modes, shift);
+  // if (shift == -1)
+    return step_gd(modes, shift);
+  // return step_power_shift(modes, shift);
 }
 
 template <int dim, int qdim>
@@ -84,7 +84,7 @@ double FissionSProblem<dim, qdim>::step_gd(dealii::BlockVector<double> &modes,
   std::cout << "rayleigh? " << rayleigh << "\n";
   fission_s_gs.set_shift(rayleigh);  // shift preconditioner
   // set up eigensolver
-  dealii::ReductionControl control(10, 1e-5, 1e-2);
+  dealii::SolverControl control(20, shift);
   dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
   eigensolver.set_target_eigenvalue(rayleigh);
   // set intial guess
@@ -118,6 +118,10 @@ double FissionSProblem<dim, qdim>::step_gd(dealii::BlockVector<double> &modes,
   double residual = ax.l2_norm() / modes.l2_norm();
   std::cout << "spatio-angular k: " << eigenvalues[0] << "\n";
   std::cout << "spatio-angular residual: " << residual << "\n";
+  for (int i = 0; i < eigenvalues.size(); ++i) {
+    std::cout << eigenvalues[i] << " ";
+  }
+  std::cout << "\n";
   return residual;
 }
 
@@ -141,10 +145,12 @@ double FissionSProblem<dim, qdim>::step_power_shift(
   if (true) {
     tmp = modes;
     for (int i = 0; i < 1; ++i) {
+      if (shift == -1)
+        ax = modes;
       solver.solve(this->fixed_source_s, modes, ax, this->fixed_source_s_gs);
       // modes.add(-shift_or_rayleigh, tmp);
       fission_s.vmult(ax, modes);
-      modes /= this->l2_norm(modes);
+      // modes /= this->l2_norm(modes);
       // modes /= modes.l2_norm();
       // modes /= shift == 0 ? rayleigh : shift;
       // modes /= rayleigh;
@@ -171,10 +177,88 @@ double FissionSProblem<dim, qdim>::step_power_shift(
 }
 
 template <int dim, int qdim>
+void FissionSProblem<dim, qdim>::residual(
+    dealii::Vector<double> &residual,
+    const dealii::Vector<double> &modes,
+    const double k_eigenvalue,
+    const std::vector<std::vector<InnerProducts>> &coefficients) {
+  const int num_modes = coefficients.size();
+  AssertDimension(num_modes, coefficients[0].size());
+  const int size = residual.size() / num_modes;
+  AssertDimension(residual.size(), modes.size());
+  dealii::BlockVector<double> ax(num_modes, size);
+  dealii::BlockVector<double> bx(num_modes, size);
+  dealii::BlockVector<double> modes_b(num_modes, size);
+  modes_b = modes;
+  this->set_cross_sections(coefficients);
+  fission_s.vmult(ax, modes_b);
+  this->fixed_source_s.vmult(bx, modes_b);
+  ax.add(-k_eigenvalue, bx);
+  residual = ax;
+}
+
+template <int dim, int qdim>
 void FissionSProblem<dim, qdim>::get_inner_products(
     const dealii::BlockVector<double> &modes,
     std::vector<std::vector<InnerProducts>> &inner_products) {
   this->fixed_source_s.get_inner_products_lhs(inner_products, modes);
+}
+
+template <int dim, int qdim>
+void FissionSProblem<dim, qdim>::get_inner_products(
+    const dealii::Vector<double> &modes,
+    std::vector<std::vector<InnerProducts>> &inner_products) {
+  const int num_modes = inner_products.size();
+  const int size = modes.size() / num_modes;
+  dealii::BlockVector<double> modes_b(num_modes, size);
+  modes_b = modes;
+  get_inner_products(modes_b, inner_products);
+}
+
+template <int dim, int qdim>
+void FissionSProblem<dim, qdim>::solve_fixed_k(
+    dealii::Vector<double> &dst,
+    const dealii::Vector<double> &src,
+    const double k_eigenvalue,
+    const std::vector<std::vector<InnerProducts>> &coefficients) {
+  // make block vectors
+  const int num_modes = coefficients.size();
+  AssertDimension(num_modes, coefficients[0].size());
+  const int size = dst.size() / num_modes;
+  AssertDimension(dst.size(), size * num_modes);
+  AssertDimension(dst.size(), src.size());
+  dealii::BlockVector<double> dst_b(num_modes, size);
+  dealii::BlockVector<double> src_b(num_modes, size);
+  dst_b = 1;
+  dst_b /= dst_b.l2_norm();
+  dst_b *= src_b.l2_norm();
+  src_b = src;
+  const double shift = k_eigenvalue;
+  set_cross_sections(coefficients);
+  int system = 1;
+  switch (system) {
+    case 0: {  // A-kB
+      // set up operators
+      ShiftedS<dim, qdim> shifted(fission_s, this->fixed_source_s);
+      shifted.shift = shift;
+      fission_s_gs.set_shift(shift);
+      fission_s_gs.vmult(dst_b, src_b);
+      // solve system
+      // dealii::IterationNumberControl control(10, 1e-6);
+      // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+      // solver.solve(shifted, dst_b, src_b, /*fission_s_gs*/ dealii::PreconditionIdentity());
+      break;
+    }
+    case 1: {  // -kB
+    // solve system
+    // dealii::IterationNumberControl control(3, 1e-6);
+    // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+    // solver.solve(this->fixed_source_s, dst_b, src_b, this->fixed_source_s_gs);
+    this->fixed_source_s_gs.vmult(dst_b, src_b);
+    dst_b /= -k_eigenvalue;
+    }
+  }
+  dst = dst_b;
 }
 
 template class FissionSProblem<1>;

@@ -47,11 +47,35 @@ class FissionSProblem : public FixedSourceSProblem<dim, qdim>,
               const double shift);
 
   /**
+   * Get residual of k-eigenvalue problem.
+   */
+  void residual(dealii::Vector<double> &residual,
+                const dealii::Vector<double> &modes,
+                const double k_eigenvalue,
+                const std::vector<std::vector<InnerProducts>> &coefficients);
+
+  /**
    * Compute inner products.
    */
   void get_inner_products(
       const dealii::BlockVector<double> &modes,
       std::vector<std::vector<InnerProducts>> &inner_products);
+
+  /**
+   * Compute inner products.
+   */
+  void get_inner_products(
+      const dealii::Vector<double> &modes,
+      std::vector<std::vector<InnerProducts>> &inner_products);
+
+  /**
+   * Solve fixed k-eigenvalue problem.
+   */
+  void solve_fixed_k(
+      dealii::Vector<double> &dst,
+      const dealii::Vector<double> &src,
+      const double k_eigenvalue,
+      const std::vector<std::vector<InnerProducts>> &coefficients);
 
  protected:
   /**
