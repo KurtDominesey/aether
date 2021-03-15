@@ -12,6 +12,21 @@ FixedSourceS<dim, qdim>::FixedSourceS(
       streaming(blocks.size(), std::vector<double>(blocks.size())) {}
 
 template <int dim, int qdim>
+void FixedSourceS<dim, qdim>::vmult(dealii::Vector<double> &dst,
+                                    const dealii::Vector<double> &src) const {
+  const int num_modes = blocks.size();
+  const int size = dst.size() / num_modes;
+  AssertDimension(dst.size(), size * num_modes);
+  AssertDimension(dst.size(), src.size());
+  dealii::BlockVector<double> dst_b(num_modes, size);
+  dealii::BlockVector<double> src_b(num_modes, size);
+  dst_b = dst;
+  src_b = src;
+  vmult(dst_b, src_b);
+  dst = dst_b;
+}
+
+template <int dim, int qdim>
 void FixedSourceS<dim, qdim>::vmult(
     dealii::BlockVector<double> &dst,
     const dealii::BlockVector<double> &src) const {

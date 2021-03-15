@@ -9,6 +9,7 @@ template <int dim, int qdim = dim == 1 ? 1 : 2>
 class FissionSGS : public FixedSourceSGS<dim, qdim> {
  public:
   using FixedSourceSGS<dim, qdim>::FixedSourceSGS;
+  using FixedSourceSGS<dim, qdim>::vmult;
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   void set_cross_sections(const std::vector<std::vector<Mgxs>> &mgxs);

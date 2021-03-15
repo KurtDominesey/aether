@@ -32,6 +32,8 @@ class FixedSourceSGS {
       const Mgxs &mgxs,
       const std::vector<std::vector<dealii::BlockVector<double>>>
         &boundary_conditions);
+  void vmult(dealii::Vector<double> &dst,
+             const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   void vmult_jacobi(dealii::BlockVector<double> &dst,

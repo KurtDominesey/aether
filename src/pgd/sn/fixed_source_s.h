@@ -18,6 +18,8 @@ class FixedSourceS {
       const aether::sn::MomentToDiscrete<dim, qdim> &m2d,
       const aether::sn::DiscreteToMoment<dim, qdim> &d2m,
       const Mgxs &mgxs);
+  void vmult(dealii::Vector<double> &dst,
+             const dealii::Vector<double> &src) const;
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
   void get_inner_products_lhs(
