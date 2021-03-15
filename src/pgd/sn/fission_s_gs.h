@@ -14,10 +14,10 @@ class FissionSGS : public FixedSourceSGS<dim, qdim> {
              const dealii::BlockVector<double> &src) const;
   void set_cross_sections(const std::vector<std::vector<Mgxs>> &mgxs);
   void set_shift(const double shift);
+  bool shifted = false;
 
  protected:
   double shift;
-  bool shifted = false;
 };
 
 }
