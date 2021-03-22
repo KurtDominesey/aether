@@ -111,8 +111,8 @@ void FixedSourceSGS<dim, qdim>::vmult(
   dealii::Vector<double> streamed(num_qdofs);
   dealii::Vector<double> mass_inv(num_qdofs);
   dealii::Vector<double> scattered(num_dofs);
-  dealii::IterationNumberControl control(10, 0);
-  dealii::SolverRichardson<dealii::Vector<double>> solver(control);
+  dealii::IterationNumberControl control(5, 1e-8);
+  dealii::SolverGMRES<dealii::Vector<double>> solver(control);
   for (int m = 0, mg = 0; m < num_modes; ++m) {
     for (int g = 0; g < num_groups; ++g, ++mg) {
       operated = 0;
