@@ -33,6 +33,8 @@ class EnergyMgFiss : public EnergyMgFull, public EigenUpdatableInterface,
                  const double k_eigenvalue,
                  const std::vector<std::vector<InnerProducts>> &coefficients) 
                  override;
+  double inner_product(const dealii::Vector<double> &left, 
+                       const dealii::Vector<double> &right) override;
   using EnergyMgFull::get_inner_products;
   void get_inner_products(
       const dealii::Vector<double> &modes,

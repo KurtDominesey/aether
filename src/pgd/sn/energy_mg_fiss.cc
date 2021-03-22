@@ -382,4 +382,24 @@ void EnergyMgFiss::get_inner_products(
     this->get_inner_products(inner_products[m], _, m, 0);
 }
 
+double EnergyMgFiss::inner_product(const dealii::Vector<double> &left,
+                                   const dealii::Vector<double> &right) {
+  double result = 0;
+  const int num_groups = mgxs.total.size();
+  const int num_modes = left.size() / num_groups;
+  for (int g = 0; g < num_groups; ++g) {
+    int g_rev = num_groups - 1 - g;
+    double lower = mgxs.group_structure[g_rev];
+    if (lower == 0)
+      lower = 1e-5;
+    double width = std::log(mgxs.group_structure[g_rev+1]
+                            / lower);
+    for (int m = 0; m < num_modes; ++m) {
+      int mg = m * num_groups + g;
+      result += left[mg] * right[mg] / width;
+    }
+  }
+  return result;
+}
+
 }
