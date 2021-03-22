@@ -67,6 +67,7 @@ double EnergyMgFiss::update(
   slowing.vmult(bx, eigenvectors[0]);
   double rayleigh = (eigenvectors[0] * ax) / (eigenvectors[0] * bx);
   std::cout << "rayleigh-e: " << rayleigh << "\n";
+  // return rayleigh; //!!!
   // rayleigh = 0;  // !!
   // eigenvectors[0].compress(dealii::VectorOperation::unknown);
   // make matrices sparse
@@ -79,7 +80,7 @@ double EnergyMgFiss::update(
   // slowing_sp.copy_from(slowing);
   // fission_sp.copy_from(fission);
   // dealii::SolverControl control(10, std::clamp(tol, 1e-5, 1e-3));
-  dealii::SolverControl control(10, 1e-5);
+  dealii::SolverControl control(1000, 1e-5);
   // dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
   dealii::SLEPcWrappers::SolverJacobiDavidson eigensolver(control);
   eigensolver.set_target_eigenvalue(rayleigh/*+1e-2*/);
@@ -114,10 +115,10 @@ double EnergyMgFiss::update(
     aether::PETScWrappers::MatrixFreeWrapper<BlockSOR> shifted_gs_mf(
         MPI_COMM_WORLD, size, size, size, size, shifted_gs);
     aether::PETScWrappers::PreconditionerShell shifted_gs_pc(shifted_gs_mf);
-    // dealii::SolverControl control_dummy(1, 0);
-    // dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
-    dealii::ReductionControl control_pc(3, 1e-6, 1e-3);
-    dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
+    dealii::SolverControl control_dummy(1, 0);
+    dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
+    // dealii::ReductionControl control_pc(5, 1e-6, 1e-3);
+    // dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
     solver_pc.initialize(shifted_gs_pc);
     // solver_pc.initialize(preconditioner);
     aether::SLEPcWrappers::TransformationPreconditioner stprecond(
@@ -126,7 +127,7 @@ double EnergyMgFiss::update(
     //     MPI_COMM_WORLD, shifted);
     stprecond.set_matrix_mode(ST_MATMODE_SHELL);
     stprecond.set_solver(solver_pc);
-    eigensolver.set_transformation(stprecond);
+    // eigensolver.set_transformation(stprecond);
   }
   // solve eigenproblem
   std::vector<double> eigenvalues;
@@ -151,7 +152,7 @@ double EnergyMgFiss::update(
         modes[m][g] = eigenvectors[0][i];
       }
     }
-    return 0;
+    return rayleigh;  // !
   }
 }
 
