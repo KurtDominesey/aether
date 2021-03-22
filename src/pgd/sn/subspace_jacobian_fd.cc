@@ -54,8 +54,7 @@ void SubspaceJacobianFD::residual(
 
 void SubspaceJacobianFD::vmult(dealii::BlockVector<double> &dst,
                                const dealii::BlockVector<double> &src) const {
-  // const double epsilon = std::sqrt(std::numeric_limits<double>::epsilon());
-  const double epsilon = 1e-6;
+  const double epsilon = std::sqrt(std::numeric_limits<double>::epsilon());
   // std::cout << "epsilon is " << epsilon << "\n";
   double scale = (epsilon * unperturbed.l1_norm()) / 
                  (src.size() * src.l2_norm()) + epsilon;
