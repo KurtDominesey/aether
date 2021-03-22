@@ -21,6 +21,11 @@ class SubspaceEigen {
   void virtual get_inner_products(
       const dealii::Vector<double> &modes,
       std::vector<std::vector<InnerProducts>> &inner_products) = 0;
+  double virtual inner_product(const dealii::Vector<double> &left,
+                               const dealii::Vector<double> &right) {
+    AssertThrow(false, dealii::ExcNotImplemented());
+    return 0;
+  }
 };
 
 }
