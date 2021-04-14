@@ -35,6 +35,7 @@
 #include "pgd/sn/subspace_eigen.h"
 #include "pgd/sn/subspace_jacobian_fd.h"
 #include "pgd/sn/subspace_jacobian_pc.h"
+#include "pgd/sn/shifted_s.h"
 
 template <int dim, int qdim>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -711,8 +712,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
     for (int m = 0; m < num_modes; ++m) {
       modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
-      // fixed_source_p.caches[m].mode = svecs_spaceangle[m]; 
-      // energy_mg.modes[m] = svecs_energy[m];
+      fixed_source_p.caches[m].mode.block(0) = svecs_spaceangle[m]; 
+      energy_mg.modes[m] = svecs_energy[m];
     }
     if (true) {
       const int num_modes_s = num_modes;
@@ -789,11 +790,12 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           }
         }
       }
+      double rayleigh_ = 0;
       if (guess_spatioangular) {
         for (int m = 0; m < 1 /*num_modes*/; ++m) {
           double norm_m = subspace_problem.transport.inner_product(
               modes.block(m), modes.block(m));
-          // modes.block(m) /= norm_m;
+          modes.block(m) /= norm_m;
           // modes.block(m) *= norm;
         }
         dealii::BlockVector<double> ax_(modes);
@@ -802,10 +804,17 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         subspace_problem.set_cross_sections(inner_products_x);
         subspace_problem.fission_s.vmult(ax_, modes);
         subspace_problem.fixed_source_s.vmult(bx_, modes);
-        double rayleigh_ = (modes * ax_) / (modes * bx_);
+        rayleigh_ = (modes * ax_) / (modes * bx_);
         std::cout << "rayleigh_ " << rayleigh_ << "?\n";
         dealii::IterationNumberControl control_sa(10, 1e-8);
         dealii::SolverFGMRES<dealii::BlockVector<double>> solver_sa(control_sa);
+        pgd::sn::ShiftedS<dim, qdim> shifted(subspace_problem.fission_s, 
+                                             subspace_problem.fixed_source_s);
+        // shifted.shift = rayleigh_;
+        subspace_problem.fission_s_gs.set_shift(rayleigh_);
+        // solver_sa.solve(shifted, modes, bx_, subspace_problem.fission_s_gs);
+        // solver_sa.solve(subspace_problem.fission_s, modes, bx_, 
+        //                 subspace_problem.fission_s_gs);
         solver_sa.solve(subspace_problem.fixed_source_s, modes, ax_, 
                         subspace_problem.fixed_source_s_gs);
         // subspace_problem.fixed_source_s_gs.vmult(modes, ax_);
@@ -815,6 +824,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
           modes.block(m) /= norm_m;
           // modes.block(m) *= norm;
         }
+        // modes /= modes.l2_norm();
         subspace_problem.fission_s.vmult(ax_, modes);
         subspace_problem.fixed_source_s.vmult(bx_, modes);
         double rayleigh2 = (modes * ax_) / (modes * bx_);
@@ -841,8 +851,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       norm = std::sqrt(norm);
       for (int m = 0; m < num_modes; ++m) {
         energy_mg.modes[m] /= norm;
-        modes.block(m) *= norm;
+        // modes.block(m) *= norm;
       }
+      // modes /= modes.l2_norm();
       // subspace_problem.fission_s_gs.set_shift(rayleigh_);
       // subspace_problem.fission_s_gs.vmult(modes, modes_copy);
       // subspace_problem.fixed_source_s_gs.vmult(modes, ax_);
@@ -1037,17 +1048,19 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       //       inner_products_x[m], inner_products_b[m], m, 0);
       // }
       // !!!
-      double shift = 1; //rayleigh_;  !!
+      double shift = rayleigh_;  //!!
       std::vector<std::vector<std::vector<aether::pgd::sn::InnerProducts>>>
           coefficients;
       // subspace_problem.fixed_source_s.get_inner_products_lhs(
       //     inner_products_x, modes);
       // shift = energy_fiss.update(inner_products_x);
-      for (int i = 0; i < (guess_spatioangular ? 1 : 0); ++i) {
-        double tol = std::max(1e-7, std::pow(10, -6-i));
+      for (int i = 0; i < (guess_spatioangular ? 0 : 0); ++i) {
+        // double tol = std::max(1e-7, std::pow(10, -4-i));
+        double tol = 1e-6;
         std::cout << "nonlinear iteration: " << i << "\n";
         double residual = subspace_problem.step(modes, inner_products_x, /*shift,*/
-                                                1e-6);
+                                                tol);
+        break;
         // double norm = subspace_problem.l2_norm(modes);
         // double norm = modes.l2_norm();
         // modes /= norm;
@@ -1062,7 +1075,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
             inner_products_x, modes);
         coefficients.push_back(inner_products_x);
         shift = energy_fiss.update(inner_products_x, /*residual*/ 
-                                   1e-6);
+                                   tol);
         // for (int m = 0; m < num_modes_s; ++m) {
         //   double norm = energy_fiss.modes[m].l1_norm();
         //   modes.block(m) *= norm;
@@ -1094,8 +1107,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       aether::pgd::sn::SubspaceJacobianPC<dim, qdim> jacobian_pc(
           subspace_problem, energy_fiss, jacobian.inner_products_unperturbed,
           jacobian.k_eigenvalue);
-      for (int i = 0; i < 15; ++i) {
+      for (int i = 0; i < 10; ++i) {
         std::cout << "setting modes " << modes_all.l2_norm() << "\n";
+        // modes_all.block(1) /= modes_all.block(1).l2_norm();
         jacobian.set_modes(modes_all);
         jacobian_pc.modes = modes_all;
         for (int m = 0; m < num_modes_s; ++m)
@@ -1105,14 +1119,24 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         // double _ = subspace_problem.step(
         //     modes, jacobian.inner_products_unperturbed[1], 1e-6);
         // modes_all.block(0) = modes;
-        double k_energy = 
-            energy_fiss.update(jacobian.inner_products_unperturbed[0], 1e-6);
+        // double tol = std::max(1e-5, std::pow(10, -3-(i/2)));
+        // double tol = jacobian.residual_unperturbed.l2_norm() * 1e-2;
+        // tol = std::max(1e-5, tol);
+        double tol = 1e-5;
+        double k_energy = modes_all.block(modes_all.n_blocks()-1)[0];
+        if (true) {
+        k_energy = 
+            energy_fiss.update(jacobian.inner_products_unperturbed[0], tol,
+                               i ? "krylovschur" : "krylovschur", i ? -1 : -1);
+        std::cout << "k-energy: " << k_energy << "\n";
+        }
         for (int m = 0; m < num_modes_s; ++m)
           for (int g = 0; g < num_groups; ++g)
             modes_all.block(1)[m*num_groups+g] = energy_fiss.modes[m][g];
-        std::cout << "k-energy: " << k_energy << "\n";
+        modes_all.block(1) /= modes_all.block(1).l2_norm();
         if (true /*i == 0*/) {
-          modes_all.block(modes_all.n_blocks()-1)[0] = k_energy;
+          if (k_energy != 0)
+            modes_all.block(modes_all.n_blocks()-1)[0] = k_energy;
           jacobian.set_modes(modes_all);
           jacobian_pc.modes = modes_all;
         }
