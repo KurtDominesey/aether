@@ -8,7 +8,9 @@ namespace aether::pgd::sn {
 class EigenUpdatableInterface : public EigenInterface {
  public:
   virtual double update(std::vector<std::vector<InnerProducts>> &coefficients,
-                        const double tol=1e-5) = 0;
+                        const double tol=1e-5,
+                        const std::string eps_type="krylovschur",
+                        const int num_modes=-1) = 0;
 };
 
 }  // namespace aether::pgd::sn

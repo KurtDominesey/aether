@@ -7,11 +7,16 @@
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 #include <deal.II/lac/petsc_solver.h>
+#include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/precondition.h>
+#include <deal.II/lac/petsc_matrix_base.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/sparsity_pattern.h>
 
 #include "base/petsc_wrapper.h"
 #include "base/petsc_precondition_shell.h"
 #include "base/slepc_transformation_preconditioner.h"
+#include "base/petsc_solver.h"
 #include "pgd/sn/energy_mg_full.h"
 #include "pgd/sn/eigen_updatable_interface.h"
 #include "pgd/sn/subspace_eigen.h"
@@ -25,7 +30,8 @@ class EnergyMgFiss : public EnergyMgFull, public EigenUpdatableInterface,
   EnergyMgFiss(const Mgxs &mgxs);
   double step_eigenvalue(InnerProducts &coefficients);
   double update(std::vector<std::vector<InnerProducts>> &coefficients,
-                const double tol=1e-5);
+                const double tol=1e-5, const std::string eps_type="krylovschur",
+                int num_modes=-1);
   void update(std::vector<std::vector<InnerProducts>> coefficients_x,
               std::vector<std::vector<double>> coefficients_b) override;
   void  residual(dealii::Vector<double> &residual,
@@ -53,6 +59,7 @@ class EnergyMgFiss : public EnergyMgFull, public EigenUpdatableInterface,
       dealii::FullMatrix<double> &a_minus_kb,
       const double k_eigenvalue,
       const std::vector<std::vector<InnerProducts>> &coefficients);
+  std::unique_ptr<dealii::PETScWrappers::PreconditionerBase> preconditioner_ptr;
 };
 
 }  // namespace aether::pgd::sn

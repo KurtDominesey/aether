@@ -14,18 +14,27 @@ double EnergyMgFiss::step_eigenvalue(InnerProducts &coefficients) {
 }
 
 double EnergyMgFiss::update(
-    std::vector<std::vector<InnerProducts>> &coefficients, const double tol) {
+    std::vector<std::vector<InnerProducts>> &coefficients, const double tol,
+    const std::string eps_type, int num_modes) {
   AssertDimension(coefficients.size(), modes.size());
+  // int num_modes = modes.size();
+  if (num_modes == -1)
+    num_modes = modes.size();
+  else
+    num_modes = std::min(int(modes.size()), num_modes);
   const int num_groups = modes[0].size();
-  const int size = modes.size() * num_groups;
+  const int size = num_modes * num_groups;
   // set matrices
   // dealii::FullMatrix<double> slowing(modes.size() * num_groups);
   // dealii::FullMatrix<double> fission(modes.size() * num_groups);
-  dealii::PETScWrappers::FullMatrix slowing(size, size);
-  dealii::PETScWrappers::FullMatrix fission(size, size);
-  for (int m_row = 0; m_row < modes.size(); ++m_row) {
+  // dealii::PETScWrappers::FullMatrix slowing(size, size);
+  // dealii::PETScWrappers::FullMatrix fission(size, size);
+  dealii::PETScWrappers::SparseMatrix slowing(size, size, size);
+  // MatSetOption(slowing, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+  dealii::PETScWrappers::SparseMatrix fission(size, size, size);
+  for (int m_row = 0; m_row < num_modes; ++m_row) {
     int mm_row = m_row * num_groups;
-    for (int m_col = 0; m_col < modes.size(); ++m_col) {
+    for (int m_col = 0; m_col < num_modes; ++m_col) {
       int mm_col = m_col * num_groups;
       for (int g = 0; g < num_groups; ++g) {
         slowing.add(mm_row+g, mm_col+g, coefficients[m_row][m_col].streaming);
@@ -54,7 +63,7 @@ double EnergyMgFiss::update(
   std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
   eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
   eigenvectors[0].compress(dealii::VectorOperation::add);
-  for (int m = 0; m < modes.size(); ++m) {
+  for (int m = 0; m < num_modes; ++m) {
     int mm = m * num_groups;
     for (int g = 0; g < num_groups; ++g) {
       eigenvectors[0][mm+g] += modes[m][g];
@@ -80,78 +89,180 @@ double EnergyMgFiss::update(
   // slowing_sp.copy_from(slowing);
   // fission_sp.copy_from(fission);
   // dealii::SolverControl control(10, std::clamp(tol, 1e-5, 1e-3));
-  dealii::SolverControl control(1000, 1e-5);
+  int max_iters = 10;
+  if (eps_type == "jd")
+    max_iters = 20;
+  dealii::IterationNumberControl control(max_iters, tol);
+  control.enable_history_data();
+  control.log_history(true);
+  std::unique_ptr<dealii::SLEPcWrappers::SolverBase> eigensolver_ptr;
+  if (eps_type == "krylovschur")
+    eigensolver_ptr = 
+        std::make_unique<dealii::SLEPcWrappers::SolverKrylovSchur>(control);
+  else if (eps_type == "jd")
+    eigensolver_ptr = 
+        std::make_unique<dealii::SLEPcWrappers::SolverJacobiDavidson>(control);
+  else
+    AssertThrow(false, dealii::ExcNotImplemented());
+  dealii::SLEPcWrappers::SolverBase &eigensolver = *eigensolver_ptr;
+  // dealii::SLEPcWrappers::SolverKrylovSchur eigensolver(control);
   // dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
-  dealii::SLEPcWrappers::SolverJacobiDavidson eigensolver(control);
+  // dealii::SLEPcWrappers::SolverJacobiDavidson eigensolver(control);
   eigensolver.set_target_eigenvalue(rayleigh/*+1e-2*/);
   eigensolver.set_which_eigenpairs(EPS_LARGEST_MAGNITUDE);
   if (eigenvectors[0].l2_norm() > 0)
     eigensolver.set_initial_space(eigenvectors);
   // set preconditioner
   bool use_pc = false;
-  if (use_pc) {
+  // if (use_pc) {
     // dealii::PETScWrappers::FullMatrix shifted(size, size);
     // shifted.add(1, fission);
     // shifted.add(-rayleigh, slowing);
-    dealii::PETScWrappers::SparseMatrix shifted(size, size, size);
-    dealii::FullMatrix<double> shifted_full(size);
-    for (int i = 0; i < size; ++i) {
-      for (int j = 0; j < size; ++j) {
-        shifted.set(i, j, fission.el(i, j) - rayleigh * slowing.el(i, j));
-        shifted_full(i, j) = fission.el(i, j) - rayleigh * slowing.el(i, j);
+    unsigned int sum = 0;
+    unsigned int sum_a = 0;
+    std::vector<unsigned int> row_sizes(size);
+    for (int r = 0; r < size; ++r) {
+      for (int c = 0; c < size; ++c) {
+        if (slowing.el(r, c) != 0 || r == c) {
+          row_sizes[r] += 1;
+          sum++;
+        } else if (fission.el(r, c) != 0) {
+          sum_a++;
+        }
       }
     }
-    shifted.compress(dealii::VectorOperation::insert);
+    std::cout << "sparsity B: " << (double(sum)/double(size*size)) << "\n";
+    std::cout << "sparsity A+B: " 
+              << (double(sum+sum_a)/double(size*size)) << "\n";
+    dealii::DynamicSparsityPattern dsp(size);
+    for (int i = 0; i < size; ++i) {
+      for (int j = 0; j < size; ++j) {
+        if (slowing.el(i, j) != 0) {
+          dsp.add(i, j);
+        }
+      }
+    }
+    dealii::SparsityPattern sp;
+    sp.copy_from(dsp);
+    // dealii::PETScWrappers::FullMatrix shifted(size, size);
+    // dealii::PETScWrappers::SparseMatrix shifted(size, size, size);
+    dealii::PETScWrappers::SparseMatrix shifted(sp);
+    // dealii::FullMatrix<double> shifted_full(size);
+    for (int i = 0; i < size; ++i) {
+      for (int j = 0; j < size; ++j) {
+        // if (slowing.el(i, j) == 0 && i != j);
+        //   continue;
+        if (slowing.el(i, j) != 0) {
+          // std::cout << "i, j: " << i << ", " << j << "\n";
+          shifted.add(i, j, /*fission.el(i, j) - rayleigh */ slowing.el(i, j));
+          // shifted_full(i, j) = fission.el(i, j) - rayleigh * slowing.el(i, j);
+        }
+      }
+    }
+    shifted.compress(dealii::VectorOperation::add);
+    for (int i = 0; i < size; ++i) {
+      // std::cout << shifted.el(i, i) << " / " << slowing.el(i, i) << "\n";
+      // AssertThrow(shifted.el(i, i) != 0, dealii::ExcMessage(std::to_string(i)));
+    }
     std::cout << "shifted it\n";
+    if (eps_type == "jd") {
+    // dealii::PETScWrappers::PreconditionNone preconditioner(shifted);
     dealii::PETScWrappers::PreconditionSOR preconditioner(shifted);
     // try dealii operators
-    dealii::SparsityPattern pattern;
-    pattern.copy_from(shifted_full);
-    dealii::SparseMatrix<double> shifted_sparse(pattern);
-    shifted_sparse.copy_from(shifted_full);
-    using BlockSOR = dealii::PreconditionBlockSOR<dealii::SparseMatrix<double>>;
-    BlockSOR shifted_gs;
-    shifted_gs.initialize(shifted_sparse, BlockSOR::AdditionalData(num_groups));
-    aether::PETScWrappers::MatrixFreeWrapper<BlockSOR> shifted_gs_mf(
-        MPI_COMM_WORLD, size, size, size, size, shifted_gs);
-    aether::PETScWrappers::PreconditionerShell shifted_gs_pc(shifted_gs_mf);
-    dealii::SolverControl control_dummy(1, 0);
-    dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
-    // dealii::ReductionControl control_pc(5, 1e-6, 1e-3);
-    // dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
-    solver_pc.initialize(shifted_gs_pc);
-    // solver_pc.initialize(preconditioner);
-    aether::SLEPcWrappers::TransformationPreconditioner stprecond(
-        MPI_COMM_WORLD, shifted_gs_mf);
+    // dealii::SparsityPattern pattern;
+    // pattern.copy_from(shifted_full);
+    // dealii::SparseMatrix<double> shifted_sparse(pattern);
+    // shifted_sparse.copy_from(shifted_full);
+    // shifted_full = 0;
+    // using BlockSOR = dealii::PreconditionBlockSOR<dealii::SparseMatrix<double>>;
+    // BlockSOR shifted_gs;
+    // shifted_gs.initialize(shifted_sparse, BlockSOR::AdditionalData(num_groups));
+    // aether::PETScWrappers::MatrixFreeWrapper<BlockSOR> shifted_gs_mf(
+    //     MPI_COMM_WORLD, size, size, size, size, shifted_gs);
+    // aether::PETScWrappers::PreconditionerShell shifted_gs_pc(shifted_gs_mf);
+    // dealii::SolverControl control_dummy(1, 0);
+    // dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
+    dealii::IterationNumberControl control_pc(10, 0);
+    dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
+    // solver_pc.initialize(shifted_gs_pc);
+    solver_pc.initialize(preconditioner);
     // aether::SLEPcWrappers::TransformationPreconditioner stprecond(
-    //     MPI_COMM_WORLD, shifted);
+    //     MPI_COMM_WORLD, shifted_gs_mf);
+    aether::SLEPcWrappers::TransformationPreconditioner stprecond(
+        MPI_COMM_WORLD, shifted);
     stprecond.set_matrix_mode(ST_MATMODE_SHELL);
     stprecond.set_solver(solver_pc);
-    // eigensolver.set_transformation(stprecond);
+      eigensolver.set_transformation(stprecond);
+    // }
   }
+  bool do_sinvert = false;
+  // if (do_sinvert) {
+    dealii::SLEPcWrappers::TransformationShift shift_invert(
+        MPI_COMM_WORLD,
+        dealii::SLEPcWrappers::TransformationShift::AdditionalData(
+          rayleigh /*1.32665514562608*/));
+    // dealii::SLEPcWrappers::TransformationShift shift_invert(MPI_COMM_WORLD);
+    // shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
+    dealii::IterationNumberControl control_inv(10, 0);
+    // dealii::PETScWrappers::SparseDirectMUMPS solver_inv(control_inv);
+    dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD,
+        dealii::PETScWrappers::SolverGMRES::AdditionalData(10));
+    // aether::PETScWrappers::SolverFGMRES solver_inv(
+    //     control_inv, MPI_COMM_WORLD, 
+    //     aether::PETScWrappers::SolverFGMRES::AdditionalData(10));
+    // dealii::PETScWrappers::PreconditionNone identity(slowing);
+    // dealii::PETScWrappers::PreconditionSOR slowing_gs(slowing);
+    // dealii::PETScWrappers::PreconditionParaSails slowing_pc(slowing,
+    //     dealii::PETScWrappers::PreconditionParaSails::AdditionalData(0));
+    std::cout << "setting up PC\n";
+    if (preconditioner_ptr.get() == NULL) {
+      preconditioner_ptr = 
+        std::make_unique<dealii::PETScWrappers::PreconditionILU>(shifted);
+    }
+    dealii::PETScWrappers::PreconditionerBase &slowing_pc = *preconditioner_ptr;
+    // dealii::PETScWrappers::PreconditionILU slowing_pc(shifted);
+    // dealii::PETScWrappers::PreconditionParaSails slowing_pc(shifted,
+    //     dealii::PETScWrappers::PreconditionParaSails::AdditionalData(0));
+    std::cout << "set up PC\n";
+    solver_inv.initialize(slowing_pc);
+    // solver_inv.initialize(slowing_gs);
+    shift_invert.set_solver(solver_inv);
+    shift_invert.set_matrix_mode(ST_MATMODE_COPY);
+    if (eps_type == "krylovschur")
+      eigensolver.set_transformation(shift_invert);
+  // }
   // solve eigenproblem
   std::vector<double> eigenvalues;
   try {
+    std::cout << "solving!\n";
     eigensolver.solve(fission, slowing, eigenvalues, eigenvectors);
     if (eigenvalues[0] < 0) {
       eigenvalues[0] *= -1;
       eigenvectors[0] *= -1;
     }
-    for (int m = 0, i = 0; m < this->modes.size(); ++m) {
+    for (int m = 0, i = 0; m < num_modes; ++m) {
       for (int g = 0; g < num_groups; ++g, ++i) {
         modes[m][g] = eigenvectors[0][i];
       }
     }
     std::cout << "k-updatestep: " << eigenvalues[0] << "\n";
     this->eigenvalue = eigenvalues[0];
+    const std::vector<double> &history = control.get_history_data();
+    for (int i = 0; i < history.size(); ++i)
+      std::cout << history[i] << "\n";
     return eigenvalues[0];
   } catch (...) {
     std::cout << "failed\n";
-    for (int m = 0, i = 0; m < this->modes.size(); ++m) {
+    for (int m = 0, i = 0; m < num_modes; ++m) {
       for (int g = 0; g < num_groups; ++g, ++i) {
+        AssertThrow(modes[m][g] == eigenvectors[0][i],
+                    dealii::ExcInvalidState())
         modes[m][g] = eigenvectors[0][i];
       }
     }
+    const std::vector<double> &history = control.get_history_data();
+    for (int i = 0; i < history.size(); ++i)
+      std::cout << history[i] << "\n";
     return rayleigh;  // !
   }
 }
@@ -238,9 +349,17 @@ void EnergyMgFiss::solve_fixed_k(
   // set up normality condition
   // (after setting up preconditioner, because of the zero diagonal)
   a_minus_kb.set(last, last, 0);
-  for (int m = 0; m < num_modes; ++m)
-    for (int g = 0; g < num_groups; ++g)
-      a_minus_kb.set(last, m*num_groups+g, 1e2*2*modes[m][g]);
+  for (int m = 0; m < num_modes; ++m) {
+    for (int g = 0; g < num_groups; ++g) {
+      int g_rev = num_groups - 1 - g;
+      double lower = mgxs.group_structure[g_rev];
+      if (lower == 0)
+        lower = 1e-5;
+      double width = std::log(mgxs.group_structure[g_rev+1]
+                              / lower);
+      a_minus_kb.set(last, m*num_groups+g, 1e2*2*modes[m][g]/*width */);
+    }
+  }
   // if (true) {  // the smart way
   // for (int m_row = 0; m_row < num_modes; ++m_row) {
   //   int mm_row = m_row * num_groups;
