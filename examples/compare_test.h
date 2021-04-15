@@ -725,16 +725,6 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       std::vector<std::vector<double>> inner_products_b(num_modes_s,
           std::vector<double>(num_sources));
       // normalize
-      // double norm = 0;
-      // for (int m = 0; m < num_modes; ++m)
-      //   for (int g = 0; g < energy_mg.modes[m].size(); ++g)
-      //     norm += energy_mg.modes[m][g];
-      //   // norm += std::pow(energy_mg.modes[m].l2_norm(), 2);
-      // // norm = std::sqrt(norm);
-      // for (int m = 0; m < num_modes; ++m) {
-      //   energy_mg.modes[m] /= norm;
-      //   fixed_source_p.caches[m].mode *= norm;
-      // }
       for (int m = 0; m < num_modes; ++m) {
         double norm_m = subspace_problem.transport.inner_product(
             fixed_source_p.caches[m].mode.block(0), 
@@ -745,105 +735,45 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int m = 0; m < num_modes_s; ++m) {
         energy_mg.get_inner_products(
             inner_products_x[m], inner_products_b[m], m, 0);
-        // std::cout << "m " << m << "\n";
-        for (int j = 0; j < num_materials; ++j) {
-          double removal_d = 0;
-          double removal_od = 0;
-          for (int mp = 0; mp < num_modes_s; ++mp) {
-            double removal = inner_products_x[m][mp].collision[j] -
-                             inner_products_x[m][mp].scattering[j][0];
-            if (m == mp)
-              removal_d += removal;
-            else
-              removal_od += removal;
-          }
-          // std::cout << std::boolalpha << (removal_d >= removal_od) << ": "
-          //           << removal_d << " >= " << removal_od << "\n";
-        }
-        // for (int mp = 0; mp < num_modes_s; ++mp) {
-        //   std::cout << inner_products_x[m][mp].streaming << " ";
-        // }
-        // std::cout << inner_products_x[m][m].streaming << std::endl;
       }
       dealii::BlockVector<double> modes(
           num_modes_s, quadrature.size()*dof_handler.n_dofs());
-      dealii::BlockVector<double> operated(modes);
-      dealii::BlockVector<double> source(modes);
-      dealii::BlockVector<double> ax(modes);
-      dealii::BlockVector<double> bx(modes);
-      dealii::Vector<double> scratch(source.block(0));
-      dealii::Vector<double> dual(source.block(0));
       bool guess_spatioangular = true;
       for (int m = 0; m < num_modes_s; ++m) {
         if (guess_spatioangular)
           modes.block(m) = m == 0 ? 1 : 0;
         else
           modes.block(m) = fixed_source_p.caches[m].mode.block(0);
-        for (int s = 0; s < num_sources; ++s) {
-          scratch = sources_spaceangle[s];
-          problem.transport.vmult_mass(dual, scratch);
-          source.block(m).add(inner_products_b[m][s], dual);
-          problem.transport.vmult_mass_inv(dual);
-          for (int i = 0; i < scratch.size(); ++i) {
-            AssertThrow(std::abs(scratch[i]-dual[i]) < 1e-12,
-                        dealii::ExcInvalidState());
-          }
-        }
       }
-      double rayleigh_ = 0;
+      double rayleigh = 0;
       if (guess_spatioangular) {
-        for (int m = 0; m < 1 /*num_modes*/; ++m) {
-          double norm_m = subspace_problem.transport.inner_product(
-              modes.block(m), modes.block(m));
-          modes.block(m) /= norm_m;
-          // modes.block(m) *= norm;
-        }
-        dealii::BlockVector<double> ax_(modes);
-        dealii::BlockVector<double> bx_(modes);
-        dealii::BlockVector<double> modes_copy(modes);
+        double norm_0 = subspace_problem.transport.inner_product(
+            modes.block(0), modes.block(0));
+        modes.block(0) /= norm_0;
+        dealii::BlockVector<double> ax(modes);
+        dealii::BlockVector<double> bx(modes);
         subspace_problem.set_cross_sections(inner_products_x);
-        subspace_problem.fission_s.vmult(ax_, modes);
-        subspace_problem.fixed_source_s.vmult(bx_, modes);
-        rayleigh_ = (modes * ax_) / (modes * bx_);
-        std::cout << "rayleigh_ " << rayleigh_ << "?\n";
+        subspace_problem.fission_s.vmult(ax, modes);
+        subspace_problem.fixed_source_s.vmult(bx, modes);
+        rayleigh = (modes * ax) / (modes * bx);
+        std::cout << "rayleigh " << rayleigh << "?\n";
         dealii::IterationNumberControl control_sa(10, 1e-8);
         dealii::SolverFGMRES<dealii::BlockVector<double>> solver_sa(control_sa);
-        pgd::sn::ShiftedS<dim, qdim> shifted(subspace_problem.fission_s, 
-                                             subspace_problem.fixed_source_s);
-        // shifted.shift = rayleigh_;
-        subspace_problem.fission_s_gs.set_shift(rayleigh_);
-        // solver_sa.solve(shifted, modes, bx_, subspace_problem.fission_s_gs);
-        // solver_sa.solve(subspace_problem.fission_s, modes, bx_, 
-        //                 subspace_problem.fission_s_gs);
-        solver_sa.solve(subspace_problem.fixed_source_s, modes, ax_, 
+        solver_sa.solve(subspace_problem.fixed_source_s, modes, ax, 
                         subspace_problem.fixed_source_s_gs);
-        // subspace_problem.fixed_source_s_gs.vmult(modes, ax_);
         for (int m = 0; m < num_modes; ++m) {
           double norm_m = subspace_problem.transport.inner_product(
               modes.block(m), modes.block(m));
           modes.block(m) /= norm_m;
-          // modes.block(m) *= norm;
         }
-        // modes /= modes.l2_norm();
-        subspace_problem.fission_s.vmult(ax_, modes);
-        subspace_problem.fixed_source_s.vmult(bx_, modes);
-        double rayleigh2 = (modes * ax_) / (modes * bx_);
-        std::cout << "rayleigh2 " << rayleigh_ << "?\n";
+        subspace_problem.fission_s.vmult(ax, modes);
+        subspace_problem.fixed_source_s.vmult(bx, modes);
+        double rayleigh2 = (modes * ax) / (modes * bx);
+        std::cout << "rayleigh2 " << rayleigh2 << "?\n";
       }
       double norm = 0;
       for (int m = 0; m < num_modes; ++m) {
-        // energy_mg.modes[m] = svecs_energy[m];
-        // double norm = energy_mg.modes[m].l2_norm();
         for (int g = 0; g < num_groups; ++g) {
-          int g_rev = num_groups - 1 - g;
-          double lower = mgxs->group_structure[g_rev];
-          if (lower == 0)
-            lower = 1e-5;
-          double width = std::log(mgxs->group_structure[g_rev+1]
-                                  / lower);
-          // std::cout << "width: " << width << "\n";
-          // norm += std::pow(energy_mg.modes[m][g], 2) / width;
-          // norm += energy_mg.modes[m][g];
           norm += std::pow(energy_mg.modes[m][g], 2);
         }
       }
@@ -851,243 +781,12 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       norm = std::sqrt(norm);
       for (int m = 0; m < num_modes; ++m) {
         energy_mg.modes[m] /= norm;
-        // modes.block(m) *= norm;
-      }
-      // modes /= modes.l2_norm();
-      // subspace_problem.fission_s_gs.set_shift(rayleigh_);
-      // subspace_problem.fission_s_gs.vmult(modes, modes_copy);
-      // subspace_problem.fixed_source_s_gs.vmult(modes, ax_);
-      double rayleigh = 1;
-      /*
-      subspace_problem.set_cross_sections(inner_products_x);
-      subspace_problem.fixed_source_s.vmult(bx, modes);
-      subspace_problem.fission_s.vmult(ax, modes);
-      double rayleigh = (modes * ax) / (modes * bx);
-      std::cout << "rayleigh quotient: " << rayleigh << std::endl;
-      // subspace_problem.step(modes, inner_products_x);
-      rayleigh = 1 / rayleigh;
-      // rayleigh = 0.5;
-      // rayleigh = 0;
-      // subspace_problem.fission_s_gs.set_shift(rayleigh);
-      */
-      if (false) {
-        dealii::IterationNumberControl control(10, 1e-8);
-        dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
-        // dealii::SolverGMRES<dealii::BlockVector<double>> solver(control/*,
-        //     dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(
-        //       30, false)*/);
-        // solver.set_omega(1.2);
-        solver.connect([](const unsigned int iteration,
-                          const double check_value,
-                          const dealii::BlockVector<double>&) {
-          std::cout << iteration << ": " << check_value << std::endl;
-          return dealii::SolverControl::success;
-        });
-        std::cout << "modes: " << modes.l2_norm() << std::endl;
-        subspace_problem.fixed_source_s_gs.use_jacobi = false;
-        if (false) {
-          solver.solve(subspace_problem.fixed_source_s, modes, source, 
-                      subspace_problem.fixed_source_s_gs
-                      //  dealii::PreconditionIdentity()
-                      );
-          
-        } else {
-          for (int m = 0; m < num_modes; ++m) {
-            // modes.block(m) = m == 0 ? 1 : 0;
-          }
-          subspace_problem.fission_s.vmult(source, modes);
-          if (false) {
-            aether::pgd::sn::ShiftedS shifted(subspace_problem.fission_s, 
-                                              subspace_problem.fixed_source_s);
-            shifted.shift = rayleigh;
-            solver.solve(shifted, modes, source, 
-                        subspace_problem.fission_s_gs
-                        // dealii::PreconditionIdentity()
-                        );
-          } else {
-            dealii::BlockVector<double> copy(modes);
-            solver.solve(subspace_problem.fixed_source_s, modes, source,
-                         subspace_problem.fixed_source_s_gs);
-            modes.add(-rayleigh, copy);
-          }
-          subspace_problem.fixed_source_s.vmult(ax, modes);
-          subspace_problem.fission_s.vmult(bx, modes);
-          double rayleigh_new = (modes * ax) / (modes * bx);
-          std::cout << "rayleigh quotient new: " << 1/rayleigh_new << std::endl;
-        }
-        std::cout << "modes: " << modes.l2_norm() << std::endl;
-        subspace_problem.fixed_source_s.vmult(operated, modes);
-        std::cout << "operated: " << operated.l2_norm() << std::endl;
-        std::cout << "source: " << source.l2_norm() << std::endl;
-        source -= operated;
-        std::cout << "source: " << source.l2_norm() << std::endl;
-      } else {
-        /*
-        std::cout << "ax, bx: " << ax.l2_norm() << ", " << bx.l2_norm() << "\n";
-        ax.add(-rayleigh, bx);
-        std::cout << "initial residual: " << ax.l2_norm() << std::endl;
-        dealii::BlockVector<double> ax_mass_inv(ax);
-        for (int m = 0; m < ax_mass_inv.n_blocks(); ++m)
-          problem.transport.vmult_mass_inv(ax_mass_inv.block(m));
-        std::cout << "initial residual: " << ax_mass_inv.l2_norm() << std::endl;
-        bx = 0;
-        subspace_problem.fixed_source_s_gs.vmult(bx, ax);
-        std::cout << "fixed gs residual: " << bx.l2_norm() << std::endl;
-        bx = 0;
-        subspace_problem.fission_s_gs.vmult(bx, ax);
-        std::cout << "fission gs residual: " << bx.l2_norm() << std::endl;
-        const int num_qdofs = quadrature.size() * dof_handler.n_dofs();
-        ::aether::PETScWrappers::BlockWrapper fixed_source_s(
-            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs,
-            subspace_problem.fixed_source_s);
-        ::aether::PETScWrappers::BlockWrapper fission_s_gs(
-            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs,
-            subspace_problem.fission_s_gs);
-        ::aether::PETScWrappers::BlockWrapper fission_s(
-            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs, 
-            subspace_problem.fission_s);
-        const int size = num_modes_s * num_qdofs;
-        std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
-        eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
-        eigenvectors[0].compress(dealii::VectorOperation::insert);
-        const double norm = modes.l2_norm();
-        // for (int i = 0; i < size; ++i)
-        //   eigenvectors[0][i] = modes[i] / norm;
-        for (int i = 0; i < num_qdofs; ++i)
-          eigenvectors[0][i] = 1;
-        eigenvectors[0].compress(dealii::VectorOperation::insert);
-        std::vector<double> eigenvalues = {0.999};
-        dealii::SolverControl control(10, 1e-4);
-        // dealii::SLEPcWrappers::SolverPower eigensolver(control);
-        dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
-        eigensolver.set_initial_space(eigenvectors);
-        eigensolver.set_target_eigenvalue(rayleigh);
-        // shift and invert
-        using Shift 
-            = dealii::SLEPcWrappers::TransformationShiftInvert::AdditionalData;
-        dealii::SLEPcWrappers::TransformationShiftInvert shift_invert(
-            MPI_COMM_WORLD, Shift(rayleigh));
-        shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
-        dealii::IterationNumberControl control_inv(10, 1e-4);
-        dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
-        // dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source_s);
-        // aether::PETScWrappers::PreconditionerMatrix preconditioner(fixed_source_s_gs);
-        aether::PETScWrappers::PreconditionerShell preconditioner(fission_s_gs);
-        // make sure preconditioner works
-        dealii::PETScWrappers::MPI::Vector foo(eigenvectors[0]);
-        dealii::PETScWrappers::MPI::Vector bar(foo);
-        std::cout << "a: ";
-        // preconditioner.vmult(bar, foo);
-        solver_inv.initialize(preconditioner);
-        // std::cout << "b: "; preconditioner.vmult(bar, foo);
-        shift_invert.set_solver(solver_inv);
-        // std::cout << "c: "; preconditioner.vmult(bar, foo);
-        // eigensolver.set_transformation(shift_invert);
-        // std::cout << "d: "; preconditioner.vmult(bar, foo);
-        dealii::SolverControl control_dummy(1, 0);
-        dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
-        // dealii::IterationNumberControl control_pc(3, 1e-6);
-        // dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
-        solver_pc.initialize(preconditioner);
-        aether::SLEPcWrappers::TransformationPreconditioner stprecond(
-            MPI_COMM_WORLD, fission_s_gs);
-        stprecond.set_matrix_mode(ST_MATMODE_SHELL);
-        stprecond.set_solver(solver_pc);
-        eigensolver.set_transformation(stprecond);
-        try {
-          std::cout << "to solve\n";
-          eigensolver.solve(fission_s, fixed_source_s, eigenvalues, eigenvectors);
-          for (int i = 0; i < eigenvectors[0].size(); ++i)
-            modes[i] = eigenvectors[0][i];
-        } catch (dealii::SolverControl::NoConvergence &failure) {
-          failure.print_info(std::cout);
-        } //catch (...) {}
-        std::cout << "k-eigenvalue: " << 1/eigenvalues[0] << std::endl;
-        // std::cout << "e: "; preconditioner.vmult(bar, foo);
-        // dealii::PETScWrappers::MPI::Vector baz(foo);
-        // fixed_source_s_gs.vmult(
-        //     static_cast<dealii::PETScWrappers::VectorBase&>(baz), 
-        //     static_cast<const dealii::PETScWrappers::VectorBase&>(foo));
-        // for (int i = 0; i < size; ++i) {
-        //   AssertThrow(bar[i] == baz[i], dealii::ExcInvalidState());
-        // }
-        */
-        for (int m = 0; m < 2; ++m) {
-          // fixed_source_p.get_inner_products(
-          //   inner_products_x[m], inner_products_b[m], m, 0);
-          for (int mp = 0; mp < 2; ++mp) {
-            std::cout << m << "," << mp << "\n";
-            std::cout << "stream " << inner_products_x[m][mp].streaming << "\n";
-            for (int j = 0; j < num_materials; ++j) {
-              std::cout << "matl " << j << ": ";
-              std::cout << "collide " << inner_products_x[m][mp].collision[j]
-                        << " scatter " << inner_products_x[m][mp].scattering[j][0]
-                        << " fission " << inner_products_x[m][mp].fission[j]
-                        << "\n";
-            }
-          }
-        }
       }
       for (int m = 0; m < num_modes; ++m) {
         energy_fiss.modes.push_back(energy_mg.modes[m]);
-        // double norm = modes.block(m).l2_norm();
-        // modes.block(m) /= norm;
-        // energy_fiss.modes[m] *= norm;
-        // double norm = subspace_problem.transport.inner_product(
-        //     modes.block(m), modes.block(m));
-        // norm = std::sqrt(norm);
-        // modes.block(m) /= norm;
-        // energy_fiss.modes[m] *= norm;
       }
-      // !!!
-      // subspace_problem.fixed_source_s.get_inner_products_lhs(
-      //     inner_products_x, modes);
-      // energy_fiss.update(inner_products_x, 1e-7);
-      // for (int m = 0; m < num_modes_s; ++m) {
-      //   energy_fiss.get_inner_products(
-      //       inner_products_x[m], inner_products_b[m], m, 0);
-      // }
-      // !!!
-      double shift = rayleigh_;  //!!
       std::vector<std::vector<std::vector<aether::pgd::sn::InnerProducts>>>
           coefficients;
-      // subspace_problem.fixed_source_s.get_inner_products_lhs(
-      //     inner_products_x, modes);
-      // shift = energy_fiss.update(inner_products_x);
-      for (int i = 0; i < (guess_spatioangular ? 0 : 0); ++i) {
-        // double tol = std::max(1e-7, std::pow(10, -4-i));
-        double tol = 1e-6;
-        std::cout << "nonlinear iteration: " << i << "\n";
-        double residual = subspace_problem.step(modes, inner_products_x, /*shift,*/
-                                                tol);
-        break;
-        // double norm = subspace_problem.l2_norm(modes);
-        // double norm = modes.l2_norm();
-        // modes /= norm;
-        // for (int m = 0; m < num_modes_s; ++m) {
-        //   double norm = subspace_problem.transport.inner_product(
-        //       modes.block(m), modes.block(m));
-        //   norm = std::sqrt(norm);
-        //   modes.block(m) /= norm;
-        //   energy_fiss.modes[m] *= norm;
-        // }
-        subspace_problem.fixed_source_s.get_inner_products_lhs(
-            inner_products_x, modes);
-        coefficients.push_back(inner_products_x);
-        shift = energy_fiss.update(inner_products_x, /*residual*/ 
-                                   tol);
-        // for (int m = 0; m < num_modes_s; ++m) {
-        //   double norm = energy_fiss.modes[m].l1_norm();
-        //   modes.block(m) *= norm;
-        //   energy_fiss.modes[m] /= norm;
-        // }
-        std::cout << shift << "\n";
-        for (int m = 0; m < num_modes_s; ++m)
-            energy_fiss.get_inner_products(
-                inner_products_x[m], inner_products_b[m], m, 0);
-        coefficients.push_back(inner_products_x);
-      }
-      // return;
       // do JFNK
       std::vector<aether::pgd::sn::SubspaceEigen*> eigen_ops = 
           {&subspace_problem, &energy_fiss};
@@ -1102,7 +801,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       for (int m = 0; m < num_modes_s; ++m)
         for (int g = 0; g < num_groups; ++g)
           modes_all.block(1)[m*num_groups+g] = energy_fiss.modes[m][g];
-      modes_all.block(modes_all.n_blocks()-1)[0] = shift;  // initial eigenvalue
+      modes_all.block(modes_all.n_blocks()-1)[0] = rayleigh;  // initial k
       dealii::BlockVector<double> step(modes_all);
       aether::pgd::sn::SubspaceJacobianPC<dim, qdim> jacobian_pc(
           subspace_problem, energy_fiss, jacobian.inner_products_unperturbed,
@@ -1115,44 +814,27 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         for (int m = 0; m < num_modes_s; ++m)
           for (int g = 0; g < num_groups; ++g)
             energy_fiss.modes[m][g] = modes_all.block(1)[m*num_groups+g];
-        // modes = modes_all.block(0);
-        // double _ = subspace_problem.step(
-        //     modes, jacobian.inner_products_unperturbed[1], 1e-6);
-        // modes_all.block(0) = modes;
-        // double tol = std::max(1e-5, std::pow(10, -3-(i/2)));
-        // double tol = jacobian.residual_unperturbed.l2_norm() * 1e-2;
-        // tol = std::max(1e-5, tol);
         double tol = 1e-5;
-        double k_energy = modes_all.block(modes_all.n_blocks()-1)[0];
-        if (true) {
-        k_energy = 
-            energy_fiss.update(jacobian.inner_products_unperturbed[0], tol,
-                               i ? "krylovschur" : "krylovschur", i ? -1 : -1);
+        double k_energy = 
+            energy_fiss.update(jacobian.inner_products_unperturbed[0], tol);
         std::cout << "k-energy: " << k_energy << "\n";
-        }
         for (int m = 0; m < num_modes_s; ++m)
           for (int g = 0; g < num_groups; ++g)
             modes_all.block(1)[m*num_groups+g] = energy_fiss.modes[m][g];
         modes_all.block(1) /= modes_all.block(1).l2_norm();
-        if (true /*i == 0*/) {
-          if (k_energy != 0)
-            modes_all.block(modes_all.n_blocks()-1)[0] = k_energy;
-          jacobian.set_modes(modes_all);
-          jacobian_pc.modes = modes_all;
-        }
+        if (k_energy != 0)
+          modes_all.block(modes_all.n_blocks()-1)[0] = k_energy;
+        jacobian.set_modes(modes_all);
+        jacobian_pc.modes = modes_all;
         std::cout << "set modes\n";
         // set initial guess
         step = modes_all;
-        // step = 1;
-        // step *= -1;
         step[step.size()-1] *= 1e-2;
         step /= step.l2_norm();
         step *= jacobian.residual_unperturbed.l2_norm();
         // solve
         dealii::IterationNumberControl control(5, 0);
-        dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control/*,
-            dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(
-              30, true, true, true)*/);
+        dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
         solver.solve(jacobian, step, jacobian.residual_unperturbed, 
                      jacobian_pc);
         modes_all.add(1.0, step);
