@@ -22,9 +22,10 @@ find_package(GTest REQUIRED 1.8.0)
 include_directories(${GTEST_INCLUDE_DIRS})
 
 file(GLOB_RECURSE source_lib "../../src/*.cc" "../../src/*/*.cc")
+file(GLOB test_base "../*.cc")
 include_directories(${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src)
 
-add_library(aether ${source_lib})
+add_library(aether ${source_lib} ${test_base})
 target_include_directories(aether PUBLIC "../../src")
 deal_ii_setup_target(aether)
 
