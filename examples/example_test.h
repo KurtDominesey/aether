@@ -85,13 +85,16 @@ class ExampleTest : public ::testing::Test {
 
   void WriteFlux(const dealii::BlockVector<double> &flux,
                  const std::vector<double> &history,
-                 const std::string &filename) {
+                 const std::string &filename,
+                 const double k_eigenvalue=0) {
     dealii::Vector<double> flux_v(flux.size());
     flux_v = flux;
     namespace HDF5 = dealii::HDF5;
     HDF5::File file(filename, HDF5::File::FileAccessMode::create);
     file.write_dataset("flux_full", flux_v);
     file.write_dataset("history_data", history);
+    if (k_eigenvalue !=0)
+      file.set_attribute("k_eigenvalue", k_eigenvalue);
     // add metadata
     file.set_attribute("n_dofs", this->dof_handler.n_dofs());
     file.set_attribute("n_polar", this->quadrature.get_tensor_basis()[0].size());
