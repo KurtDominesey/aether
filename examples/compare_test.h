@@ -81,7 +81,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
   }
 
   template <class TransportType>
-  void RunFullOrderCriticality(
+  double RunFullOrderCriticality(
       dealii::BlockVector<double> &flux,
       const dealii::BlockVector<double> &source,
       const FissionProblem<dim, qdim, TransportType> &problem,
@@ -119,6 +119,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
         flux[i] = eigenvectors[0][i];
       std::cout << "EIGENVALUE: " << std::setprecision(10) 
                 << eigenvalues[0] << std::endl;
+      return eigenvalues[0];
     } else {
       // dealii::BlockVector<double> uncollided(source.get_block_indices());
       // problem.sweep_source(uncollided, source);
@@ -144,6 +145,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       flux /= flux.l2_norm();
       eigensolver.solve(k, fission_source, flux);
       std::cout << "k-eigenvalue: " << std::setprecision(10) << k << std::endl;
+      return k;
     }
   }
 
