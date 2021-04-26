@@ -328,7 +328,7 @@ void EnergyMgFiss::solve_fixed_k(
     const std::vector<std::vector<InnerProducts>> &coefficients) {
   const int num_modes = coefficients.size();
   AssertDimension(num_modes, coefficients[0].size());
-  const int num_groups = dst.size() / num_modes;
+  const int num_groups = mgxs.total.size();
   AssertDimension(dst.size(), src.size());
   dealii::FullMatrix<double> a_minus_kb(dst.size());
   set_fixed_k_matrix(a_minus_kb, k_eigenvalue, coefficients);
@@ -457,7 +457,7 @@ void EnergyMgFiss::set_fixed_k_matrix(
     const std::vector<std::vector<InnerProducts>> &coefficients) {
   const int num_modes = coefficients.size();
   AssertDimension(num_modes, coefficients[0].size());
-  const int num_groups = a_minus_kb.m() / num_modes;
+  const int num_groups = mgxs.total.size();
   for (int m_row = 0; m_row < num_modes; ++m_row) {
     int mm_row = m_row * num_groups;
     for (int m_col = 0; m_col < num_modes; ++m_col) {
