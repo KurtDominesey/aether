@@ -235,24 +235,24 @@ void FissionSProblem<dim, qdim>::solve_fixed_k(
   src_b = src;
   const double shift = k_eigenvalue;
   set_cross_sections(coefficients);
-  int system = 1;
+  int system = 0;
   switch (system) {
     case 0: {  // A-kB
       // set up operators
       ShiftedS<dim, qdim> shifted(fission_s, this->fixed_source_s);
       shifted.shift = shift;
       fission_s_gs.set_shift(shift);
-      fission_s_gs.vmult(dst_b, src_b);
+      // fission_s_gs.vmult(dst_b, src_b);
       // solve system
-      // dealii::IterationNumberControl control(10, 1e-6);
-      // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
-      // solver.solve(shifted, dst_b, src_b, /*fission_s_gs*/ dealii::PreconditionIdentity());
+      dealii::IterationNumberControl control(5, 0);
+      dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
+      solver.solve(shifted, dst_b, src_b, fission_s_gs);
       break;
     }
     case 1: {  // -kB
     // solve system
-    // dealii::IterationNumberControl control(3, 1e-6);
-    // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+    // dealii::IterationNumberControl control(5, 0);
+    // dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
     // solver.solve(this->fixed_source_s, dst_b, src_b, this->fixed_source_s_gs);
     this->fixed_source_s_gs.vmult(dst_b, src_b);
     dst_b /= -k_eigenvalue;
