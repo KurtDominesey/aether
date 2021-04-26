@@ -442,7 +442,7 @@ void CompareTest<dim, qdim>::ComputeSvd(
 }
 
 template <int dim, int qdim>
-void CompareTest<dim, qdim>::Compare(const int num_modes,
+void CompareTest<dim, qdim>::Compare(int num_modes,
                                      const int max_iters_nonlinear,
                                      const double tol_nonlinear,
                                      const int max_iters_fullorder,
@@ -473,23 +473,34 @@ void CompareTest<dim, qdim>::Compare(const int num_modes,
           sources_energy[j][g], sources_spaceangle[j].block(0));
   FissionProblem<dim, qdim> problem_full(
       dof_handler, quadrature, *mgxs, boundary_conditions);
-  const std::string filename_full = this->GetTestName() + "_full.h5";
+  double eigenvalue_full = 0;
+  std::string filename_full = this->GetTestName() + "_full.h5";
+  if (do_eigenvalue)
+    filename_full = this->GetTestName() + "_k_full.h5";
   namespace HDF5 = dealii::HDF5;
   if (precomputed_full) {
     HDF5::File file(filename_full, HDF5::File::FileAccessMode::open);
     flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+    if (do_eigenvalue)
+      eigenvalue_full = file.get_attribute<double>("k_eigenvalue");
   } else {
     std::vector<double> history_data;
     // run problem
     if (do_eigenvalue) {
-      // RunFullOrderCriticality(flux_full, source_full, problem_full, 
-      //     max_iters_fullorder, tol_fullorder, &history_data);
+      eigenvalue_full = RunFullOrderCriticality(
+          flux_full, source_full, problem_full, 
+          max_iters_fullorder, tol_fullorder, &history_data);
     } else {
       RunFullOrder(flux_full, source_full, problem_full, 
                   max_iters_fullorder, tol_fullorder, &history_data);
     }
-    this->WriteFlux(flux_full, history_data, filename_full);
+    this->WriteFlux(flux_full, history_data, filename_full, eigenvalue_full);
   }
+  double sum = 0;
+  for (int i = 0; i < flux_full.size(); ++i)
+    sum += flux_full[i];
+  if (sum < 0)
+    flux_full *= -1;
   this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
   // Compute svd of full order
   std::cout << "compute svd\n";
@@ -582,22 +593,35 @@ void CompareTest<dim, qdim>::Compare(const int num_modes,
   }
   std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
       dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
+  bool guess_svd = false;
   for (int m = 0; m < num_modes; ++m) {
     modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
-    fixed_source_p.caches[m].mode.block(0) = svecs_spaceangle[m]; 
-    energy_mg.modes[m] = svecs_energy[m];
+    if (guess_svd) {
+      fixed_source_p.caches[m].mode.block(0) = svecs_spaceangle[m]; 
+      energy_mg.modes[m] = svecs_energy[m];
+    }
   }
   if (true) {
-    const int num_modes_s = num_modes;
-    pgd::sn::FissionSProblem<dim, qdim> subspace_problem(
-        dof_handler, quadrature, mgxs_one, boundary_conditions, num_modes_s);
+    const int num_modes_s = 10;
+    for (int m = num_modes_s; m < num_modes; ++m)
+      fixed_source_p.caches.pop_back();
+    energy_mg.modes.resize(num_modes_s);
     std::vector<std::vector<pgd::sn::InnerProducts>> inner_products_x( 
         num_modes_s, std::vector<pgd::sn::InnerProducts>(
           num_modes_s, pgd::sn::InnerProducts(num_materials, 1)));
     std::vector<std::vector<double>> inner_products_b(num_modes_s,
         std::vector<double>(num_sources));
+    if (false && num_modes_s != num_modes) {
+      for (int m = 0; m < num_modes_s; ++m) {
+        fixed_source_p.get_inner_products(inner_products_x[m], 
+                                          inner_products_b[m], m, 0);
+      }
+      energy_mg.update(inner_products_x, inner_products_b);
+    }
+    pgd::sn::FissionSProblem<dim, qdim> subspace_problem(
+        dof_handler, quadrature, mgxs_one, boundary_conditions, num_modes_s);
     // normalize
-    for (int m = 0; m < num_modes; ++m) {
+    for (int m = 0; m < num_modes_s; ++m) {
       double norm_m = subspace_problem.transport.inner_product(
           fixed_source_p.caches[m].mode.block(0), 
           fixed_source_p.caches[m].mode.block(0));
@@ -629,11 +653,11 @@ void CompareTest<dim, qdim>::Compare(const int num_modes,
       subspace_problem.fixed_source_s.vmult(bx, modes);
       rayleigh = (modes * ax) / (modes * bx);
       std::cout << "rayleigh " << rayleigh << "?\n";
-      dealii::IterationNumberControl control_sa(10, 1e-8);
+      dealii::IterationNumberControl control_sa(50, 0);
       dealii::SolverFGMRES<dealii::BlockVector<double>> solver_sa(control_sa);
       solver_sa.solve(subspace_problem.fixed_source_s, modes, ax, 
                       subspace_problem.fixed_source_s_gs);
-      for (int m = 0; m < num_modes; ++m) {
+      for (int m = 0; m < num_modes_s; ++m) {
         double norm_m = subspace_problem.transport.inner_product(
             modes.block(m), modes.block(m));
         modes.block(m) /= norm_m;
@@ -644,17 +668,17 @@ void CompareTest<dim, qdim>::Compare(const int num_modes,
       std::cout << "rayleigh2 " << rayleigh2 << "?\n";
     }
     double norm = 0;
-    for (int m = 0; m < num_modes; ++m) {
+    for (int m = 0; m < num_modes_s; ++m) {
       for (int g = 0; g < num_groups; ++g) {
         norm += std::pow(energy_mg.modes[m][g], 2);
       }
     }
     std::cout << "norm: " << norm << ", sqrt: " << std::sqrt(norm) << std::endl;
     norm = std::sqrt(norm);
-    for (int m = 0; m < num_modes; ++m) {
+    for (int m = 0; m < num_modes_s; ++m) {
       energy_mg.modes[m] /= norm;
     }
-    for (int m = 0; m < num_modes; ++m) {
+    for (int m = 0; m < num_modes_s; ++m) {
       energy_fiss.modes.push_back(energy_mg.modes[m]);
     }
     std::vector<std::vector<std::vector<aether::pgd::sn::InnerProducts>>>
@@ -678,27 +702,34 @@ void CompareTest<dim, qdim>::Compare(const int num_modes,
     aether::pgd::sn::SubspaceJacobianPC<dim, qdim> jacobian_pc(
         subspace_problem, energy_fiss, jacobian.inner_products_unperturbed,
         jacobian.k_eigenvalue);
-    for (int i = 0; i < 10; ++i) {
+    const int jfnk_iters = 10;
+    for (int i = 0; i <= jfnk_iters; ++i) {
       std::cout << "setting modes " << modes_all.l2_norm() << "\n";
-      // modes_all.block(1) /= modes_all.block(1).l2_norm();
       jacobian.set_modes(modes_all);
       jacobian_pc.modes = modes_all;
       for (int m = 0; m < num_modes_s; ++m)
         for (int g = 0; g < num_groups; ++g)
           energy_fiss.modes[m][g] = modes_all.block(1)[m*num_groups+g];
-      double tol = 1e-5;
+      double tol = 1e-8;
       double k_energy = 
           energy_fiss.update(jacobian.inner_products_unperturbed[0], tol);
       std::cout << "k-energy: " << k_energy << "\n";
+      // step = 0;
       for (int m = 0; m < num_modes_s; ++m)
         for (int g = 0; g < num_groups; ++g)
           modes_all.block(1)[m*num_groups+g] = energy_fiss.modes[m][g];
-      modes_all.block(1) /= modes_all.block(1).l2_norm();
-      if (k_energy != 0)
+          // step = energy_fiss.modes[m][g] - modes_all.block(1)[m*num_groups+g];
+      // modes_all.block(1) /= modes_all.block(1).l2_norm();
+      if (k_energy != 0) {
         modes_all.block(modes_all.n_blocks()-1)[0] = k_energy;
+        // step.block(step.n_blocks()-1)[0] = 
+            // k_energy - modes_all.block(modes_all.n_blocks()-1)[0];
+      }
       jacobian.set_modes(modes_all);
       jacobian_pc.modes = modes_all;
       std::cout << "set modes\n";
+      if (i == jfnk_iters)
+        continue;
       // set initial guess
       step = modes_all;
       step[step.size()-1] *= 1e-2;
@@ -713,7 +744,55 @@ void CompareTest<dim, qdim>::Compare(const int num_modes,
     }
     jacobian.set_modes(modes_all);
     jacobian_pc.modes = modes_all;
-    return;
+    const int num_qdofs = modes_spaceangle[0].size();
+    for (int m = 0; m < num_modes_s; ++m) {
+      // energy_mg.modes[m] = energy_fiss.modes[m];
+      for (int g = 0; g < num_groups; ++g)
+        energy_mg.modes[m][g] = modes_all.block(1)[m*num_groups+g];
+      for (int i = 0; i < num_qdofs; ++i) {
+        modes_spaceangle[m][i] = modes_all.block(0)[m*num_qdofs+i];
+        modes.block(m)[i] = modes_all.block(0)[m*num_qdofs+i];
+      }
+    }
+    num_modes = num_modes_s;
+    dealii::BlockVector<double> flux_pgd(flux_full);
+    flux_pgd = 0;
+    for (int m = 0; m < num_modes; ++m) {
+      for (int g = 0; g < num_groups; ++g) {
+        flux_pgd.block(g).add(energy_mg.modes[m][g], modes.block(m));
+      }
+    }
+    double norm_expanded = flux_pgd.l2_norm();
+    for (int m = 0; m < num_modes; ++m)
+      energy_mg.modes[m] /= norm_expanded;
+    flux_pgd /= norm_expanded;
+    sum = 0;
+    for (int i = 0; i < flux_pgd.size(); ++i)
+      sum += flux_pgd[i];
+    if (sum < 0) {
+      flux_pgd *= -1;
+      for (int m = 0; m < num_modes; ++m)
+        energy_mg.modes[m] *= -1;
+    }
+    double k_eigenvalue_pgd_s = modes_all.block(modes_all.n_blocks()-1)[0];
+    // store subspace pgd
+    const std::string filename_pgd_s = this->GetTestName() + "_pgd_s.h5";
+    HDF5::File file(filename_pgd_s, HDF5::File::FileAccessMode::create);
+    file.set_attribute("k_eigenvalue", k_eigenvalue_pgd_s);
+    for (int m = 0; m < num_modes; ++m) {
+      const std::string mm = std::to_string(m);
+      file.write_dataset("modes_spaceangle"+mm, modes.block(m));
+      file.write_dataset("modes_energy"+mm, energy_mg.modes[m]);
+    }
+    // stored subspace pgd
+    problem_full.fission.vmult(source_full, flux_pgd, false);
+    source_full /= k_eigenvalue_pgd_s;
+    dealii::BlockVector<double> ax_full(flux_pgd);
+    dealii::BlockVector<double> bx_full(flux_pgd);
+    problem_full.fixed_source.vmult(bx_full, flux_pgd);
+    problem_full.fission.vmult(ax_full, flux_pgd);
+    double rayleigh_full = (flux_pgd * ax_full) / (flux_pgd * bx_full);
+    std::cout << "rayleigh_full: " << rayleigh_full << "\n";
   }
   dealii::ConvergenceTable table;
   std::vector<double> l2_errors_svd_d(num_svecs+1);

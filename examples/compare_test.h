@@ -212,7 +212,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                   const dealii::BlockVector<double> &flux,
                   const Transport<dim, qdim> &transport);
 
-  void Compare(const int num_modes,
+  void Compare(int num_modes,
                const int max_iters_nonlinear,
                const double tol_nonlinear,
                const int max_iters_fullorder,
