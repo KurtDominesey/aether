@@ -16,7 +16,8 @@ Fission<dim, qdim>::Fission(
 
 template <int dim, int qdim>
 void Fission<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
-                               const dealii::BlockVector<double> &src) const {
+                               const dealii::BlockVector<double> &src,
+                               const bool sweep) const {
   AssertDimension(dst.n_blocks(), src.n_blocks());
   AssertDimension(dst.size(), src.size());
   const int num_ords = d2m.n_block_cols();
@@ -32,7 +33,10 @@ void Fission<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
   dst = 0;
   for (int g = 0; g < num_groups; ++g) {
     m2d.vmult(emitted, scratch.block(g));
-    transport_blocks[g].get().vmult(dst.block(g), emitted, true);
+    if (sweep)
+      transport_blocks[g].get().vmult(dst.block(g), emitted, true);
+    else
+      dst.block(g) = emitted;
   }
 }
 

@@ -29,7 +29,8 @@ class Fission {
           const Production<dim> &production,
           const DiscreteToMoment<dim, qdim> &d2m);
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src,
+             const bool sweep=true) const;
 
  protected:
   TransportBlocks transport_blocks;
