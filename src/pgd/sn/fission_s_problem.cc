@@ -229,9 +229,7 @@ void FissionSProblem<dim, qdim>::solve_fixed_k(
   AssertDimension(dst.size(), src.size());
   dealii::BlockVector<double> dst_b(num_modes, size);
   dealii::BlockVector<double> src_b(num_modes, size);
-  dst_b = 1;
-  dst_b /= dst_b.l2_norm();
-  dst_b *= src_b.l2_norm();
+  dst_b = src;
   src_b = src;
   const double shift = k_eigenvalue;
   set_cross_sections(coefficients);
