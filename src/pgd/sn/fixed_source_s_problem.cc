@@ -83,10 +83,14 @@ void FixedSourceSProblem<dim, qdim>::sweep_source(
     const dealii::BlockVector<double> &src) const {
   const int num_modes = blocks.size();
   const int num_groups = blocks[0][0].within_groups.size();
+  dealii::Vector<double> transported(dst.block(0));
+  dealii::Vector<double> src_mg(dst.block(0));
   for (int m = 0, mg = 0; m < num_modes; ++m) {
     for (int g = 0; g < num_groups; ++g, ++mg) {
+      transported = 0;  //src.block(mg);
       blocks[m][m].within_groups[g].transport.vmult(
-          dst.block(mg), src.block(mg), false);
+          transported, src.block(mg), false);
+      dst.block(mg).equ(fixed_source_s.streaming[m][m], transported);
     }
   }
 }

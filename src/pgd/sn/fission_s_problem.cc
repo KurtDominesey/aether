@@ -85,6 +85,7 @@ double FissionSProblem<dim, qdim>::step_gd(dealii::BlockVector<double> &modes,
   fission_s_gs.set_shift(rayleigh);  // shift preconditioner
   // set up eigensolver
   dealii::SolverControl control(20, shift);
+  // dealii::SLEPcWrappers::SolverJacobiDavidson eigensolver(control);
   dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
   eigensolver.set_target_eigenvalue(rayleigh);
   // set intial guess
@@ -97,6 +98,8 @@ double FissionSProblem<dim, qdim>::step_gd(dealii::BlockVector<double> &modes,
   // set up preconditioner
   dealii::SolverControl control_dummy(1, 0);  // dummy, solver ignores this
   dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
+  // dealii::ReductionControl control_pc(5, 1e-8, 1e-2);
+  // dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
   aether::PETScWrappers::PreconditionerShell pc(fission_s_gs_petsc);
   solver_pc.initialize(pc);
   aether::SLEPcWrappers::TransformationPreconditioner stprecond(

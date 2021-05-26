@@ -47,6 +47,9 @@ void SubspaceJacobianFD::residual(
     ops[i]->residual(dst.block(i), modes.block(i), k_eigenvalue, coefficients);
     if (i == modes.n_blocks()-2)
       norm += std::pow(modes.block(i).l2_norm(), 2);
+      // for (int g = 0; g < modes.block(i).size(); ++g)
+      //   norm += modes.block(i)[g];
+      // norm += ops[i]->inner_product(modes.block(i), modes.block(i));
   }
   dst.block(modes.n_blocks()-1)[0] = 1e2 * (norm - 1);
 }
@@ -55,6 +58,7 @@ void SubspaceJacobianFD::residual(
 void SubspaceJacobianFD::vmult(dealii::BlockVector<double> &dst,
                                const dealii::BlockVector<double> &src) const {
   const double epsilon = std::sqrt(std::numeric_limits<double>::epsilon());
+  // const double epsilon = 1e-6;
   // std::cout << "epsilon is " << epsilon << "\n";
   double scale = (epsilon * unperturbed.l1_norm()) / 
                  (src.size() * src.l2_norm()) + epsilon;
