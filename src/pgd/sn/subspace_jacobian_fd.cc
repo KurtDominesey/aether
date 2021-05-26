@@ -59,7 +59,6 @@ void SubspaceJacobianFD::vmult(dealii::BlockVector<double> &dst,
   double scale = (epsilon * unperturbed.l1_norm()) / 
                  (src.size() * src.l2_norm()) + epsilon;
   // scale = 1e-4;
-  std::cout << "scale: " << scale << "\n";
   dealii::BlockVector<double> perturbed(unperturbed);
   perturbed.add(scale, src);
   dst = 0;
@@ -67,9 +66,6 @@ void SubspaceJacobianFD::vmult(dealii::BlockVector<double> &dst,
   double perturbed_norm = dst.l2_norm();
   dst += residual_unperturbed;  // += -F(u)
   dst /= scale;
-  std::cout << "residual/perturbed: " << residual_unperturbed.l2_norm() << " "
-            << perturbed_norm << "\n";
-  std::cout << "J(u)v: " << dst.l2_norm() << "\n";
 }
 
 }  // namespace aether::pgd::sn

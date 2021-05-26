@@ -37,7 +37,6 @@ void SubspaceJacobianPC<dim, qdim>::vmult(
   for (int i = 0; i < dst.block(1).size(); ++i)
     dst.block(1)[i] = dst_aug[i];
   dst.block(2)[0] = dst_aug[dst_aug.size()-1];
-  std::cout << "delta-k: " << dst.block(2)[0] << "\n";
   // return;
   // dst.block(2)[0] = -2*(modes.block(1)*dst.block(1));
   // std::cout << "delta-k: " << dst.block(2)[0] << "\n";
