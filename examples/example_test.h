@@ -60,7 +60,7 @@ class ExampleTest : public ::testing::Test {
     else {  // TODO: generalize this
       auto this_with_params =
           dynamic_cast<const ::testing::WithParamInterface<
-            std::tuple<std::string, std::string>>*>(this);
+            std::tuple<std::string, std::string, int>>*>(this);
       if (this_with_params != nullptr)
         param = std::get<0>(this_with_params->GetParam())
                 + "/" + std::get<1>(this_with_params->GetParam());

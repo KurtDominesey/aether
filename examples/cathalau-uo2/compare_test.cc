@@ -6,7 +6,7 @@ namespace cathalau {
 class CathalauCompareTest : public CathalauTest, 
                             public CompareTest<dim_, qdim_>,
                             public ::testing::WithParamInterface<
-                                std::tuple<std::string, std::string>> {
+                                std::tuple<std::string, std::string, int>> {
  protected:
   void SetUp() override {
     materials[2] = std::get<0>(this->GetParam());
@@ -25,7 +25,7 @@ TEST_P(CathalauCompareTest, Progressive) {
 }
 
 TEST_P(CathalauCompareTest, WithUpdate) {
-  this->Compare(50, 50, 1e-4, 50, 1e-8, true, false, false);
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, false, false, false, false);
 }
 
 INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest,
@@ -34,12 +34,41 @@ INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest,
     ::testing::Values(//"CASMO-8", "CASMO-16", "CASMO-25", "CASMO-40", 
                       "CASMO-70", "XMAS-172", "SHEM-361"
                       // ,"CCFE-709", "UKAEA-1102"
-                      )
+                      ),
+    ::testing::Values(0)
     )
 );
 
 // INSTANTIATE_TEST_CASE_P(CasmoStructure, CathalauCompareTest, 
 //     ::testing::Values("CASMO-8", "CASMO-16", "CASMO-25", "CASMO-40", "CASMO-70")
 //     );
+
+class CathalauCompareSubspaceTest : public CathalauCompareTest {};
+
+TEST_P(CathalauCompareSubspaceTest, PgdEnergy) {
+  const int num_modes_s = std::get<2>(this->GetParam());
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true, 
+                false, num_modes_s, false, true);
+}
+
+TEST_P(CathalauCompareSubspaceTest, PgdBoth) {
+  const int num_modes_s = std::get<2>(this->GetParam());
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true, 
+                false, num_modes_s, false, false);
+}
+
+TEST_P(CathalauCompareSubspaceTest, SvdEnergy) {
+  const int num_modes_s = std::get<2>(this->GetParam());
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true,
+                false, num_modes_s, true, true);
+}
+
+INSTANTIATE_TEST_CASE_P(GroupStructureModes, CathalauCompareSubspaceTest,
+    ::testing::Combine(
+    ::testing::Values("mox43"),
+    ::testing::Values("CASMO-70"),
+    ::testing::Values(5, 10, 20, 30, 40, 50)
+    )
+);
 
 }  // namespace cathalau

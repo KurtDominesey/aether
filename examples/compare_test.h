@@ -36,6 +36,7 @@
 #include "pgd/sn/subspace_jacobian_fd.h"
 #include "pgd/sn/subspace_jacobian_pc.h"
 #include "pgd/sn/shifted_s.h"
+#include "pgd/sn/fission_source_shifted_s.h"
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
 class CompareTest : virtual public ExampleTest<dim, qdim> {
@@ -87,7 +88,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       const FissionProblem<dim, qdim, TransportType> &problem,
       const int max_iters, const double tol,
       std::vector<double> *history_data = nullptr) {
-    const bool use_slepc = true;
+    const bool use_slepc = flux.n_blocks() < 300;
     dealii::SolverControl control(max_iters, tol);
     control.enable_history_data();
     if (use_slepc) {
@@ -98,6 +99,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       ::aether::PETScWrappers::BlockBlockWrapper fission(
           num_groups, quadrature.size(), MPI_COMM_WORLD, 
           dof_handler.n_dofs(), dof_handler.n_dofs(), problem.fission);
+      // FixedSourceGS preconditioner(problem.fixed_source, solver_wg);
       const int size = dof_handler.n_dofs() * quadrature.size() * num_groups;
       std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
       eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
@@ -220,7 +222,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                const bool do_update,
                const bool precomputed_full=true,
                const bool precomputed_pgd=true,
-               const bool do_eigenvalue=false);
+               const bool do_eigenvalue=false,
+               const bool full_only=false,
+               int num_modes_s=0,
+               const bool guess_svd=false,
+               const bool guess_spatioangular=false);
 };
 
 

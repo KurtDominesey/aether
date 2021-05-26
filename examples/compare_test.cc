@@ -450,7 +450,11 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
                                      const bool do_update,
                                      const bool precomputed_full,
                                      const bool precomputed_pgd,
-                                     const bool do_eigenvalue) {
+                                     const bool do_eigenvalue,
+                                     const bool full_only,
+                                     int num_modes_s,
+                                     const bool guess_svd,
+                                     const bool guess_spatioangular) {
   const int num_groups = mgxs->total.size();
   const int num_materials = mgxs->total[0].size();
   // Create sources
@@ -474,15 +478,25 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
   FissionProblem<dim, qdim> problem_full(
       dof_handler, quadrature, *mgxs, boundary_conditions);
   double eigenvalue_full = 0;
-  std::string filename_full = this->GetTestName() + "_full.h5";
+  std::string filebase = "";
+  using StrStrInt = std::tuple<std::string, std::string, int>;
+  auto this_with_params = dynamic_cast<const ::testing::WithParamInterface<
+      StrStrInt>*>(this);
+  if (this_with_params != nullptr) {
+    StrStrInt param = this_with_params->GetParam();
+    filebase = std::get<0>(param) + "_" + std::get<1>(param);
+  }
+  std::string filename_full = filebase + "_full.h5";
   if (do_eigenvalue)
-    filename_full = this->GetTestName() + "_k_full.h5";
+    filename_full = filebase + "_k_full.h5";
   namespace HDF5 = dealii::HDF5;
   if (precomputed_full) {
     HDF5::File file(filename_full, HDF5::File::FileAccessMode::open);
     flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
-    if (do_eigenvalue)
+    if (do_eigenvalue) {
       eigenvalue_full = file.get_attribute<double>("k_eigenvalue");
+      std::cout << "eigenvalue_full: " << eigenvalue_full << "\n";
+    }
   } else {
     std::vector<double> history_data;
     // run problem
@@ -496,6 +510,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     }
     this->WriteFlux(flux_full, history_data, filename_full, eigenvalue_full);
   }
+  if (full_only)
+    return;
   double sum = 0;
   for (int i = 0; i < flux_full.size(); ++i)
     sum += flux_full[i];
@@ -541,7 +557,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
   pgd::sn::FissionSourceP fission_source_p(
     problem.fixed_source, problem.fission, mgxs_pseudo, mgxs_one);
   pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
-  const std::string filename_pgd = this->GetTestName() + "_pgd.h5";
+  const std::string filename_pgd = filebase + "_pgd_" +
+      (do_update ? "update" : "prog") + ".h5";
   if (precomputed_pgd) {
     // read from file
     HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::open);
@@ -593,7 +610,6 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
   }
   std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
       dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
-  bool guess_svd = false;
   for (int m = 0; m < num_modes; ++m) {
     modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
     if (guess_svd) {
@@ -601,8 +617,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
       energy_mg.modes[m] = svecs_energy[m];
     }
   }
-  if (true) {
-    const int num_modes_s = 10;
+  if (num_modes_s > 0) {
     for (int m = num_modes_s; m < num_modes; ++m)
       fixed_source_p.caches.pop_back();
     energy_mg.modes.resize(num_modes_s);
@@ -634,7 +649,6 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     }
     dealii::BlockVector<double> modes(
         num_modes_s, quadrature.size()*dof_handler.n_dofs());
-    bool guess_spatioangular = true;
     for (int m = 0; m < num_modes_s; ++m) {
       if (guess_spatioangular)
         modes.block(m) = m == 0 ? 1 : 0;
@@ -678,6 +692,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     for (int m = 0; m < num_modes_s; ++m) {
       energy_mg.modes[m] /= norm;
     }
+    modes /= modes.l2_norm();
     for (int m = 0; m < num_modes_s; ++m) {
       energy_fiss.modes.push_back(energy_mg.modes[m]);
     }
@@ -705,13 +720,15 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     const int jfnk_iters = 10;
     for (int i = 0; i <= jfnk_iters; ++i) {
       std::cout << "setting modes " << modes_all.l2_norm() << "\n";
+      // modes_all.block(0) /= modes_all.block(0).l2_norm();
       jacobian.set_modes(modes_all);
       jacobian_pc.modes = modes_all;
       for (int m = 0; m < num_modes_s; ++m)
         for (int g = 0; g < num_groups; ++g)
           energy_fiss.modes[m][g] = modes_all.block(1)[m*num_groups+g];
-      double tol = 1e-8;
-      double k_energy = 
+      double tol = 1e-12;
+      double k_energy = 0;
+      k_energy = 
           energy_fiss.update(jacobian.inner_products_unperturbed[0], tol);
       std::cout << "k-energy: " << k_energy << "\n";
       // step = 0;
@@ -730,17 +747,93 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
       std::cout << "set modes\n";
       if (i == jfnk_iters)
         continue;
+      if (false) {  // do this bad thing
+        modes = modes_all.block(0);
+        dealii::BlockVector<double> modes_copy(modes);
+        modes_copy = modes;
+        dealii::BlockVector<double> ax(modes);
+        dealii::BlockVector<double> bx(modes);
+        subspace_problem.set_cross_sections(
+          jacobian.inner_products_unperturbed[1]);
+        for (int foo = 0; foo < 1; ++foo) {
+          subspace_problem.fission_s.vmult(ax, modes);
+          subspace_problem.fixed_source_s.vmult(bx, modes);
+          dealii::IterationNumberControl control_sa(10, 0);
+          control_sa.enable_history_data();
+          dealii::SolverFGMRES<dealii::BlockVector<double>> solver_sa(control_sa);
+          solver_sa.solve(subspace_problem.fixed_source_s, modes, ax, 
+                          subspace_problem.fixed_source_s_gs);
+          // aether::pgd::sn::ShiftedS<2> shifted(subspace_problem.fission_s,
+          //                                      subspace_problem.fixed_source_s);
+          // shifted.shift = k_energy;
+          // subspace_problem.fission_s_gs.set_shift(k_energy);
+          // solver_sa.solve(shifted, modes, bx, subspace_problem.fission_s_gs);
+          std::cout << "B^-1: ";
+          for (double res : control_sa.get_history_data())
+            std::cout << res << ", ";
+          std::cout << "\n";
+          modes.add(-k_energy, modes_copy);
+        }
+        if (false) {
+          dealii::IterationNumberControl control_sa(10, 0);
+          control_sa.enable_history_data();
+          dealii::SolverFGMRES<dealii::BlockVector<double>> solver_sa(control_sa);
+          aether::pgd::sn::FissionSourceShiftedS<2> shifted(
+              subspace_problem.fission_s, subspace_problem.fixed_source_s,
+              subspace_problem.fission_s_gs);
+          shifted.shift = k_energy;
+          solver_sa.solve(shifted, modes, modes_copy, dealii::PreconditionIdentity());
+          // shifted.vmult(modes, modes_copy);
+          std::cout << "sinvert: ";
+          for (double res : control_sa.get_history_data())
+            std::cout << res << ", ";
+          std::cout << "\n";
+        }
+        modes /= modes.l2_norm();
+        modes_all.block(0) = modes;
+        jacobian.set_modes(modes_all);
+        jacobian_pc.modes = modes_all;
+        continue;
+      }
       // set initial guess
-      step = modes_all;
-      step[step.size()-1] *= 1e-2;
-      step /= step.l2_norm();
-      step *= jacobian.residual_unperturbed.l2_norm();
+      // step = modes_all;
+      // step *= -1;
+      // step[step.size()-1] *= 1e-5;
+      // step /= step.l2_norm();
+      // step *= jacobian.residual_unperturbed.l2_norm();
+      step = jacobian.residual_unperturbed;
       // solve
       dealii::IterationNumberControl control(5, 0);
+      control.enable_history_data();
       dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
       solver.solve(jacobian, step, jacobian.residual_unperturbed, 
-                    jacobian_pc);
-      modes_all.add(1.0, step);
+                    jacobian_pc 
+                    // dealii::PreconditionIdentity()
+                    );
+      if (false) { // do l2 line search
+        double norm_0 = jacobian.residual_unperturbed.l2_norm();
+        modes_all.add(0.5, step);
+        jacobian.set_modes(modes_all);
+        double norm_half = jacobian.residual_unperturbed.l2_norm();
+        modes_all.add(0.5, step);
+        jacobian.set_modes(modes_all);
+        double norm_1 = jacobian.residual_unperturbed.l2_norm();
+        norm_0 *= norm_0;
+        norm_half *= norm_half;
+        norm_1 *= norm_1;
+        double grad_1 = 3*norm_1 - 4*norm_half + norm_0;
+        double grad_0 = norm_1 - 4*norm_half + 3*norm_0;
+        grad_1 /= 2;
+        grad_0 /= 2;
+        double step_size = 1 - (grad_1*0.5) / (grad_1-grad_0);
+        std::cout << "STEP SIZE: " << step_size << "\n";
+        modes_all.add(step_size-1, step);
+      } else {
+        modes_all.add(1, step);
+      }
+      for (double res : control.get_history_data())
+        std::cout << res << ", ";
+      std::cout << "\n";
     }
     jacobian.set_modes(modes_all);
     jacobian_pc.modes = modes_all;
@@ -776,7 +869,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     }
     double k_eigenvalue_pgd_s = modes_all.block(modes_all.n_blocks()-1)[0];
     // store subspace pgd
-    const std::string filename_pgd_s = this->GetTestName() + "_pgd_s.h5";
+    const std::string filename_pgd_s = 
+      this->GetTestName() + "_pgd_s_M" + std::to_string(num_modes_s) + ".h5";
     HDF5::File file(filename_pgd_s, HDF5::File::FileAccessMode::create);
     file.set_attribute("k_eigenvalue", k_eigenvalue_pgd_s);
     for (int m = 0; m < num_modes; ++m) {
@@ -836,7 +930,10 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
                       uncollided, problem.transport, problem_full, table, 
                       "residual_swept");
   }
-  this->WriteConvergenceTable(table);
+  if (num_modes_s > 0)
+    this->WriteConvergenceTable(table, "_M"+std::to_string(num_modes_s));
+  else
+    this->WriteConvergenceTable(table);
 }
 
 template class CompareTest<2>;
