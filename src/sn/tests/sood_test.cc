@@ -322,7 +322,95 @@ TEST_F(TakedaOneTest, PuAOneGroupIsotropicSlab) {
 }
 
 template <typename Solver>
-class SoodSLEPcTest : public SoodTest {};
+class SoodSLEPcTest : public SoodTest {
+ protected:
+  // standardized eigenproblem, A^-1 Bx = kx
+  void TestStandardized() {
+    const int num_groups = this->mgxs->total.size();
+    dealii::ReductionControl control_wg(100, 1e-5, 1e-3);
+    dealii::SolverGMRES<dealii::BlockVector<double>> solver_wg(control_wg);
+    PETScWrappers::FissionSource fission_source(
+        this->problem->fixed_source, this->problem->fission, solver_wg, 
+        dealii::PreconditionIdentity());
+    dealii::SolverControl control(100, 1e-5);
+    const int size = 
+        this->dof_handler.n_dofs() * this->quadrature->size() * num_groups;
+    std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+    eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+    std::vector<double> eigenvalues = {0.5};
+    Solver eigensolver(control);
+    eigensolver.solve(fission_source, eigenvalues, eigenvectors, 1);
+    EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
+  }
+
+  // generalized eigenproblem, Ax = kBx
+  void TestGeneralized() {
+    const int num_groups = this->mgxs->total.size();
+    ::aether::PETScWrappers::BlockBlockWrapper fixed_source(
+        num_groups, this->quadrature->size(), MPI_COMM_WORLD, 
+        this->dof_handler.n_dofs(), this->dof_handler.n_dofs(),
+        this->problem->fixed_source);
+    ::aether::PETScWrappers::BlockBlockWrapper fission(
+        num_groups, this->quadrature->size(), MPI_COMM_WORLD, 
+        this->dof_handler.n_dofs(), this->dof_handler.n_dofs(),
+        this->problem->fission);
+    dealii::SolverControl control(100, 1e-5);
+    const int size = 
+        this->dof_handler.n_dofs() * this->quadrature->size() * num_groups;
+    std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+    eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+    eigenvectors[0] = 1;
+    eigenvectors[0] /= eigenvectors[0].l2_norm();
+    std::vector<double> eigenvalues = {0.5};
+    Solver eigensolver(control);
+    eigensolver.set_initial_space(eigenvectors);
+    bool is_davidson = 
+        dynamic_cast<dealii::SLEPcWrappers::SolverGeneralizedDavidson*>
+        (&eigensolver) != nullptr ||
+        dynamic_cast<dealii::SLEPcWrappers::SolverJacobiDavidson*>
+        (&eigensolver) != nullptr;
+    if (is_davidson) {
+      eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+    } else {
+      dealii::SLEPcWrappers::TransformationShiftInvert shift_invert(
+          MPI_COMM_WORLD,
+          dealii::SLEPcWrappers::TransformationShiftInvert::AdditionalData(0.9));
+      shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
+      dealii::ReductionControl control_inv(100, 1e-5, 1e-3);
+      dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
+      dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source);
+      solver_inv.initialize(preconditioner);
+      shift_invert.set_solver(solver_inv);
+      eigensolver.set_transformation(shift_invert);
+      eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+    }
+    // multiplication factor (k) is reciprocal of eigenvalue (lambda)
+    // for (int i = 0; i < eigenvalues.size(); ++i)
+    //   eigenvalues[i] = 1.0 / eigenvalues[i];
+    EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
+    // plot flux
+    dealii::DataOut<this->dim> data_out;
+    data_out.attach_dof_handler(this->dof_handler);
+    std::vector<dealii::Vector<double>> fluxes(num_groups,
+        dealii::Vector<double>(this->dof_handler.n_dofs()));
+    // quick and sloppy way to compute scalar fluxes
+    for (int g = 0; g < num_groups; ++g) {
+      data_out.add_data_vector(fluxes[g], "g"+std::to_string(g));
+      int gg = g * this->quadrature->size() * this->dof_handler.n_dofs();
+      for (int n = 0; n < this->quadrature->size(); ++n) {
+        int nn = n * this->dof_handler.n_dofs();
+        for (int i = 0; i < this->dof_handler.n_dofs(); ++i) {
+          fluxes[g][i] += this->quadrature->weight(n)*eigenvectors[0][gg+nn+i];
+        }
+      }
+      if (fluxes[g][0] < 0)
+        fluxes[g] *= -1;
+    }
+    data_out.build_patches();
+    std::ofstream output("sood.vtu");
+    data_out.write_vtu(output);
+  }
+};
 
 using Solvers = ::testing::Types<
     dealii::SLEPcWrappers::SolverPower,
@@ -334,88 +422,29 @@ using Solvers = ::testing::Types<
 TYPED_TEST_CASE(SoodSLEPcTest, Solvers);
 
 TYPED_TEST(SoodSLEPcTest, PuAOneGroupIsotropicSlab) {
-  const int num_groups = this->mgxs->total.size();
-  dealii::ReductionControl control_wg(100, 1e-5, 1e-3);
-  dealii::SolverGMRES<dealii::BlockVector<double>> solver_wg(control_wg);
-  PETScWrappers::FissionSource fission_source(
-      this->problem->fixed_source, this->problem->fission, solver_wg, 
-      dealii::PreconditionIdentity());
-  dealii::SolverControl control(100, 1e-5);
-  const int size = 
-      this->dof_handler.n_dofs() * this->quadrature->size() * num_groups;
-  std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
-  eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
-  std::vector<double> eigenvalues = {0.5};
-  TypeParam eigensolver(control);
-  eigensolver.solve(fission_source, eigenvalues, eigenvectors, 1);
-  EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
+  this->TestStandardized();
 }
 
 TYPED_TEST(SoodSLEPcTest, PuAOneGroupIsotropicSlabGeneralized) {
-  const int num_groups = this->mgxs->total.size();
-  ::aether::PETScWrappers::BlockBlockWrapper fixed_source(
-      num_groups, this->quadrature->size(), MPI_COMM_WORLD, 
-      this->dof_handler.n_dofs(), this->dof_handler.n_dofs(),
-      this->problem->fixed_source);
-  ::aether::PETScWrappers::BlockBlockWrapper fission(
-      num_groups, this->quadrature->size(), MPI_COMM_WORLD, 
-      this->dof_handler.n_dofs(), this->dof_handler.n_dofs(),
-      this->problem->fission);
-  dealii::SolverControl control(100, 1e-5);
-  const int size = 
-      this->dof_handler.n_dofs() * this->quadrature->size() * num_groups;
-  std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
-  eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
-  eigenvectors[0] = 1;
-  eigenvectors[0] /= eigenvectors[0].l2_norm();
-  std::vector<double> eigenvalues = {0.5};
-  TypeParam eigensolver(control);
-  eigensolver.set_initial_space(eigenvectors);
-  bool is_davidson = 
-      dynamic_cast<dealii::SLEPcWrappers::SolverGeneralizedDavidson*>
-      (&eigensolver) != nullptr ||
-      dynamic_cast<dealii::SLEPcWrappers::SolverJacobiDavidson*>
-      (&eigensolver) != nullptr;
-  if (is_davidson) {
-    eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
-  } else {
-    dealii::SLEPcWrappers::TransformationShiftInvert shift_invert(
-        MPI_COMM_WORLD,
-        dealii::SLEPcWrappers::TransformationShiftInvert::AdditionalData(0.9));
-    shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
-    dealii::ReductionControl control_inv(100, 1e-5, 1e-3);
-    dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
-    dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source);
-    solver_inv.initialize(preconditioner);
-    shift_invert.set_solver(solver_inv);
-    eigensolver.set_transformation(shift_invert);
-    eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+  this->TestGeneralized();
+}
+
+using SoodSLEPcGDTest = 
+    SoodSLEPcTest<dealii::SLEPcWrappers::SolverGeneralizedDavidson>;
+class SoodSLEPcAdjointTest : public SoodSLEPcGDTest {
+  void SetUp() {
+    SoodSLEPcGDTest::SetUp();
+    this->problem->fission.transposed = true;
+    this->problem->fixed_source.transposed = true;
   }
-  // multiplication factor (k) is reciprocal of eigenvalue (lambda)
-  // for (int i = 0; i < eigenvalues.size(); ++i)
-  //   eigenvalues[i] = 1.0 / eigenvalues[i];
-  EXPECT_NEAR(eigenvalues[0], 1, 1e-5);
-  // plot flux
-  dealii::DataOut<this->dim> data_out;
-  data_out.attach_dof_handler(this->dof_handler);
-  std::vector<dealii::Vector<double>> fluxes(num_groups,
-      dealii::Vector<double>(this->dof_handler.n_dofs()));
-  // quick and sloppy way to compute scalar fluxes
-  for (int g = 0; g < num_groups; ++g) {
-    data_out.add_data_vector(fluxes[g], "g"+std::to_string(g));
-    int gg = g * this->quadrature->size() * this->dof_handler.n_dofs();
-    for (int n = 0; n < this->quadrature->size(); ++n) {
-      int nn = n * this->dof_handler.n_dofs();
-      for (int i = 0; i < this->dof_handler.n_dofs(); ++i) {
-        fluxes[g][i] += this->quadrature->weight(n) * eigenvectors[0][gg+nn+i];
-      }
-    }
-    if (fluxes[g][0] < 0)
-      fluxes[g] *= -1;
-  }
-  data_out.build_patches();
-  std::ofstream output("takeda1.vtu");
-  data_out.write_vtu(output);
+};
+
+TEST_F(SoodSLEPcAdjointTest, PuAOneGroupIsotropicSlab) {
+  this->TestStandardized();
+}
+
+TEST_F(SoodSLEPcAdjointTest, PuAOneGroupIsotropicSlabGeneralized) {
+  this->TestGeneralized();
 }
 
 }  // namespace
