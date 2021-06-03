@@ -30,7 +30,11 @@ class Fission {
           const DiscreteToMoment<dim, qdim> &d2m);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src,
-             const bool sweep=true) const;
+             const bool sweep=true, bool transposing=false) const;
+  template <typename VectorType>
+  void Tvmult(VectorType &dst, const VectorType &src, 
+              const bool sweep=true) const;
+  bool transposed = false;
 
  protected:
   TransportBlocks transport_blocks;
@@ -39,6 +43,13 @@ class Fission {
   const Production<dim> &production;
   const DiscreteToMoment<dim, qdim> d2m;
 };
+
+template <int dim, int qdim>
+template <typename VectorType>
+void Fission<dim, qdim>::Tvmult(VectorType &dst, const VectorType &src, 
+                                const bool sweep) const {
+  vmult(dst, src, sweep, true);
+}
 
 }  // namespace aether::sn
 

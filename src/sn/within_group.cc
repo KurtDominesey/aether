@@ -25,32 +25,35 @@ WithinGroup<dim, qdim>::WithinGroup(
 
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(dealii::Vector<double> &flux,
-                                   const dealii::Vector<double> &src) const {
+                                   const dealii::Vector<double> &src,
+                                   const bool transposing) const {
   const int num_ords = transport.n_block_cols();
   const int num_dofs = flux.size() / num_ords;
   dealii::BlockVector<double> flux_b(num_ords, num_dofs);
   dealii::BlockVector<double> src_b(num_ords, num_dofs);
   src_b = src;
-  vmult(flux_b, src_b);
+  vmult(flux_b, src_b, transposing);
   flux = flux_b;
 }
 
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(
     dealii::BlockVector<double> &flux,
-    const dealii::BlockVector<double> &src) const {
+    const dealii::BlockVector<double> &src,
+    const bool transposing) const {
   const int num_dofs = src.block(0).size();
   dealii::BlockVector<double> src_m(1, num_dofs);
   dealii::BlockVector<double> scattered_m(1, num_dofs);
   dealii::BlockVector<double> scattered(src.n_blocks(), num_dofs);
   dealii::BlockVector<double> transported(src.n_blocks(), num_dofs);
-  vmult(flux, src, src_m, scattered_m, scattered, transported);
+  vmult(flux, src, src_m, scattered_m, scattered, transported, transposing);
 }
 
 template <int dim, int qdim>
 void WithinGroup<dim, qdim>::vmult(
       dealii::PETScWrappers::MPI::BlockVector &flux,
-      const dealii::PETScWrappers::MPI::BlockVector &src) const {
+      const dealii::PETScWrappers::MPI::BlockVector &src,
+      const bool transposing) const {
   const MPI_Comm& communicator = src.get_mpi_communicator();
   const int size = src.block(0).size();
   const int local_size = src.block(0).local_size();
@@ -59,7 +62,7 @@ void WithinGroup<dim, qdim>::vmult(
   BlockVector scattered_m(1, communicator, size, local_size);
   BlockVector scattered(src.n_blocks(), communicator, size, local_size);
   BlockVector transported(src.n_blocks(), communicator, size, local_size);
-  vmult(flux, src, src_m, scattered_m, scattered, transported);
+  vmult(flux, src, src_m, scattered_m, scattered, transported, transposing);
 }
 
 template <int dim, int qdim>
@@ -70,7 +73,9 @@ void WithinGroup<dim, qdim>::vmult(
     dealii::BlockVectorBase<Vector> &src_m,
     dealii::BlockVectorBase<Vector> &scattered_m,
     dealii::BlockVectorBase<Vector> &scattered,
-    dealii::BlockVectorBase<Vector> &transported) const {
+    dealii::BlockVectorBase<Vector> &transported,
+    bool transposing) const {
+  transposing = transposing != transposed;  // (A^T)^T = A
   AssertDimension(src.n_blocks(), flux.n_blocks());
   AssertDimension(src.size(), flux.size());
   // apply the linear operator
@@ -78,7 +83,10 @@ void WithinGroup<dim, qdim>::vmult(
   scattering.vmult(scattered_m, src_m);
   m2d.vmult(scattered, scattered_m);
   transported = src;
-  transport.vmult(transported, scattered);  // L^-1 S x
+  if (!transposing)
+    transport.vmult(transported, scattered);  // L^-1 S x
+  else
+    transport.Tvmult(transported, scattered);  // (L^T)^-1 S x
   flux = src;  // I x
   flux -= transported;  // (I - L^-1 S) x
 }

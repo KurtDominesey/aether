@@ -20,6 +20,10 @@ class Emission {
              const dealii::Vector<double> &src) const;
   void vmult_add(dealii::BlockVector<double> &dst,
                  const dealii::Vector<double> &src) const;
+  void Tvmult(dealii::Vector<double> &dst, 
+              const dealii::BlockVector<double> &src) const;
+  void Tvmult_add(dealii::Vector<double> &dst, 
+                  const dealii::BlockVector<double> &src) const;
 
  protected:
   const dealii::DoFHandler<dim> &dof_handler;

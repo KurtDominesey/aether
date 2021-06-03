@@ -112,7 +112,8 @@ class Transport {
              const dealii::Vector<double> &src,
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>>
-                 &boundary_conditions) const;
+                 &boundary_conditions,
+             const bool transposing=false) const;
 
   /**
    * Compute \f$L^{-1}q\f$.
@@ -126,7 +127,8 @@ class Transport {
              const dealii::PETScWrappers::MPI::Vector &src,
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>>
-                 &boundary_conditions) const;
+                 &boundary_conditions,
+             const bool transposing=false) const;
 
   /**
    * Compute \f$L^{-1}q\f$.
@@ -141,7 +143,8 @@ class Transport {
              const dealii::BlockVectorBase<Vector> &src,
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>> 
-                 &boundary_conditions) const;
+                 &boundary_conditions,
+             const bool transposing=false) const;
   
   /**
    * Return the number of blocks in a column.
@@ -189,7 +192,8 @@ class Transport {
                     const dealii::BlockVectorBase<Vector> &src,
                     const std::vector<double> &cross_sections,
                     const std::vector<dealii::BlockVector<double>>
-                        &boundary_conditions) const;
+                        &boundary_conditions,
+                    const bool transposing=false) const;
 
   //! Discrete ordinates (sweep directions).
   std::vector<Ordinate> ordinates;

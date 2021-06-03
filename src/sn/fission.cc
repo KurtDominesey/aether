@@ -17,7 +17,9 @@ Fission<dim, qdim>::Fission(
 template <int dim, int qdim>
 void Fission<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
                                const dealii::BlockVector<double> &src,
-                               const bool sweep) const {
+                               const bool sweep,
+                               bool transposing) const {
+  transposing = transposing != transposed;  // (A^T)^T = A
   AssertDimension(dst.n_blocks(), src.n_blocks());
   AssertDimension(dst.size(), src.size());
   const int num_ords = d2m.n_block_cols();
@@ -27,14 +29,23 @@ void Fission<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
   dealii::BlockVector<double> scratch(num_groups, num_dofs);
   for (int g = 0; g < num_groups; ++g)
     d2m.vmult(scratch.block(g), src.block(g));
-  production.vmult(produced, scratch);
-  emission.vmult(scratch, produced);
+  if (!transposing) {
+    production.vmult(produced, scratch);
+    emission.vmult(scratch, produced);
+  } else {
+    emission.Tvmult(produced, scratch);
+    production.Tvmult(scratch, produced);
+  }
   dealii::Vector<double> emitted(num_ords*num_dofs);
   dst = 0;
   for (int g = 0; g < num_groups; ++g) {
     m2d.vmult(emitted, scratch.block(g));
-    if (sweep)
-      transport_blocks[g].get().vmult(dst.block(g), emitted, true);
+    if (sweep) {
+      if (!transposing)
+        transport_blocks[g].get().vmult(dst.block(g), emitted, true);
+      else
+        transport_blocks[g].get().Tvmult(dst.block(g), emitted, true);
+    }
     else
       dst.block(g) = emitted;
   }

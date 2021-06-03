@@ -18,7 +18,9 @@ FixedSource<dim, qdim>::FixedSource(
 template <int dim, int qdim>
 void FixedSource<dim, qdim>::vmult(
     dealii::BlockVector<double> &dst,
-    const dealii::BlockVector<double> &src) const {
+    const dealii::BlockVector<double> &src,
+    bool transposing) const {
+  transposing = transposing != transposed;  // (A^T)^T = A
   const int num_groups = within_groups.size();
   const int num_ords = within_groups[0].transport.n_block_cols();
   const int num_dofs = dst.block(0).size() / num_ords;
@@ -38,14 +40,30 @@ void FixedSource<dim, qdim>::vmult(
     Assert(downscattering[g].size() < g + 1, dealii::ExcInvalidState());
     transported = 0;
     inscattered_m = 0;
-    for (int down = 0; down < upscattering[g].size(); ++down)
-      upscattering[g][down].vmult_add(inscattered_m, src_m.block(g+1+down));
-    for (int up = 0; up < downscattering[g].size(); ++up)
-      downscattering[g][up].vmult_add(inscattered_m, src_m.block(g-1-up));
+    if (!transposing) {
+      for (int down = 0; down < upscattering[g].size(); ++down)
+        upscattering[g][down].vmult_add(inscattered_m, src_m.block(g+1+down));
+      for (int up = 0; up < downscattering[g].size(); ++up)
+        downscattering[g][up].vmult_add(inscattered_m, src_m.block(g-1-up));
+    } else {
+      for (int gp = 0; gp < g; ++gp) {
+        int gg = g - gp - 1; 
+        if (gg < upscattering[gp].size())
+          upscattering[gp][gg].vmult_add(inscattered_m, src_m.block(gp));
+      }
+      for (int gp = g + 1; gp < num_groups; ++gp) {
+        int gg = gp - g - 1;
+        if (gg < downscattering[gp].size())
+          downscattering[gp][gg].vmult_add(inscattered_m, src_m.block(gp));
+      }
+    }
     within_groups[g].scattering.vmult_add(inscattered_m, src_m.block(g));
     m2d.vmult(inscattered, inscattered_m);  // M S D x
     transported = src.block(g);
-    within_groups[g].transport.vmult(transported, inscattered);  // L^-1 M S D x
+    if (!transposing)  // L^-1 M S D x
+      within_groups[g].transport.vmult(transported, inscattered);
+    else  // (L^T)^-1 M S D x
+      within_groups[g].transport.Tvmult(transported, inscattered);
     dst.block(g) -= transported;  // (I - L^-1 M S D) x
   }
 }

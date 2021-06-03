@@ -40,7 +40,18 @@ class TransportBlock {
    */
   template <typename VectorType>
   void vmult(VectorType &dst, const VectorType &src,
-             const bool homogeneous = true) const;
+             const bool homogeneous = true, bool transposing = false) const;
+
+  /**
+   * Apply the transpose of the linear operator.
+   * 
+   * @param dst The destination vector.
+   * @param src The source vector.
+   * @param homogeneous Whether to ignore the inhomogeneous boundary conditions.
+   */
+  template <typename VectorType>
+  void Tvmult(VectorType &dst, const VectorType &src,
+              const bool homogeneous = true) const;
 
   /**
    * Return the number of blocks in a column.
@@ -54,6 +65,9 @@ class TransportBlock {
 
   //! The transport operator.
   const Transport<dim> &transport;
+
+  //! Whether the matrix is transposed
+  bool transposed = false;
 
  protected:
   //! The total material cross-sections.
@@ -69,11 +83,21 @@ class TransportBlock {
 template <int dim, int qdim>
 template <typename VectorType>
 void TransportBlock<dim, qdim>::vmult(VectorType &dst, const VectorType &src,
-                                      const bool homogeneous) const {
+                                      const bool homogeneous, 
+                                      bool transposing) const {
+  transposing = transposing != transposed;  // (A^T)^T = A
   if (homogeneous)
-    transport.vmult(dst, src, cross_sections, boundary_conditions_zero);
+    transport.vmult(dst, src, cross_sections, boundary_conditions_zero,
+                    transposing);
   else
-    transport.vmult(dst, src, cross_sections, boundary_conditions);
+    transport.vmult(dst, src, cross_sections, boundary_conditions, transposing);
+}
+
+template <int dim, int qdim>
+template <typename VectorType>
+void TransportBlock<dim, qdim>::Tvmult(VectorType &dst, const VectorType &src,
+                                       const bool homogeneous) const {
+  vmult(dst, src, homogeneous, true);
 }
 
 }

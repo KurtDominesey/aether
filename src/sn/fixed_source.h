@@ -48,7 +48,13 @@ class FixedSource {
    * Matrix-vector multiplication by fixed-source operator.
    */
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src,
+             bool transposing=false) const;
+  /**
+   * Transpose matrix-vector multiplication by fixed-source operator.
+   */
+  template <typename VectorType>
+  void Tvmult(VectorType &dst, const VectorType &src) const;
   /**
    * Number of rows.
    */
@@ -61,6 +67,8 @@ class FixedSource {
   const std::vector<WithinGroup<dim, qdim>> &within_groups;
   //! Moment to discrete operator, \f$M\f$
   const MomentToDiscrete<dim, qdim> &m2d;
+  //! Whether the matrix is transposed.
+  bool transposed = false;
 
  protected:
   //! Ragged vector of vectors of downscattering blocks, 
@@ -77,6 +85,13 @@ class FixedSource {
   template <class SolverType, int dimm, int qdimm>
   friend class FixedSourceGS;
 };
+
+template <int dim, int qdim>
+template <typename VectorType>
+void FixedSource<dim, qdim>::Tvmult(VectorType &dst, 
+                                    const VectorType &src) const {
+  vmult(dst, src, true);
+}
 
 }  // namespace aether::sn
 

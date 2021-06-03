@@ -39,21 +39,32 @@ class WithinGroup {
    * Matrix-vector multiplication by within-group operator.
    */
   void vmult(dealii::Vector<double> &dst,
-             const dealii::Vector<double> &src) const;
+             const dealii::Vector<double> &src, 
+             const bool transposing=false) const;
   /**
    * Matrix-vector multplication by within-group operator.
    */
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src, 
+             const bool transposing=false) const;
   /**
    * Matrix-vector multplication by within-group operator.
    */
   void vmult(dealii::PETScWrappers::MPI::BlockVector &dst,
-             const dealii::PETScWrappers::MPI::BlockVector &src) const;
+             const dealii::PETScWrappers::MPI::BlockVector &src,
+             const bool transposing=false) const;
+  /**
+   * Transpose matrix-vector multiplication by within-group operator.
+   */
+  template <typename VectorType>
+  void Tvmult(VectorType &dst,
+              const VectorType &src) const;
   //! Group transport block, \f$\underline{L}_g^{-1}(\overline{L}_g+B)\f$.
   const TransportBlock<dim, qdim> &transport;
   //! Within-group scattering block, \f$\Sigma_{s,g\rightarrow g}\f$.
   const ScatteringBlock<dim> &scattering;
+  //! Whether the matrix is transposed
+  bool transposed = false;
 
  protected:
   /**
@@ -67,7 +78,8 @@ class WithinGroup {
              dealii::BlockVectorBase<Vector> &src_m,
              dealii::BlockVectorBase<Vector> &scattered_m,
              dealii::BlockVectorBase<Vector> &scattered,
-             dealii::BlockVectorBase<Vector> &transported) const;
+             dealii::BlockVectorBase<Vector> &transported,
+             bool transposing) const;
   //! Moment to discrete operator, \f$M\f$.
   const MomentToDiscrete<dim, qdim> &m2d;
   //! Discrete to moment operator, \f$D\f$.
@@ -77,6 +89,13 @@ class WithinGroup {
   //! Shared pointer to scattering block.
   const std::shared_ptr<ScatteringBlock<dim>> scattering_shared;
 };
+
+template <int dim, int qdim>
+template <typename VectorType>
+void WithinGroup<dim, qdim>::Tvmult(VectorType &dst, 
+                                    const VectorType &src) const {
+  vmult(dst, src, true);
+}
 
 }  // namespace aether::sn
 

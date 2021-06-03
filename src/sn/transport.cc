@@ -202,12 +202,13 @@ void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
                                  const dealii::Vector<double> &src,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
-                                     &boundary_conditions) const {
+                                     &boundary_conditions,
+                                 const bool transposing) const {
   dealii::BlockVector<double> dst_b(quadrature.size(), dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(quadrature.size(), dof_handler.n_dofs());
   dst_b = dst;
   src_b = src;
-  vmult(dst_b, src_b, cross_sections, boundary_conditions);
+  vmult(dst_b, src_b, cross_sections, boundary_conditions, transposing);
   dst = dst_b;
 }
 
@@ -216,7 +217,8 @@ void Transport<dim, qdim>::vmult(dealii::PETScWrappers::MPI::Vector &dst,
                                  const dealii::PETScWrappers::MPI::Vector &src,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
-                                     &boundary_conditions) const {
+                                     &boundary_conditions,
+                                 const bool transposing) const {
   dealii::PETScWrappers::MPI::BlockVector dst_b(quadrature.size(), 
                                                 dst.get_mpi_communicator(), 
                                                 dof_handler.n_dofs(),
@@ -232,7 +234,7 @@ void Transport<dim, qdim>::vmult(dealii::PETScWrappers::MPI::Vector &dst,
       src_b.block(n)[i] = src[nn+i];
     }
   }
-  vmult(dst_b, src_b, cross_sections, boundary_conditions);
+  vmult(dst_b, src_b, cross_sections, boundary_conditions, transposing);
   for (int n = 0; n < quadrature.size(); ++n) {
     int nn = n * dof_handler.n_dofs();
     for (int i = 0; i < dof_handler.n_dofs(); ++i) {
@@ -247,7 +249,8 @@ void Transport<dim, qdim>::vmult(dealii::BlockVectorBase<Vector> &dst,
                                  const dealii::BlockVectorBase<Vector> &src,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
-                                     &boundary_conditions) const {
+                                     &boundary_conditions,
+                                 const bool transposing) const {
   const std::vector<dealii::types::boundary_id> &boundaries =
       dof_handler.get_triangulation().get_boundary_ids();
   int num_natural_boundaries = boundaries.size();
@@ -260,7 +263,8 @@ void Transport<dim, qdim>::vmult(dealii::BlockVectorBase<Vector> &dst,
   AssertDimension(num_natural_boundaries, boundary_conditions.size());
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
-    vmult_octant(oct, dst, src, cross_sections, boundary_conditions);
+    vmult_octant(oct, dst, src, cross_sections, boundary_conditions, 
+                 transposing);
   }
 }
 
@@ -270,7 +274,8 @@ void Transport<dim, qdim>::vmult_octant(
     int oct, dealii::BlockVectorBase<Vector> &dst,
     const dealii::BlockVectorBase<Vector> &src,
     const std::vector<double> &cross_sections,
-    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions,
+    const bool transposing) const {
   const std::vector<int> &octant_to_global = octants_to_global[oct];
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
   std::vector<dealii::types::global_dof_index> dof_indices(fe.dofs_per_cell);
@@ -296,8 +301,9 @@ void Transport<dim, qdim>::vmult_octant(
   dealii::Vector<double> dst_boundary(fe.dofs_per_cell);
   for (int n_oct = 0; n_oct < octant_to_global.size(); ++n_oct) {
     const int n = octant_to_global[n_oct];
-    const Ordinate &ordinate = ordinates[n];
-    for (int c : sweep_orders[n]) {
+    const Ordinate ordinate = transposing ? -ordinates[n] : ordinates[n];
+    for (int s = 0; s < sweep_orders[n].size(); ++s) {
+      int c = sweep_orders[n][transposing ? sweep_orders[n].size()-1-s : s];
       const ActiveCell &cell = cells[c];
       if (!cell->is_locally_owned()) 
         continue;
@@ -417,33 +423,39 @@ template void Transport<1>::vmult<dealii::Vector<double>>(
     dealii::BlockVectorBase<dealii::Vector<double>>&, 
     const dealii::BlockVectorBase<dealii::Vector<double>>&,
     const std::vector<double>&, 
-    const std::vector<dealii::BlockVector<double>>&) const;
+    const std::vector<dealii::BlockVector<double>>&,
+    const bool) const;
 template void Transport<2>::vmult<dealii::Vector<double>>(
     dealii::BlockVectorBase<dealii::Vector<double>>&, 
     const dealii::BlockVectorBase<dealii::Vector<double>>&,
     const std::vector<double>&, 
-    const std::vector<dealii::BlockVector<double>>&) const;
+    const std::vector<dealii::BlockVector<double>>&,
+    const bool) const;
 template void Transport<3>::vmult<dealii::Vector<double>>(
     dealii::BlockVectorBase<dealii::Vector<double>>&, 
     const dealii::BlockVectorBase<dealii::Vector<double>>&,
     const std::vector<double>&, 
-    const std::vector<dealii::BlockVector<double>>&) const;
+    const std::vector<dealii::BlockVector<double>>&,
+    const bool) const;
 // Vector is dealii::PETScWrappers::VectorBase
 template void Transport<1>::vmult<dealii::PETScWrappers::MPI::Vector>(
     dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
     const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
     const std::vector<double>&, 
-    const std::vector<dealii::BlockVector<double>>&) const;
+    const std::vector<dealii::BlockVector<double>>&,
+    const bool) const;
 template void Transport<2>::vmult<dealii::PETScWrappers::MPI::Vector>(
     dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
     const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
     const std::vector<double>&, 
-    const std::vector<dealii::BlockVector<double>>&) const;
+    const std::vector<dealii::BlockVector<double>>&,
+    const bool) const;
 template void Transport<3>::vmult<dealii::PETScWrappers::MPI::Vector>(
     dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
     const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
     const std::vector<double>&, 
-    const std::vector<dealii::BlockVector<double>>&) const;
+    const std::vector<dealii::BlockVector<double>>&,
+    const bool) const;
 
 template struct CellMatrices<1>;
 template struct CellMatrices<2>;
