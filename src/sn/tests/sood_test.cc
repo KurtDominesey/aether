@@ -322,7 +322,7 @@ TEST_F(TakedaOneTest, PuAOneGroupIsotropicSlab) {
 }
 
 template <typename Solver>
-class SoodSLEPcTest : public TakedaOneTest {};
+class SoodSLEPcTest : public SoodTest {};
 
 using Solvers = ::testing::Types<
     dealii::SLEPcWrappers::SolverPower,
@@ -335,7 +335,7 @@ TYPED_TEST_CASE(SoodSLEPcTest, Solvers);
 
 TYPED_TEST(SoodSLEPcTest, PuAOneGroupIsotropicSlab) {
   const int num_groups = this->mgxs->total.size();
-  dealii::ReductionControl control_wg(100, 1e-6, 1e-2);
+  dealii::ReductionControl control_wg(100, 1e-5, 1e-3);
   dealii::SolverGMRES<dealii::BlockVector<double>> solver_wg(control_wg);
   PETScWrappers::FissionSource fission_source(
       this->problem->fixed_source, this->problem->fission, solver_wg, 
@@ -383,7 +383,7 @@ TYPED_TEST(SoodSLEPcTest, PuAOneGroupIsotropicSlabGeneralized) {
         MPI_COMM_WORLD,
         dealii::SLEPcWrappers::TransformationShiftInvert::AdditionalData(0.9));
     shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
-    dealii::ReductionControl control_inv(100, 1e-6, 1e-2);
+    dealii::ReductionControl control_inv(100, 1e-5, 1e-3);
     dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
     dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source);
     solver_inv.initialize(preconditioner);
