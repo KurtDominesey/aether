@@ -59,6 +59,14 @@ class WithinGroup {
   template <typename VectorType>
   void Tvmult(VectorType &dst,
               const VectorType &src) const;
+  /**
+   * Number of rows.
+   */
+  int m() const;
+  /**
+   * Number of columns.
+   */
+  int n() const;
   //! Group transport block, \f$\underline{L}_g^{-1}(\overline{L}_g+B)\f$.
   const TransportBlock<dim, qdim> &transport;
   //! Within-group scattering block, \f$\Sigma_{s,g\rightarrow g}\f$.

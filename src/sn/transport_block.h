@@ -63,6 +63,16 @@ class TransportBlock {
    */
   int n_block_rows() const;
 
+  /**
+   * Number of rows.
+   */
+  int m() const;
+
+  /**
+   * Number of columns.
+   */
+  int n() const;
+
   //! The transport operator.
   const Transport<dim> &transport;
 

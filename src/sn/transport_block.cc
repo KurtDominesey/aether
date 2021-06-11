@@ -25,6 +25,16 @@ int TransportBlock<dim, qdim>::n_block_rows() const {
   return transport.n_block_rows();
 }
 
+template <int dim, int qdim>
+int TransportBlock<dim, qdim>::m() const {
+  return transport.m();
+}
+
+template <int dim, int qdim>
+int TransportBlock<dim, qdim>::n() const {
+  return transport.n();
+}
+
 template class TransportBlock<1>;
 template class TransportBlock<2>;
 template class TransportBlock<3>;

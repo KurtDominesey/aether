@@ -91,6 +91,16 @@ void WithinGroup<dim, qdim>::vmult(
   flux -= transported;  // (I - L^-1 S) x
 }
 
+template <int dim, int qdim>
+int WithinGroup<dim, qdim>::m() const {
+  return transport.m();
+}
+
+template <int dim, int qdim>
+int WithinGroup<dim, qdim>::n() const {
+  return transport.n();
+}
+
 template class WithinGroup<1>;
 template class WithinGroup<2>;
 template class WithinGroup<3>;
