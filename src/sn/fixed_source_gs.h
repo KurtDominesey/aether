@@ -5,6 +5,7 @@
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/solver_richardson.h>
 #include <deal.II/lac/precondition.h>
+#include <deal.II/lac/linear_operator.h>
 
 #include "sn/within_group.h"
 #include "sn/scattering_block.h"
@@ -49,6 +50,15 @@ class FixedSourceGS {
              const dealii::BlockVector<double> &src) const;
 
   /**
+   * Apply the transpose of the Gauss-Seidel linear operator.
+   * 
+   * @param dst Desination vector.
+   * @param src Source vector.
+   */
+  void Tvmult(dealii::BlockVector<double> &dst,
+              const dealii::BlockVector<double> &src) const;
+
+  /**
    * Perform one step of the Gauss-Seidel iteration.
    *
    * @param x Current iterate.
@@ -57,7 +67,28 @@ class FixedSourceGS {
   void step(dealii::BlockVector<double> &x,
             const dealii::BlockVector<double> &src) const;
 
+  //! Whether the matrix is transposed
+  bool transposed = false;
+
  protected:
+  /**
+   * Apply the Gauss-Seidel linear operator (internal method).
+   * 
+   * @param dst Destination vector.
+   * @param src Source vector.
+   */
+  void do_vmult(dealii::BlockVector<double> &dst,
+                const dealii::BlockVector<double> &src) const;
+
+  /**
+   * Apply the transpose of the Gauss-Seidel linear operator (internal method).
+   *  
+   * @param dst Desination vector.
+   * @param src Source vector.
+   */
+  void do_Tvmult(dealii::BlockVector<double> &dst,
+                 const dealii::BlockVector<double> &src) const;
+
   //! Within group (diagonal block) operators.
   const std::vector<WithinGroup<dim, qdim>> &within_groups;
   //! Downscattering (lower triangle) operators.

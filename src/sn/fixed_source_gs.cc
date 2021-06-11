@@ -25,10 +25,32 @@ FixedSourceGS<SolverType, dim, qdim>::FixedSourceGS(
         upscattering(fixed_source.upscattering),
         m2d(fixed_source.m2d), 
         d2m(fixed_source.d2m),
-        solver(solver) {}
+        solver(solver) {
+  transposed = fixed_source.transposed;
+}
 
 template <class SolverType, int dim, int qdim>
 void FixedSourceGS<SolverType, dim, qdim>::vmult(
+      dealii::BlockVector<double> &dst,
+      const dealii::BlockVector<double> &src) const {
+  if (transposed)
+    do_Tvmult(dst, src);
+  else
+    do_vmult(dst, src);
+}
+
+template <class SolverType, int dim, int qdim>
+void FixedSourceGS<SolverType, dim, qdim>::Tvmult(
+      dealii::BlockVector<double> &dst,
+      const dealii::BlockVector<double> &src) const {
+  if (transposed)
+    do_vmult(dst, src);  // (A^T)^T = A
+  else
+    do_Tvmult(dst, src);
+}
+
+template <class SolverType, int dim, int qdim>
+void FixedSourceGS<SolverType, dim, qdim>::do_vmult(
     dealii::BlockVector<double> &dst, 
     const dealii::BlockVector<double> &src) const {
   const int num_groups = within_groups.size();
@@ -53,6 +75,48 @@ void FixedSourceGS<SolverType, dim, qdim>::vmult(
     transported += src.block(g);
     try {
       solver.solve(within_groups[g], dst.block(g), transported,
+                  dealii::PreconditionIdentity());
+    } catch (dealii::SolverControl::NoConvergence &failure) {
+      // TODO: log this event, don't print
+      std::cout << "Within-group failure in group " << g << std::endl;
+      failure.print_info(std::cout);
+    }
+    d2m.vmult(dst_m.block(g), dst.block(g));
+  }
+}
+
+template <class SolverType, int dim, int qdim>
+void FixedSourceGS<SolverType, dim, qdim>::do_Tvmult(
+    dealii::BlockVector<double> &dst, 
+    const dealii::BlockVector<double> &src) const {
+  const int num_groups = within_groups.size();
+  const int num_ords = within_groups[0].transport.n_block_cols();
+  const int num_dofs = dst.block(0).size() / num_ords;
+  AssertDimension(num_groups, dst.n_blocks());
+  AssertDimension(num_groups, src.n_blocks());
+  AssertDimension(num_groups, upscattering.size());
+  AssertDimension(num_groups, downscattering.size());
+  dealii::BlockVector<double> dst_m(num_groups, num_dofs);
+  dealii::Vector<double> upscattered_m(num_dofs);
+  dealii::Vector<double> upscattered(num_ords*num_dofs);
+  dealii::Vector<double> transported(num_ords*num_dofs);
+  for (int g = num_groups-1; g >= 0; --g) {
+    Assert(downscattering[g].size() < g + 1, dealii::ExcInvalidState());
+    transported = 0;
+    upscattered_m = 0;
+    for (int gp = g+1; gp < num_groups; ++gp) {
+      int gg  = gp - g - 1;
+      // forward downscattering becomes adjoint upscattering
+      if (gg < downscattering[gp].size())
+        downscattering[gp][gg].vmult_add(upscattered_m, dst_m.block(gp));
+    }
+    m2d.vmult(upscattered, upscattered_m);
+    within_groups[g].transport.Tvmult(transported, upscattered);
+    transported += src.block(g);
+    try {
+      const auto within_group = dealii::linear_operator(within_groups[g]);
+      const auto within_groupT = dealii::transpose_operator(within_group);
+      solver.solve(within_groupT, dst.block(g), transported,
                   dealii::PreconditionIdentity());
     } catch (dealii::SolverControl::NoConvergence &failure) {
       // TODO: log this event, don't print
