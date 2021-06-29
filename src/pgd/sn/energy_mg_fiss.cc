@@ -240,9 +240,43 @@ double EnergyMgFiss::update(
       eigenvalues[0] *= -1;
       eigenvectors[0] *= -1;
     }
+    bool do_adjoint = false;
+    std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors_adj;
+    if (do_adjoint) {  // do adjoint
+      fission.transpose();
+      slowing.transpose();
+      std::vector<double> eigenvalues_adj(eigenvalues);
+      eigenvectors_adj = eigenvectors;
+      if (preconditioner_adj_ptr.get() == NULL) {
+        shifted.transpose();
+        preconditioner_adj_ptr = 
+          std::make_unique<dealii::PETScWrappers::PreconditionILU>(shifted);
+      }
+      solver_inv.initialize(*preconditioner_adj_ptr);
+      shift_invert.set_solver(solver_inv);
+      eigensolver.set_transformation(shift_invert);
+      eigensolver.solve(fission, slowing, eigenvalues_adj, eigenvectors_adj);
+      std::cout << "FORWARD EIGENVALUE: " << eigenvalues[0] << "\n"
+                << "ADJOINT EIGENVALUE: " << eigenvalues_adj[0] << "\n"
+                << "DIFFERENCE [pcm]: " 
+                << (1e5 * (eigenvalues_adj[0]-eigenvalues[0])) << "\n";
+      eigenvectors_adj[0] *= -1;
+      // auto bx(eigenvectors[0]);
+      // auto bx_adj(eigenvectors_adj[0]);
+      // fission.vmult(bx, eigenvectors[0]);
+      // fission.vmult(bx_adj, eigenvectors_adj[0]);
+      // std::cout << "biorthogonal? "
+      //           // << (eigenvectors[0]*bx_adj) << " "
+      //           << (eigenvectors_adj[0]*bx) << "\n";
+      if (modes_adj.empty())
+        modes_adj.resize(num_modes, dealii::Vector<double>(num_groups));
+    }
     for (int m = 0, i = 0; m < num_modes; ++m) {
       for (int g = 0; g < num_groups; ++g, ++i) {
         modes[m][g] = eigenvectors[0][i];
+        if (do_adjoint) {
+          modes_adj[m][g] = eigenvectors_adj[0][i];
+        }
       }
     }
     std::cout << "k-updatestep: " << eigenvalues[0] << "\n";

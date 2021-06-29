@@ -60,6 +60,7 @@ class EnergyMgFiss : public EnergyMgFull, public EigenUpdatableInterface,
       const double k_eigenvalue,
       const std::vector<std::vector<InnerProducts>> &coefficients);
   std::unique_ptr<dealii::PETScWrappers::PreconditionerBase> preconditioner_ptr;
+  std::unique_ptr<dealii::PETScWrappers::PreconditionerBase> preconditioner_adj_ptr;
 };
 
 }  // namespace aether::pgd::sn
