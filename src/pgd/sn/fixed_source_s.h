@@ -35,6 +35,8 @@ class FixedSourceS {
   std::vector<std::vector<double>> streaming;  // streaming coefficients
   bool transposed = false;
 
+  std::vector<dealii::Vector<double>> test_functions;
+
  protected:
   // friend class FixedSourceSProblem<dim, qdim>;
   const std::vector<std::vector<aether::sn::FixedSource<dim, qdim>>> &blocks;

@@ -60,6 +60,7 @@ class EnergyMgFull : public LinearUpdatableInterface {
   void update(std::vector<std::vector<InnerProducts>> coefficients_x,
               std::vector<std::vector<double>> coefficients_b);
   std::vector<dealii::Vector<double>> modes;
+  std::vector<dealii::Vector<double>> modes_adj;
   const std::vector<dealii::Vector<double>> &sources;
   const Mgxs &mgxs;
  protected:
