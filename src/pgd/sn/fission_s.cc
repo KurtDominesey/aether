@@ -14,7 +14,9 @@ FissionS<dim, qdim>::FissionS(
 
 template <int dim, int qdim>
 void FissionS<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
-                                const dealii::BlockVector<double> &src) const {
+                                const dealii::BlockVector<double> &src,
+                                bool transposing) const {
+  transposing = transposed != transposing;
   const int num_modes = emission.size();
   AssertDimension(num_modes, production.size());
   const int num_groups = dst.n_blocks() / num_modes;
@@ -40,9 +42,15 @@ void FissionS<dim, qdim>::vmult(dealii::BlockVector<double> &dst,
       for (int g = 0; g < num_groups; ++g) {
         src_mp.block(g) = src_lm.block(mp*num_groups+g);
       }
-      production[m][mp].vmult(produced, src_mp);
-      transport.collide_ordinate(produced_mass, produced);
-      emission[m][mp].vmult_add(emitted, produced_mass);
+      if (!transposing) {
+        production[m][mp].vmult(produced, src_mp);
+        transport.collide_ordinate(produced_mass, produced);
+        emission[m][mp].vmult_add(emitted, produced_mass);
+      } else {
+        emission[mp][m].Tvmult(produced, src_mp);
+        transport.collide_ordinate(produced_mass, produced);
+        production[mp][m].Tvmult_add(emitted, produced_mass);
+      }
     }
     for (int g = 0; g < num_groups; ++g) {
       m2d.vmult_add(dst.block(m*num_groups+g), emitted.block(g));

@@ -19,15 +19,21 @@ class FixedSourceS {
       const aether::sn::DiscreteToMoment<dim, qdim> &d2m,
       const Mgxs &mgxs);
   void vmult(dealii::Vector<double> &dst,
-             const dealii::Vector<double> &src) const;
+             const dealii::Vector<double> &src, bool transposing=false) const;
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src, bool transposing=false)
+             const;
+  void Tvmult(dealii::Vector<double> &dst,
+              const dealii::Vector<double> &src) const;
+  void Tvmult(dealii::BlockVector<double> &dst,
+              const dealii::BlockVector<double> &src) const;
   void get_inner_products_lhs(
       std::vector<std::vector<InnerProducts>> &inner_products,
       const dealii::BlockVector<double> &modes);
   void get_inner_products_rhs(std::vector<double>& inner_products,
                               const dealii::BlockVector<double> &modes);
   std::vector<std::vector<double>> streaming;  // streaming coefficients
+  bool transposed = false;
 
  protected:
   // friend class FixedSourceSProblem<dim, qdim>;

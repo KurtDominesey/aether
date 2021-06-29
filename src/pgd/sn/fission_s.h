@@ -21,7 +21,9 @@ class FissionS {
            const std::vector<std::vector<aether::sn::Production<dim>>> &production,
            const aether::sn::DiscreteToMoment<dim, qdim> &d2m);
   void vmult(dealii::BlockVector<double> &dst,
-             const dealii::BlockVector<double> &src) const;
+             const dealii::BlockVector<double> &src,
+             bool transposing=false) const;
+  bool transposed = false;
   
  protected:
   const Transport<dim, qdim> &transport;

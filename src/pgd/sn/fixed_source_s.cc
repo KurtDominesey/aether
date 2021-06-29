@@ -13,7 +13,8 @@ FixedSourceS<dim, qdim>::FixedSourceS(
 
 template <int dim, int qdim>
 void FixedSourceS<dim, qdim>::vmult(dealii::Vector<double> &dst,
-                                    const dealii::Vector<double> &src) const {
+                                    const dealii::Vector<double> &src,
+                                    bool transposing) const {
   const int num_modes = blocks.size();
   const int size = dst.size() / num_modes;
   AssertDimension(dst.size(), size * num_modes);
@@ -22,14 +23,16 @@ void FixedSourceS<dim, qdim>::vmult(dealii::Vector<double> &dst,
   dealii::BlockVector<double> src_b(num_modes, size);
   dst_b = dst;
   src_b = src;
-  vmult(dst_b, src_b);
+  vmult(dst_b, src_b, transposing);
   dst = dst_b;
 }
 
 template <int dim, int qdim>
 void FixedSourceS<dim, qdim>::vmult(
     dealii::BlockVector<double> &dst,
-    const dealii::BlockVector<double> &src) const {
+    const dealii::BlockVector<double> &src,
+    bool transposing) const {
+  transposing = transposing != transposed;  // (A^T)^T = A
   AssertDimension(dst.size(), src.size());
   AssertDimension(dst.n_blocks(), src.n_blocks());
   const int num_groups = blocks[0][0].within_groups.size();
@@ -56,24 +59,50 @@ void FixedSourceS<dim, qdim>::vmult(
       collided = 0;
       for (int mp = 0; mp < num_modes; ++mp) {
         int mpg = mp * num_groups + g;
-        for (int down = 0; down < blocks[m][mp].upscattering[g].size(); ++down)
-          blocks[m][mp].upscattering[g][down].vmult_add(
-              transferred_lm, src_lm.block(mpg+1+down));
-        for (int up = 0; up < blocks[m][mp].downscattering[g].size(); ++up)
-          blocks[m][mp].downscattering[g][up].vmult_add(
-              transferred_lm, src_lm.block(mpg-1-up));
-        blocks[m][mp].within_groups[g].scattering.vmult_add(
-            transferred_lm, src_lm.block(mpg));
-        streamed.add(streaming[m][mp], src.block(mpg));
-        const auto &transport_block = 
-            dynamic_cast<const TransportBlock<dim, qdim>&>(
-              blocks[m][mp].within_groups[g].transport);
-        transport_block.collide_add(collided, src.block(mpg));
+        if (!transposing) {
+          for (int down = 0; down < blocks[m][mp].upscattering[g].size(); 
+               ++down)
+            blocks[m][mp].upscattering[g][down].vmult_add(
+                transferred_lm, src_lm.block(mpg+1+down));
+          for (int up = 0; up < blocks[m][mp].downscattering[g].size(); ++up)
+            blocks[m][mp].downscattering[g][up].vmult_add(
+                transferred_lm, src_lm.block(mpg-1-up));
+          blocks[m][mp].within_groups[g].scattering.vmult_add(
+              transferred_lm, src_lm.block(mpg));
+          streamed.add(streaming[m][mp], src.block(mpg));
+          const auto &transport_block =
+              dynamic_cast<const TransportBlock<dim, qdim>&>(
+                blocks[m][mp].within_groups[g].transport);
+          transport_block.collide_add(collided, src.block(mpg));
+        } else {
+          // TODO: test that this logic is correct for multigroup problems 
+          for (int gp = 0; gp < g; ++gp) {
+            int mpgp = mp * num_groups + gp;
+            int gg = g - gp - 1;
+            if (gg < blocks[mp][m].upscattering[gp].size())
+              blocks[mp][m].upscattering[gp][gg].vmult_add(
+                  transferred_lm, src_lm.block(mpgp));
+          }
+          for (int gp = g + 1; gp < num_groups; ++gp) {
+            int mpgp = mp * num_groups + gp;
+            int gg = gp - g - 1;
+            if (gg < blocks[mp][m].downscattering[gp].size())
+              blocks[mp][m].downscattering[gp][gg].vmult_add(
+                  transferred_lm, src_lm.block(mpgp));
+          }
+          blocks[mp][m].within_groups[g].scattering.vmult_add(
+              transferred_lm, src_lm.block(mpg));
+          streamed.add(streaming[mp][m], src.block(mpg));
+          const auto &transport_block = 
+              dynamic_cast<const TransportBlock<dim, qdim>&>(
+                blocks[mp][m].within_groups[g].transport);
+          transport_block.collide_add(collided, src.block(mpg));
+        }
       }
       const auto &transport_block = 
           dynamic_cast<const TransportBlock<dim, qdim>&>(
               blocks[m][m].within_groups[g].transport);
-      transport_block.stream_add(dst.block(mg), streamed);
+      transport_block.stream_add(dst.block(mg), streamed, transposing);
       transferred_lm *= -1;
       m2d.vmult_add(collided, transferred_lm);
       const auto &transport = 
@@ -81,6 +110,19 @@ void FixedSourceS<dim, qdim>::vmult(
       transport.vmult_mass_add(dst.block(mg), collided);
     }
   }
+}
+
+template <int dim, int qdim>
+void FixedSourceS<dim, qdim>::Tvmult(dealii::Vector<double> &dst,
+                                     const dealii::Vector<double> &src) const {
+  vmult(dst, src, true);
+}
+
+template <int dim, int qdim>
+void FixedSourceS<dim, qdim>::Tvmult(
+    dealii::BlockVector<double> &dst,
+    const dealii::BlockVector<double> &src) const {
+  vmult(dst, src, true);
 }
 
 template <int dim, int qdim>
