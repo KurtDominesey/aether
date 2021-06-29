@@ -13,19 +13,23 @@ class Transport : public aether::sn::Transport<dim, qdim> {
   void stream(dealii::Vector<double> &dst, 
               const dealii::Vector<double> &src,
               const std::vector<dealii::BlockVector<double>>
-                  &boundary_conditions) const;
+                  &boundary_conditions,
+              bool transposing=false) const;
   void stream(dealii::BlockVector<double> &dst,
               const dealii::BlockVector<double> &src,
               const std::vector<dealii::BlockVector<double>>
-                  &boundary_conditions) const;
+                  &boundary_conditions,
+              bool transposing=false) const;
   void stream_add(dealii::Vector<double> &dst, 
                   const dealii::Vector<double> &src,
                   const std::vector<dealii::BlockVector<double>>
-                      &boundary_conditions) const;
+                      &boundary_conditions,
+                  bool transposing=false) const;
   void stream_add(dealii::BlockVector<double> &dst,
                   const dealii::BlockVector<double> &src,
                   const std::vector<dealii::BlockVector<double>>
-                      &boundary_conditions) const;
+                      &boundary_conditions,
+                  bool transposing=false) const;
   void vmult_mass(dealii::Vector<double> &dst,
                   const dealii::Vector<double> &src) const;
   void vmult_mass(dealii::BlockVector<double> &dst,

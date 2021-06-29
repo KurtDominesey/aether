@@ -5,27 +5,29 @@ namespace aether::pgd::sn {
 template <int dim, int qdim>
 void Transport<dim, qdim>::stream(
     dealii::Vector<double> &dst, const dealii::Vector<double> &src,
-    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions,
+    const bool transposing) const {
   dealii::BlockVector<double> dst_b(this->quadrature.size(),
                                     this->dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(this->quadrature.size(),
                                     this->dof_handler.n_dofs());
   src_b = src;
-  stream(dst_b, src_b, boundary_conditions);
+  stream(dst_b, src_b, boundary_conditions, transposing);
   dst = dst_b;
 }
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::stream_add(
     dealii::Vector<double> &dst, const dealii::Vector<double> &src,
-    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions,
+    const bool transposing) const {
   dealii::BlockVector<double> dst_b(this->quadrature.size(),
                                     this->dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(this->quadrature.size(),
                                     this->dof_handler.n_dofs());
   dst_b = dst;
   src_b = src;
-  stream_add(dst_b, src_b, boundary_conditions);
+  stream_add(dst_b, src_b, boundary_conditions, transposing);
   dst = dst_b;
 }
 
@@ -96,16 +98,18 @@ template <int dim, int qdim>
 void Transport<dim, qdim>::stream(
     dealii::BlockVector<double> &dst,
     const dealii::BlockVector<double> &src,
-    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions,
+    const bool transposing) const {
   dst = 0;
-  stream_add(dst, src, boundary_conditions);
+  stream_add(dst, src, boundary_conditions, transposing);
 }
 
 template <int dim, int qdim>
 void Transport<dim, qdim>::stream_add(
     dealii::BlockVector<double> &dst,
     const dealii::BlockVector<double> &src,
-    const std::vector<dealii::BlockVector<double>> &boundary_conditions) const {
+    const std::vector<dealii::BlockVector<double>> &boundary_conditions,
+    const bool transposing) const {
   std::vector<dealii::types::global_dof_index> dof_indices(
       this->dof_handler.get_fe().dofs_per_cell);
   std::vector<dealii::types::global_dof_index> dof_indices_neighbor(
@@ -121,7 +125,9 @@ void Transport<dim, qdim>::stream_add(
     const auto &matrices = this->cell_matrices[c];
     cell->get_dof_indices(dof_indices);
     for (int n = 0; n < this->quadrature.size(); ++n) {
-      const Ordinate &ordinate = this->ordinates[n];
+      Ordinate ordinate = this->ordinates[n];
+      if (transposing)
+        ordinate *= -1;
       for (int i = 0; i < dof_indices.size(); ++i)
         for (int j = 0; j < dof_indices.size(); ++j)
           dst.block(n)[dof_indices[i]] +=

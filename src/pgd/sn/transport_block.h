@@ -11,9 +11,11 @@ class TransportBlock : public aether::sn::TransportBlock<dim, qdim> {
  public:
   using aether::sn::TransportBlock<dim, qdim>::TransportBlock;
   template <typename VectorType>
-  void stream(VectorType &dst, const VectorType &src) const;
+  void stream(VectorType &dst, const VectorType &src, bool transposing=false) 
+      const;
   template <typename VectorType>
-  void stream_add(VectorType &dst, const VectorType &src) const;
+  void stream_add(VectorType &dst, const VectorType &src,
+      bool transposing=false) const;
   template <typename VectorType>
   void collide(VectorType &dst, const VectorType &src) const;
   template <typename VectorType>
@@ -25,19 +27,23 @@ class TransportBlock : public aether::sn::TransportBlock<dim, qdim> {
 template <int dim, int qdim>
 template <typename VectorType>
 void TransportBlock<dim, qdim>::stream(VectorType &dst,
-                                       const VectorType &src) const {
+                                       const VectorType &src,
+                                       bool transposing) const {
   const Transport<dim, qdim> &transport =
       dynamic_cast<const Transport<dim, qdim>&>(this->transport);
-  transport.stream(dst, src, this->boundary_conditions);
+  transposing = this->transposed != transposing;
+  transport.stream(dst, src, this->boundary_conditions, transposing);
 }
 
 template <int dim, int qdim>
 template <typename VectorType>
 void TransportBlock<dim, qdim>::stream_add(VectorType &dst,
-                                       const VectorType &src) const {
+                                           const VectorType &src,
+                                           bool transposing) const {
   const Transport<dim, qdim> &transport =
       dynamic_cast<const Transport<dim, qdim>&>(this->transport);
-  transport.stream_add(dst, src, this->boundary_conditions);
+  transposing = this->transposed != transposing;
+  transport.stream_add(dst, src, this->boundary_conditions, transposing);
 }
 
 template <int dim, int qdim>
