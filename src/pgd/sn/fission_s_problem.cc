@@ -243,11 +243,11 @@ void FissionSProblem<dim, qdim>::solve_fixed_k(
       ShiftedS<dim, qdim> shifted(fission_s, this->fixed_source_s);
       shifted.shift = shift;
       fission_s_gs.set_shift(shift);
-      // fission_s_gs.vmult(dst_b, src_b);
+      fission_s_gs.vmult(dst_b, src_b);
       // solve system
-      dealii::IterationNumberControl control(5, 0);
-      dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
-      solver.solve(shifted, dst_b, src_b, fission_s_gs);
+      // dealii::IterationNumberControl control(5, 0);
+      // dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
+      // solver.solve(shifted, dst_b, src_b, fission_s_gs);
       break;
     }
     case 1: {  // -kB

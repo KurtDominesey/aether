@@ -30,7 +30,7 @@ class EnergyMgFiss : public EnergyMgFull, public EigenUpdatableInterface,
   EnergyMgFiss(const Mgxs &mgxs);
   double step_eigenvalue(InnerProducts &coefficients);
   double update(std::vector<std::vector<InnerProducts>> &coefficients,
-                const double tol=1e-5, const std::string eps_type="krylovschur",
+                const double tol=1e-6, const std::string eps_type="krylovschur",
                 int num_modes=-1);
   void update(std::vector<std::vector<InnerProducts>> coefficients_x,
               std::vector<std::vector<double>> coefficients_b) override;

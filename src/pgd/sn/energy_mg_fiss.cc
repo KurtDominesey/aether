@@ -226,8 +226,8 @@ double EnergyMgFiss::update(
     std::cout << "set up PC\n";
     solver_inv.initialize(slowing_pc);
     // solver_inv.initialize(slowing_gs);
-    shift_invert.set_solver(solver_inv);
-    shift_invert.set_matrix_mode(ST_MATMODE_COPY);
+    // shift_invert.set_solver(solver_inv);
+    shift_invert.set_matrix_mode(ST_MATMODE_INPLACE);
     if (eps_type == "krylovschur")
       eigensolver.set_transformation(shift_invert);
   // }

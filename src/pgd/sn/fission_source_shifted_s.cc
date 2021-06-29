@@ -18,7 +18,7 @@ void FissionSourceShiftedS<dim, qdim>::vmult(
   dst = 0;
   dealii::BlockVector<double> ax(dst);
   fission_s.vmult(ax, src);
-  dealii::IterationNumberControl control(10, 0);
+  dealii::IterationNumberControl control(3, 1e-7);
   control.enable_history_data();
   dealii::SolverFGMRES<dealii::BlockVector<double>> solver(control);
   solver.solve(fixed_source_s, dst, ax, fixed_source_s_gs);
