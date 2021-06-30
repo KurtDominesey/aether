@@ -368,13 +368,22 @@ void CompareTest<dim, qdim>::ComputeSvd(
     std::vector<dealii::BlockVector<double>> &svecs_spaceangle,
     std::vector<dealii::Vector<double>> &svecs_energy,
     const dealii::BlockVector<double> &flux,
-    const Transport<dim, qdim> &transport) {
+    const Transport<dim, qdim> &transport,
+    const dealii::BlockVector<double> *adjoint,
+    std::vector<dealii::Vector<double>> *adjoints_energy,
+    std::vector<dealii::BlockVector<double>> *adjoints_spaceangle) {
   AssertDimension(svecs_spaceangle.size(), 0);
   AssertDimension(svecs_energy.size(), 0);
   const int num_groups = flux.n_blocks();
   const int num_qdofs = flux.block(0).size();
   std::cout << "initialize flux matrix\n";
   dealii::LAPACKFullMatrix_<double> flux_matrix(num_qdofs, num_groups);
+  dealii::LAPACKFullMatrix_<double> adjoint_matrix;
+  if (adjoint != nullptr) {
+    std::cout << adjoint->size() << "\n";
+    std::cout << num_qdofs * num_groups << "\n";
+    adjoint_matrix.reinit(num_qdofs, num_groups);
+  }
   std::cout << "initialized flux matrix\n";
   std::vector<dealii::FullMatrix<double>> masses_cho(
       dof_handler.get_triangulation().n_active_cells());
@@ -397,6 +406,11 @@ void CompareTest<dim, qdim>::ComputeSvd(
             flux_matrix(nc+i, g) += mass_cho[i][j] * flux.block(g)[nc+j]
                                     * std::sqrt(quadrature.weight(n))
                                     / std::sqrt(width);
+            if (adjoint != nullptr)
+              adjoint_matrix(nc+i, g) += mass_cho[i][j] 
+                        * adjoint->block(g)[nc+j]
+                        * std::sqrt(quadrature.weight(n))
+                        / std::sqrt(width);
           }
         }
       }
@@ -439,6 +453,81 @@ void CompareTest<dim, qdim>::ComputeSvd(
     }
     svecs_energy[s] *= flux_matrix.singular_value(s);
   }
+  if (adjoints_energy != nullptr) {
+    // do decomposition of adjoint to get energy test functions
+    // flux_matrix = U S V^T
+    // adjoint_matrix = U S X^T --> X^T = (U S)^-1 adjoint_matrix
+    // X^T = S^-1 U^-1 adjoint_matrix, where U^-1 = U^T
+    dealii::LAPACKFullMatrix_<double> adjoint_energy(num_svecs, num_groups);
+    adjoints_energy->resize(num_svecs, dealii::Vector<double>(num_groups));
+    // dealii::LAPACKFullMatrix_<double> u_s;//(flux_matrix.get_svd_u());
+    // dealii::LAPACKFullMatrix_<double> pseudoinverse(num_qdofs, num_qdofs);
+    // u_s = flux_matrix.get_svd_u();
+    // for (int s = 0; s < num_svecs; ++s)
+    //   for (int ni = 0; ni < num_qdofs; ++ni) 
+    //     u_s(ni, s) *= flux_matrix.singular_value(s);
+    // std::cout << "assembled u_s\n";
+    // u_s.invert();
+    // std::cout << "inverted u_s\n";
+    // u_s.mmult(adjoint_energy, adjoint_matrix);
+    // std::cout << "mmult u_s\n";
+    flux_matrix.get_svd_u().Tmmult(adjoint_energy, adjoint_matrix);
+    for (int s = 0; s < num_svecs; ++s) {
+      for (int g = 0; g < num_groups; ++g) {
+        int g_rev = num_groups - 1 - g;
+        double lower = mgxs->group_structure[g_rev] > 0 ? 
+                        mgxs->group_structure[g_rev] : lowest;
+        double width =
+            std::log(mgxs->group_structure[g_rev+1]/lower);
+        (*adjoints_energy)[s][g] = adjoint_energy(s, g) * std::sqrt(width);
+      }
+      (*adjoints_energy)[s] /= flux_matrix.singular_value(s);
+    }
+    // print out test functions
+    std::ofstream adjoint_file;
+    adjoint_file.open("adjoint_test_functions.txt");
+    for (int s = 0; s < num_svecs; ++s) {
+      for (int g = 0; g < num_groups; ++g) {
+        adjoint_file << (*adjoints_energy)[s][g];
+        if (g < num_groups - 1)
+          adjoint_file << " ";
+      }
+      adjoint_file << "\n";
+    }
+    adjoint_file.close();
+  }
+  if (adjoints_spaceangle != nullptr) {
+    // do decomposition of adjoint to get spatio-angular test functions
+    // flux_matrix = U S V^T
+    // adjoint_matrix = U S X^T
+    // adjoint_matrix^T = X S U^T
+    // U^T = (X S)^-1 adjoint_matrix^T
+    // U^T = S^-1 X^-1 adjoint_matrix^T
+    // U = adjoint_matrix X S^-1
+    // X^T = S^-1 U^-1 adjoint_matrix, where U^-1 = U^T
+    dealii::LAPACKFullMatrix_<double> adjoint_spaceangle(num_qdofs, num_svecs);
+    adjoints_spaceangle->resize(num_svecs, 
+        dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
+    adjoint_matrix.mTmult(adjoint_spaceangle, flux_matrix.get_svd_vt());
+    for (int s = 0; s < num_svecs; ++s) {
+      for (int n = 0; n < quadrature.size(); ++n) {
+        for (int c = 0; c < masses_cho.size(); ++c) {
+          int nc = n * dof_handler.n_dofs() 
+                    + c * dof_handler.get_fe().n_dofs_per_cell();
+          dealii::FullMatrix<double> mass_cho_inv = masses_cho[c];
+          for (int i = 0; i < mass_cho_inv.m(); ++i) {
+            for (int j = 0; j < mass_cho_inv.n(); ++j) {
+              (*adjoints_spaceangle)[s][nc+i] += 
+                  mass_cho_inv[i][j]  * adjoint_spaceangle(nc+j, s)
+                  / std::sqrt(quadrature.weight(n));
+            }
+          }
+        }
+      }
+      (*adjoints_spaceangle)[s] /= flux_matrix.singular_value(s);
+    }
+    std::cout << "computed adjoints spaceangle\n";
+  }
 }
 
 template <int dim, int qdim>
@@ -477,6 +566,11 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
           sources_energy[j][g], sources_spaceangle[j].block(0));
   FissionProblem<dim, qdim> problem_full(
       dof_handler, quadrature, *mgxs, boundary_conditions);
+  bool do_adjoint = false;
+  if (do_adjoint) {
+    problem_full.fixed_source.transposed = true;
+    problem_full.fission.transposed = true;
+  }
   double eigenvalue_full = 0;
   std::string filebase = "";
   using StrStrInt = std::tuple<std::string, std::string, int>;
@@ -488,11 +582,23 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
   }
   std::string filename_full = filebase + "_full.h5";
   if (do_eigenvalue)
-    filename_full = filebase + "_k_full.h5";
+    filename_full = filebase + "_k_full" + (do_adjoint ? "_adj" : "") + ".h5";
+  bool do_forward_adjoint = true;
+  bool do_lorenzi = do_forward_adjoint && false;
+  std::string filename_adjoint = 
+      filebase + "_k_full" + (do_adjoint ? "_adj" : "") + ".h5";
+  dealii::BlockVector<double> flux_full_adjoint;
   namespace HDF5 = dealii::HDF5;
   if (precomputed_full) {
     HDF5::File file(filename_full, HDF5::File::FileAccessMode::open);
     flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+    if (do_forward_adjoint) {
+      HDF5::File file_adjoint(filename_adjoint, 
+                              HDF5::File::FileAccessMode::open);
+      flux_full_adjoint.reinit(flux_full.get_block_indices());
+      flux_full_adjoint = 
+          file_adjoint.open_dataset("flux_full").read<dealii::Vector<double>>();
+    }
     if (do_eigenvalue) {
       eigenvalue_full = file.get_attribute<double>("k_eigenvalue");
       std::cout << "eigenvalue_full: " << eigenvalue_full << "\n";
@@ -510,20 +616,68 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     }
     this->WriteFlux(flux_full, history_data, filename_full, eigenvalue_full);
   }
-  if (full_only)
-    return;
   double sum = 0;
   for (int i = 0; i < flux_full.size(); ++i)
     sum += flux_full[i];
   if (sum < 0)
     flux_full *= -1;
-  this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
+  this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full_adj");
+  int lower_left = 0;
+  bool found = false;
+  for (auto cell = dof_handler.begin_active(); 
+       cell != dof_handler.end() && !found; ++cell) {
+    for (int v = 0; v < dealii::GeometryInfo<dim>::vertices_per_cell; 
+         ++v, ++lower_left) {
+      std::cout << cell->vertex(v) << "\n";
+      if (cell->vertex(v)[0] == 0 && cell->vertex(v)[1] == 0) {
+        found = true;
+        std::vector<dealii::types::global_dof_index> dof_indices(
+            dof_handler.get_fe().dofs_per_cell);
+        cell->get_dof_indices(dof_indices);
+        std::cout << dof_indices[v] << "\n";
+        break;
+      }
+    }
+  }
+  // std::cout << (++mesh.begin_active())->vertex(1) << "\n";
+  std::cout << lower_left << "\n";
+  std::div_t wrap = 
+      std::div(lower_left, dealii::GeometryInfo<dim>::vertices_per_cell);
+  int i = 0;
+  auto cell = mesh.begin_active();
+  for (; i < wrap.quot; ++cell, ++i) {}
+  std::cout << cell->vertex(wrap.rem) << "\n";
+  std::ofstream spectrum_file;
+  spectrum_file.open(
+      filebase + "_spectrum" + (do_adjoint ? "_adj" : "") + ".txt");
+  for (int g = 0; g < num_groups; ++g) {
+    double spectrum = 0;
+    for (int n = 0; n < quadrature.size(); ++n) {
+      int gni = g*quadrature.size()*dof_handler.n_dofs() + 
+                n*dof_handler.n_dofs() + lower_left;
+      spectrum += quadrature.weight(n) * flux_full[gni];
+    }
+    spectrum_file << spectrum << "\n";
+  }
+  spectrum_file.close();
+  for (int n = 0; n < quadrature.size(); ++n)
+  if (full_only)
+    return;
   // Compute svd of full order
   std::cout << "compute svd\n";
   std::vector<dealii::BlockVector<double>> svecs_spaceangle;
   std::vector<dealii::Vector<double>> svecs_energy;
+  std::vector<dealii::Vector<double>> adjoint_energy;
+  std::vector<dealii::BlockVector<double>> adjoint_spaceangle;
   ComputeSvd(svecs_spaceangle, svecs_energy, flux_full, 
-              problem_full.transport);
+              problem_full.transport, 
+              do_lorenzi ? &flux_full_adjoint : nullptr,
+              do_lorenzi ? &adjoint_energy : nullptr,
+              do_lorenzi ? &adjoint_spaceangle : nullptr);
+  if (do_forward_adjoint && !do_lorenzi) {
+    ComputeSvd(adjoint_spaceangle, adjoint_energy, flux_full_adjoint,
+               problem_full.transport);
+  }
   int num_svecs = svecs_spaceangle.size();
   if (num_svecs > num_modes) {
     svecs_spaceangle.resize(num_modes);
@@ -717,10 +871,20 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     aether::pgd::sn::SubspaceJacobianPC<dim, qdim> jacobian_pc(
         subspace_problem, energy_fiss, jacobian.inner_products_unperturbed,
         jacobian.k_eigenvalue);
-    const int jfnk_iters = 10;
+    const int jfnk_iters = 50;
+    // set adjoint modes
+    if (do_forward_adjoint) {
+      for (int s = 0; s < num_svecs; ++s) {
+        energy_fiss.modes_adj.push_back(adjoint_energy[s]);
+        subspace_problem.fixed_source_s.test_functions.emplace_back(
+            adjoint_spaceangle[s].size());
+        subspace_problem.fixed_source_s.test_functions[s] = 
+            adjoint_spaceangle[s];
+      }
+    }
     for (int i = 0; i <= jfnk_iters; ++i) {
       std::cout << "setting modes " << modes_all.l2_norm() << "\n";
-      // modes_all.block(0) /= modes_all.block(0).l2_norm();
+      modes_all.block(0) /= modes_all.block(0).l2_norm();
       jacobian.set_modes(modes_all);
       jacobian_pc.modes = modes_all;
       for (int m = 0; m < num_modes_s; ++m)
@@ -747,6 +911,116 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
       std::cout << "set modes\n";
       if (i == jfnk_iters)
         continue;
+      if (false) {  // do spatio-angular eigensolve
+        modes = modes_all.block(0);
+        subspace_problem.set_cross_sections(
+          jacobian.inner_products_unperturbed[1]);
+        // std::cout << "ax, bx: " << ax.l2_norm() << ", " << bx.l2_norm() << "\n";
+        // ax.add(-rayleigh, bx);
+        // std::cout << "initial residual: " << ax.l2_norm() << std::endl;
+        // dealii::BlockVector<double> ax_mass_inv(ax);
+        // for (int m = 0; m < ax_mass_inv.n_blocks(); ++m)
+        //   problem.transport.vmult_mass_inv(ax_mass_inv.block(m));
+        // std::cout << "initial residual: " << ax_mass_inv.l2_norm() << std::endl;
+        // bx = 0;
+        // subspace_problem.fixed_source_s_gs.vmult(bx, ax);
+        // std::cout << "fixed gs residual: " << bx.l2_norm() << std::endl;
+        // bx = 0;
+        // subspace_problem.fission_s_gs.vmult(bx, ax);
+        // std::cout << "fission gs residual: " << bx.l2_norm() << std::endl;
+        subspace_problem.fission_s_gs.set_shift(k_energy);
+        const int num_qdofs = quadrature.size() * dof_handler.n_dofs();
+        aether::pgd::sn::FissionSourceShiftedS<dim> fission_source_s(
+            subspace_problem.fission_s,
+            subspace_problem.fixed_source_s,
+            subspace_problem.fixed_source_s_gs);
+        // fission_source_s.shift = 0;
+        // dealii::BlockVector<double> modes_power(modes);
+        // fission_source_s.vmult(modes_power, modes);
+        // modes_power /= modes_power.l2_norm();
+        // modes_all.block(0) = modes_power;
+        // continue;
+        ::aether::PETScWrappers::BlockWrapper fission_source_s_petsc(
+            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs,
+            fission_source_s);
+
+        ::aether::PETScWrappers::BlockWrapper fixed_source_s(
+            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs,
+            subspace_problem.fixed_source_s);
+        // ::aether::PETScWrappers::BlockWrapper fission_s_gs(
+        //     num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs,
+        //     subspace_problem.fission_s_gs);
+        ::aether::PETScWrappers::BlockWrapper fission_s(
+            num_modes_s, MPI_COMM_WORLD, num_qdofs, num_qdofs, 
+            subspace_problem.fission_s);
+        const int size = num_modes_s * num_qdofs;
+        std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+        eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+        eigenvectors[0].compress(dealii::VectorOperation::insert);
+        const double norm = 1; //modes.l2_norm();
+        for (int i = 0; i < size; ++i)
+          eigenvectors[0][i] = modes[i] / norm;
+        // for (int i = 0; i < num_qdofs; ++i)
+        //   eigenvectors[0][i] = 1;
+        eigenvectors[0].compress(dealii::VectorOperation::insert);
+        std::vector<double> eigenvalues = {k_energy};
+        dealii::SolverControl control(20, std::max(1e-6, std::pow(10, -2-i)));
+        // dealii::SolverControl control(100, 1e-6);
+        dealii::SLEPcWrappers::SolverKrylovSchur eigensolver(control);
+        // dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
+        eigensolver.set_initial_space(eigenvectors);
+        eigensolver.set_target_eigenvalue(k_energy);
+        eigensolver.set_which_eigenpairs(EPS_LARGEST_MAGNITUDE);
+        // shift and invert
+        using Shift 
+            = dealii::SLEPcWrappers::TransformationShift::AdditionalData;
+        dealii::SLEPcWrappers::TransformationShift shift(
+            MPI_COMM_WORLD, Shift(k_energy));
+        shift.set_matrix_mode(ST_MATMODE_SHELL);
+        // eigensolver.set_transformation(shift);
+        /*
+        // dealii::IterationNumberControl control_inv(10, 1e-4);
+        // dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD);
+        // dealii::PETScWrappers::PreconditionNone preconditioner(fixed_source_s);
+        // aether::PETScWrappers::PreconditionerMatrix preconditioner(fixed_source_s_gs);
+        aether::PETScWrappers::PreconditionerShell preconditioner(fission_s_gs);
+        // solver_inv.initialize(preconditioner);
+        // std::cout << "b: "; preconditioner.vmult(bar, foo);
+        // shift_invert.set_solver(solver_inv);
+        // std::cout << "c: "; preconditioner.vmult(bar, foo);
+        // eigensolver.set_transformation(shift_invert);
+        // std::cout << "d: "; preconditioner.vmult(bar, foo);
+        dealii::SolverControl control_dummy(1, 0);
+        dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
+        solver_pc.initialize(preconditioner);
+        // dealii::IterationNumberControl control_si(3, 1e-6);
+        // dealii::PETScWrappers::SolverGMRES solver_si(control_si);
+        // solver_si.initialize(preconditioner);
+        // shift.set_solver(solver_si);
+        // eigensolver.set_transformation(shift);
+        aether::SLEPcWrappers::TransformationPreconditioner stprecond(
+            MPI_COMM_WORLD, fission_s_gs);
+        stprecond.set_matrix_mode(ST_MATMODE_SHELL);
+        stprecond.set_solver(solver_pc);
+        eigensolver.set_transformation(stprecond);
+        */
+        try {
+          std::cout << "to solve\n";
+          eigensolver.solve(fission_source_s_petsc, eigenvalues, eigenvectors);
+          // eigensolver.solve(fission_s, fixed_source_s, eigenvalues, eigenvectors);
+          for (int i = 0; i < eigenvectors[0].size(); ++i)
+            modes[i] = eigenvectors[0][i];
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+        } //catch (...) {}
+        std::cout << "SPATIO-ANGULAR EIGENVALUE: " << eigenvalues[0] << std::endl;
+        if (eigenvalues[0] < 0) {
+          eigenvalues[0] *= -1;
+          eigenvectors[0] *= -1;
+        }
+        modes_all.block(0) = eigenvectors[0];
+        continue;
+      }
       if (false) {  // do this bad thing
         modes = modes_all.block(0);
         dealii::BlockVector<double> modes_copy(modes);
@@ -772,7 +1046,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
           for (double res : control_sa.get_history_data())
             std::cout << res << ", ";
           std::cout << "\n";
-          modes.add(-k_energy, modes_copy);
+          // modes.add(-k_energy, modes_copy);
         }
         if (false) {
           dealii::IterationNumberControl control_sa(10, 0);
@@ -838,6 +1112,9 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     jacobian.set_modes(modes_all);
     jacobian_pc.modes = modes_all;
     const int num_qdofs = modes_spaceangle[0].size();
+    if (!energy_fiss.modes_adj.empty()) {
+      energy_mg.modes_adj = energy_fiss.modes_adj;
+    }
     for (int m = 0; m < num_modes_s; ++m) {
       // energy_mg.modes[m] = energy_fiss.modes[m];
       for (int g = 0; g < num_groups; ++g)
@@ -873,10 +1150,13 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
       this->GetTestName() + "_pgd_s_M" + std::to_string(num_modes_s) + ".h5";
     HDF5::File file(filename_pgd_s, HDF5::File::FileAccessMode::create);
     file.set_attribute("k_eigenvalue", k_eigenvalue_pgd_s);
+    file.set_attribute("num_modes", num_modes_s);
     for (int m = 0; m < num_modes; ++m) {
       const std::string mm = std::to_string(m);
       file.write_dataset("modes_spaceangle"+mm, modes.block(m));
       file.write_dataset("modes_energy"+mm, energy_mg.modes[m]);
+      if (!energy_mg.modes_adj.empty())
+        file.write_dataset("modes_energy_adj"+mm, energy_mg.modes_adj[m]);
     }
     // stored subspace pgd
     problem_full.fission.vmult(source_full, flux_pgd, false);

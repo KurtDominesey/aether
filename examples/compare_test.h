@@ -212,7 +212,11 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
   void ComputeSvd(std::vector<dealii::BlockVector<double>> &svecs_spaceangle,
                   std::vector<dealii::Vector<double>> &svecs_energy,
                   const dealii::BlockVector<double> &flux,
-                  const Transport<dim, qdim> &transport);
+                  const Transport<dim, qdim> &transport,
+                  const dealii::BlockVector<double> *flux_adjoint=nullptr,
+                  std::vector<dealii::Vector<double>> *adjoints_energy=nullptr,
+                  std::vector<dealii::BlockVector<double>>
+                      *adjoints_spaceangle=nullptr);
 
   void Compare(int num_modes,
                const int max_iters_nonlinear,
