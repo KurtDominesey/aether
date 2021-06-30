@@ -63,6 +63,12 @@ TEST_P(CathalauCompareSubspaceTest, SvdEnergy) {
                 false, num_modes_s, true, true);
 }
 
+TEST_P(CathalauCompareSubspaceTest, SvdBoth) {
+  const int num_modes_s = std::get<2>(this->GetParam());
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true,
+                false, num_modes_s, true, false);
+}
+
 INSTANTIATE_TEST_CASE_P(GroupStructureModes, CathalauCompareSubspaceTest,
     ::testing::Combine(
     ::testing::Values("mox43"),
