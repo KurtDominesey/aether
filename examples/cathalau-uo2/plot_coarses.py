@@ -172,13 +172,13 @@ def plot_all(*args):
                     lines = [line(alpha=ALPHA, color='C'+str(i), label=label)
                              for i, label in enumerate((1, 10, 20, 30))]
                     plt.legend(handles=lines, loc='upper center', 
-                               title='Cross-Sections, $M=$',
+                               title='Cross Sections, $M=$',
                                ncol=len(lines), bbox_to_anchor=(0.5, upper),
                                columnspacing=1.3)
             # handles = plt.gca().get_legend_handles_labels()
             if i == nrows - 1 and j == 0:
                 lines = [line(alpha=ALPHA, color='black', 
-                              label='Full-order cross-sections')]
+                              label='Full-order cross sections')]
                 plt.legend(handles=lines, loc='lower left')
             if j == ncols - 1:
                 plt.setp(axij.get_yticklabels(), visible=False)

@@ -111,7 +111,7 @@ def plot_spectrum(filename, savename, fuel, **kwargs):
                alpha=0.5, label=fuel_fancy+r' $\Sigma_t$')
     plt.yscale('log')
     plt.gca().spines['right'].set_color(xs_color)
-    plt.ylabel(r'Total Cross-Section $\Sigma_t$ [cm\textsuperscript{-1}]', color=xs_color)
+    plt.ylabel(r'Total Cross Section $\Sigma_t$ [cm\textsuperscript{-1}]', color=xs_color)
     plt.tick_params(axis='y', which='both', labelcolor=xs_color, color=xs_color)
     plt.grid(visible=False)
     # plt.xlim(plt.xlim()[0], 1)

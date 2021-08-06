@@ -63,7 +63,7 @@ def plot_all(loc, fuels):
     ax0.set_xticks([])
     ax0.set_yticks([])
     ax0.set_xlabel('Energy [eV]', labelpad=20 if not JCP else 18)
-    ax0.set_ylabel(r'Total Cross-Section $\Sigma_t$ [cm\textsuperscript{-1}]', 
+    ax0.set_ylabel(r'Total Cross Section $\Sigma_t$ [cm\textsuperscript{-1}]', 
                    labelpad=25 if not JCP else 23)
     legend = ax0.legend(lines, materials, loc='upper center', ncol=len(materials),
                         bbox_to_anchor=(0.5, 1.17) if not JCP else (0.5, 1.175))

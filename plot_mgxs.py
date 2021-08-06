@@ -77,7 +77,7 @@ if __name__ == '__main__':
         name = 'mgxs-uncorrected-{}.h5'
         for groups in ['SHEM-361', 'XMAS-172', 'CASMO-70']:
             plot_mgxs(folder+name.format(groups), [fuel], alpha=0.8)
-    plt.ylabel(r'Cross-Section [cm\textsuperscript{-1}]\hspace{-5cm}', 
+    plt.ylabel(r'Cross Section [cm\textsuperscript{-1}]\hspace{-5cm}', 
                labelpad=majorpad)
     plt.xlabel('Energy [eV]')
     # majorformatter_old = plt.gca().get_yaxis().get_major_formatter()

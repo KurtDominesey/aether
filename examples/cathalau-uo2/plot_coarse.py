@@ -262,7 +262,7 @@ def plot_all(name, suffix):
                 plt.legend(handles=lines, loc='lower left', ncol=ncol)
             if j == ncols -1 and i == nrows - 1:
                 lines = [line(alpha=ALPHA, color='black', ls='--',
-                             label='Total error [-]')]
+                             label='Total error')]
                 plt.legend(handles=lines, loc='lower left')
             if j == ncols - 1:
                 plt.setp(axij.get_yticklabels(), visible=False)

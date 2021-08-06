@@ -194,6 +194,6 @@ if __name__ == '__main__':
     axt = plt.twinx()
     axt.set_frame_on(False)
     axt.set_yticks([])
-    plt.ylabel(r'Total Cross-Section $\Sigma_t$ [cm\textsuperscript{-1}]', color='C4', 
+    plt.ylabel(r'Total Cross Section $\Sigma_t$ [cm\textsuperscript{-1}]', color='C4', 
                labelpad=20)
     plt.savefig(f'{name}-{study}.pdf')
