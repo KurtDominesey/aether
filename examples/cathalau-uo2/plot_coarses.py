@@ -26,13 +26,9 @@ def plot_coarses(filename, savename, show_pgd=True, show_scalar=False,
     # groups = openmc.mgxs.GROUP_STRUCTURES['CASMO-70']
     folder = '/mnt/c/Users/kurt/Documents/projects/openmc-c5g7/'
     groups = np.load(folder+'casmo-sh-70.npy')[::-1]
-    widths = groups[1:] - groups[:-1]
-    widths = widths[::-1]
     table = np.genfromtxt(filename, names=True)
     alpha = ALPHA
     alpha2 = 0.6 #0.35
-    coarsened = table['flux_coarsened'] / np.sqrt(widths)
-    norm_coarsened = sum(coarsened**2)**0.5
     names = list(table.dtype.names)
     for i, name in enumerate(names):
         if 'norm' in name or 'source' in name:
