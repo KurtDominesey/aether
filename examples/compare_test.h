@@ -402,6 +402,73 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     table.set_precision(key, 16);
   }
 
+  void CompareGroupwise(
+      dealii::BlockVector<double> flux,
+      const std::vector<dealii::BlockVector<double>> &modes_spaceangle,
+      const std::vector<dealii::Vector<double>> &modes_energy,
+      const pgd::sn::Transport<dim, qdim> &transport,
+      const DiscreteToMoment<qdim> &d2m,
+      const std::vector<double> &group_structure,
+      const std::string &suffix) {
+    const int num_groups = flux.n_blocks();
+    const int num_dofs = transport.m() / transport.n_block_cols();
+    std::vector<double> group_widths(num_groups);
+    double norm_total_d = 0;
+    double norm_total_m = 0;
+    dealii::Vector<double> scalar(num_dofs);
+    dealii::Vector<double> scalar_l2(num_dofs);
+    for (int g = 0; g < num_groups; ++g) {
+      int g_rev = num_groups - 1 - g;
+      group_widths[g] =
+          std::log(group_structure[g_rev+1]/group_structure[g_rev]);
+      AssertThrow(group_widths[g] > 0, dealii::ExcInvalidState());
+      double norm_d_g = transport.norm(flux.block(g));
+      norm_total_d += std::pow(norm_d_g, 2) / group_widths[g];
+      d2m.vmult(scalar, flux.block(g));
+      transport.collide_ordinate(scalar_l2, scalar);
+      norm_total_m += (scalar * scalar_l2) / group_widths[g];
+    }
+    norm_total_d = std::sqrt(norm_total_d);
+    norm_total_m = std::sqrt(norm_total_m);
+    std::ofstream groups_out_d;
+    std::ofstream groups_out_m;
+    groups_out_d.open(
+        this->GetTestName()+"_"+suffix+"_d_groupwise.txt", std::ios::trunc);
+    groups_out_m.open(
+        this->GetTestName()+"_"+suffix+"_m_groupwise.txt", std::ios::trunc);
+    groups_out_d << std::scientific << std::setprecision(10);
+    groups_out_m << std::scientific << std::setprecision(10);
+    const int num_qdofs = transport.m();
+    const int num_modes = modes_spaceangle.size();
+    AssertDimension(modes_spaceangle.size(), modes_energy.size());
+    for (int m = 0; m < num_modes; ++m) {
+      bool record = ((m+1) % 10) == 0;
+      for (int g = 0; g < num_groups; ++g) {
+        for (int i = 0; i < num_qdofs; ++i)
+          flux.block(g)[i] -= modes_energy[m][g] * modes_spaceangle[m][i];
+        if (record) {
+          // divide by group width in post-processing script, not here
+          double error_norm_d = transport.norm(flux.block(g)) / norm_total_d;
+          d2m.vmult(scalar, flux.block(g));
+          transport.collide_ordinate(scalar_l2, scalar);
+          double error_norm_m = std::sqrt(scalar*scalar_l2) / norm_total_m;
+          if (g > 0) {
+            groups_out_d << " ";
+            groups_out_m << " ";
+          }
+          groups_out_d << error_norm_d;
+          groups_out_m << error_norm_m;
+        } 
+      }
+      if (record) {
+        groups_out_d << "\n";
+        groups_out_m << "\n";
+      }
+    }
+    groups_out_d.close();
+    groups_out_m.close();
+  }
+
   void ComputeSvd(std::vector<dealii::BlockVector<double>> &svecs_spaceangle,
                   std::vector<dealii::Vector<double>> &svecs_energy,
                   const dealii::BlockVector<double> &flux,
@@ -635,6 +702,13 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                        "residual_swept");
     }
     this->WriteConvergenceTable(table);
+    std::cout << "groupwise plots\n";
+    CompareGroupwise(flux_full, modes_spaceangle, energy_mg.modes, 
+                     problem.transport, problem.d2m, mgxs->group_structure,
+                     "pgd");
+    CompareGroupwise(flux_full, svecs_spaceangle, svecs_energy, 
+                     problem.transport, problem.d2m, mgxs->group_structure,
+                     "svd");
   }
 };
 
