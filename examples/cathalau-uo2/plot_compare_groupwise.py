@@ -44,14 +44,16 @@ def plot_groups(filename, structure, yfloor):
     assert num_groups == len(groups) - 1
     widths = np.log(groups[1:]/groups[:-1])
     widths = widths[::-1]
+    scale_width = math.log(groups[-1]/groups[1])
+    assert abs((sum(widths[:-1]) - scale_width)/scale_width) < 1e-10
     for m in range(mm):
         ydata = table[m, :]
-        total = sum(ydata**2 / widths)**0.5
+        total = sum(ydata[:-1]**2 / widths[:-1])**0.5
         ydata /= widths
         color = f'C{m}'
+        plt.axhline(total/scale_width**0.5, color=color, ls='--', alpha=0.5)
         plt.step(groups[::-1], np.append(ydata[0], ydata), where='pre',
                  color=color, alpha=0.8, label=str((m+1)*10))
-        plt.axhline(total, color=color, ls='--', alpha=0.5)
         print('{:.2e}'.format(total))
     plt.xscale('log')
     plt.yscale('log')
@@ -95,7 +97,7 @@ def plot_fuel(base, savename, yfloors):
                 plt.setp(plt.gca().get_yticklabels(), visible=False)
             if row == num_rows -1 and col == 0:
                 line = matplotlib.lines.Line2D([], [], ls='--', alpha=0.5,
-                                               color='k', label='Total error')
+                                               color='k', label='Average error')
                 plt.legend(handles=[line], loc='lower left')
         for ax in axes_row:
             ax.set_ylim(ymin_row, ymax_row)
