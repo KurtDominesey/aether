@@ -409,14 +409,19 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       const pgd::sn::Transport<dim, qdim> &transport,
       const DiscreteToMoment<qdim> &d2m,
       const std::vector<double> &group_structure,
-      const std::string &suffix) {
+      const std::string &suffix,
+      const int norm=1) {
+    AssertThrow(norm == 1 || norm == 2, dealii::ExcNotImplemented());
     const int num_groups = flux.n_blocks();
     const int num_dofs = transport.m() / transport.n_block_cols();
     std::vector<double> group_widths(num_groups);
     double norm_total_d = 0;
     double norm_total_m = 0;
+    double norm_total_l1 = 0;
     dealii::Vector<double> scalar(num_dofs);
     dealii::Vector<double> scalar_l2(num_dofs);
+    dealii::Vector<double> flux_g(flux.block(0).size());
+    std::vector<dealii::BlockVector<double>> vout;
     for (int g = 0; g < num_groups; ++g) {
       int g_rev = num_groups - 1 - g;
       group_widths[g] =
@@ -427,6 +432,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       d2m.vmult(scalar, flux.block(g));
       transport.collide_ordinate(scalar_l2, scalar);
       norm_total_m += (scalar * scalar_l2) / group_widths[g];
+      for (int i = 0; i < scalar_l2.size(); ++i)
+        norm_total_l1 += std::abs(scalar_l2[i]);
     }
     norm_total_d = std::sqrt(norm_total_d);
     norm_total_m = std::sqrt(norm_total_m);
@@ -441,6 +448,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     const int num_qdofs = transport.m();
     const int num_modes = modes_spaceangle.size();
     AssertDimension(modes_spaceangle.size(), modes_energy.size());
+    dealii::DataOut<dim> data_out;
+    data_out.attach_dof_handler(this->dof_handler);
     for (int m = 0; m < num_modes; ++m) {
       bool record = ((m+1) % 10) == 0;
       for (int g = 0; g < num_groups; ++g) {
@@ -463,10 +472,49 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       if (record) {
         groups_out_d << "\n";
         groups_out_m << "\n";
+        // plot error
+        scalar = 0;
+        for (int g = 0; g < num_groups; ++g) {
+          if (norm == 1) {
+            flux_g = flux.block(g);
+            for (int i = 0; i < flux_g.size(); ++i)
+              flux_g[i] = std::abs(flux_g[i]);
+          } else if (norm == 2) {
+            flux_g.equ(1/group_widths[g], flux.block(g));
+            flux_g.scale(flux.block(g));
+          }
+          d2m.vmult_add(scalar, flux_g);
+        }
+        if (norm == 1) {
+          scalar /= norm_total_l1;
+        } else if (norm == 2) {
+          for (int i = 0; i < scalar.size(); ++i)
+            scalar[i] = std::sqrt(scalar[i]);
+          scalar /= norm_total_d;
+        }
+        vout.emplace_back(1, scalar.size());
+        vout.back() = scalar;
+        data_out.add_data_vector(vout.back().block(0), 
+                                 "error_d_"+std::to_string(m+1));
+        scalar = 0;
+        for (int g = 0; g < num_groups; ++g) {
+          d2m.vmult(scalar_l2, flux.block(g));  // scalar_l2 is scratch vector
+          for (int i = 0; i < scalar_l2.size(); ++i)
+            scalar[i] += std::abs(scalar_l2[i]);
+        }
+        scalar /= norm_total_l1;
+        vout.emplace_back(1, scalar.size());
+        vout.back() = scalar;
+        data_out.add_data_vector(vout.back().block(0), 
+                                 "error_m_"+std::to_string(m+1));
       }
     }
     groups_out_d.close();
     groups_out_m.close();
+    data_out.build_patches();
+    std::string name = this->GetTestName()+"_"+suffix+"_error";
+    std::ofstream output(name+".vtu");
+    data_out.write_vtu(output);
   }
 
   void ComputeSvd(std::vector<dealii::BlockVector<double>> &svecs_spaceangle,
