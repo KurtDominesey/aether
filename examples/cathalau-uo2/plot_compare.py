@@ -49,6 +49,7 @@ def plot_compare(filename, savename, **kwargs):
         ('error_svd_d', 'Error $\\psi$, SVD'),
         ('error_m', 'Error $\\phi$, PGD'),
         ('error_d', 'Error $\\psi$, PGD')])
+    print(table['error_d'][0]/table['error_m'][0])
     # for name in table.dtype.names:
     for name in labels.keys():
         if name not in table.dtype.names:
@@ -88,21 +89,22 @@ def plot_compare(filename, savename, **kwargs):
             # kwargs_line['ls'] = '--'
             kwargs_line['marker'] = 'D'
             kwargs_line['alpha'] = 0.5
-            # continue
+            ydata = table[name] / table['error_m'][0]
+        else:
+            ydata = table[name] / table['error_d'][0]
         # if name != 'error_d' and name != 'error_svd_d':
         #     continue
         # if name[-1] == 'm':
         #     kwargs['color'] = plt.gca().lines[-1].get_color()
         #     kwargs['ls'] = '--'
         xdata = enrichments
-        ydata = table[name] / table['error_d'][0]
         ydata = np.abs(ydata)
         if ydata[0] == 0:
             ydata = ydata[1:]
             xdata = xdata[:-1]
         # ydata /= ydata[0]
         plt.plot(xdata, ydata, **kwargs_line)
-        if 'error' in name and 'svd' not in name:
+        if 'error' in name:
             print(name, ' & '.join('%.2e' % y for y in ydata[10::10]))
     # plt.xticks(refinements)
     # plt.legend(loc='best')
@@ -201,8 +203,8 @@ def main(fuel, ext):
     plt.savefig('compare-{fuel}.pdf'.format(fuel=fuel))
 
 if __name__ == '__main__':
-    # python plot_compare.py uo2 pdf
-    # python plot_comapre.py mox43 pdf
+    # python plot_compare.py uo2 pdf jcp
+    # python plot_compare.py mox43 pdf jcp
     plt.style.use('thesis.mplstyle')
     matplotlib.rc('figure', figsize=(6.5, 6.375))
     if sys.argv[-1] == 'jcp':

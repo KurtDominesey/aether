@@ -35,6 +35,7 @@ def plot_coarse(filename, savename, is_relative, show_scalar=False):
     norm_coarsened_m = sum(coarsened_m**2 / widths)**0.5
     print('norm_coarsened', norm_coarsened)
     print('norm_coarsened_m', norm_coarsened_m)
+    print('ratio', norm_coarsened/norm_coarsened_m)
     is_sep = False
     for name in table.dtype.names:
         invisible = False
@@ -115,8 +116,14 @@ def plot_coarse(filename, savename, is_relative, show_scalar=False):
             ydata /= widths
             # if name == 'coarse_d_abs':
             #     norm_coarse = norm
-            norm /= norm_coarsened
-            ydata /= norm_coarsened
+            if '_m_' in name:
+                norm /= norm_coarsened_m
+                ydata /= norm_coarsened_m
+            elif '_d_' in name:
+                norm /= norm_coarsened
+                ydata /= norm_coarsened
+            else:
+                raise NotImplementedError
             # ls = '--' if '_m_' in name else '--'
             ls = '-.' if kwargs_line.get('ls', '') == ':' else '--'
         if not invisible:

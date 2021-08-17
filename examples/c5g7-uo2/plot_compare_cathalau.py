@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, '../cathalau-uo2')
+sys.path.insert(0, '../cathalau-uo2')  # this precedes current working dir
 import plot_compare
 
 JCP = True
