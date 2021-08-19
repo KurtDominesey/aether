@@ -84,6 +84,15 @@ double NonlinearGS::step(dealii::BlockVector<double> x,
     //     ip_b_ones[i], ones);
 
     linear_ops[i]->take_step(1.0, steps[i]);
+    if (linear_ops[i]->do_minimax) {
+      double norm = 1;
+      for (int j = 0; j < linear_ops.size(); ++j) {
+        if (i == j)
+          continue;
+        norm *= linear_ops[j]->get_norm();
+      }
+      linear_ops[i]->solve_minimax(norm);
+    }
     if (i < linear_ops.size() - 1)
       linear_ops[i]->get_inner_products(inner_products_x[i],
                                         inner_products_b[i]);

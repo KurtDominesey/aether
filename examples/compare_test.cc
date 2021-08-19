@@ -537,6 +537,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
                                      const int max_iters_fullorder,
                                      const double tol_fullorder,
                                      const bool do_update,
+                                     const bool do_minimax,
                                      const bool precomputed_full,
                                      const bool precomputed_pgd,
                                      const bool do_eigenvalue,
@@ -712,7 +713,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     problem.fixed_source, problem.fission, mgxs_pseudo, mgxs_one);
   pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
   const std::string filename_pgd = filebase + "_pgd_" +
-      (do_update ? "update" : "prog") + ".h5";
+      (do_update ? "update" : "prog") +
+      (do_minimax ? "_minimax_" : "") + ".h5";
   if (precomputed_pgd) {
     // read from file
     HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::open);
@@ -736,6 +738,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
       auto eigen_gs = dynamic_cast<pgd::sn::EigenGS*>(nonlinear_gs.get());
       eigen_gs->initialize_guess();
     } else {
+      energy_mg.do_minimax = do_minimax;
+      fixed_source_p.do_minimax = do_minimax;
       linear_ops = {&energy_mg, &fixed_source_p};
       nonlinear_gs = std::make_unique<pgd::sn::NonlinearGS>(
           linear_ops, num_materials, 1, num_sources);

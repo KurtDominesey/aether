@@ -40,6 +40,7 @@ class FixedSourceP : public LinearInterface {
             std::vector<double> coefficients_b,
             double omega = 1.0);
   void take_step(const double factor, const dealii::Vector<double> &delta);
+  void solve_minimax(const double norm);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
@@ -73,6 +74,7 @@ class FixedSourceP : public LinearInterface {
   void scale(double factor);
   double get_residual(std::vector<InnerProducts> coefficients_x,
                       std::vector<double> coefficients_b);
+  double get_norm() const;
   std::vector<Cache> caches;
   const std::vector<dealii::BlockVector<double>> &sources;
   aether::sn::FixedSource<dim, qdim> &fixed_source;
@@ -80,6 +82,7 @@ class FixedSourceP : public LinearInterface {
  protected:
   const Mgxs &mgxs;
   Mgxs &mgxs_pseudo;
+  std::vector<dealii::BlockVector<double>> test_funcs;
   void set_last_cache();
   virtual void set_cross_sections(const InnerProducts &coefficients_x);
   void get_source(dealii::BlockVector<double> &source,

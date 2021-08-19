@@ -34,8 +34,10 @@ template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products_x(
     std::vector<InnerProducts> &inner_products, 
     const int m_row, const int m_col_start) {
+  const dealii::BlockVector<double> &left = do_minimax ?
+      test_funcs[m_row] : caches[m_row].mode;
   for (int m = m_col_start; m < caches.size(); ++m) {
-    get_inner_products_x(inner_products[m], caches[m_row].mode, caches[m]);
+    get_inner_products_x(inner_products[m], left, caches[m]);
   }
 }
 
@@ -153,7 +155,9 @@ void FixedSourceP<dim, qdim>::get_inner_products_x(
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::get_inner_products_b(
     std::vector<double> &inner_products, const int m_row) {
-  get_inner_products_b(inner_products, caches[m_row].mode);
+  const dealii::BlockVector<double> &left = do_minimax ?
+      test_funcs[m_row] : caches[m_row].mode;
+  get_inner_products_b(inner_products, left);
 }
 
 template <int dim, int qdim>
@@ -321,6 +325,25 @@ void FixedSourceP<dim, qdim>::take_step(
 }
 
 template <int dim, int qdim>
+void FixedSourceP<dim, qdim>::solve_minimax(const double norm) {
+  dealii::BlockVector<double> uncollided(
+        caches.back().mode.get_block_indices());
+  for (int g = 0; g < fixed_source.within_groups.size(); ++g)
+    fixed_source.within_groups[g].transport.Tvmult(
+        uncollided.block(g), caches.back().mode.block(g), false);
+  // assume that the cross-sections are already correctly set
+  // (by a previous call to step)
+  dealii::IterationNumberControl solver_control(25, 1e-8);
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver(solver_control,
+      dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
+  fixed_source.transposed = !fixed_source.transposed;
+  solver.solve(fixed_source, test_funcs.back(), uncollided, 
+               dealii::PreconditionIdentity());
+  fixed_source.transposed = !fixed_source.transposed;
+  test_funcs.back() *= norm;
+}
+
+template <int dim, int qdim>
 double FixedSourceP<dim, qdim>::get_residual(
       std::vector<InnerProducts> coefficients_x,
       std::vector<double> coefficients_b) {
@@ -430,6 +453,7 @@ double FixedSourceP<dim, qdim>::enrich(const double factor) {
                       1,
                       transport.dof_handler.n_dofs());
   caches.back().mode = 1;
+  test_funcs.emplace_back(caches.back().mode);
   return 0;
 }
 
@@ -470,6 +494,8 @@ double FixedSourceP<dim, qdim>::normalize() {
   // double denom = std::pow(transport.inner_product(one, mode), 2);
   double denom = transport.norm(mode);
   mode /= denom;
+  dealii::Vector<double> &test = test_funcs.back().block(0);
+  test_funcs.back() /= transport.norm(test);
   return denom;
   // throw dealii::ExcNotImplemented();
 }
@@ -477,6 +503,15 @@ double FixedSourceP<dim, qdim>::normalize() {
 template <int dim, int qdim>
 void FixedSourceP<dim, qdim>::scale(double factor) {
   throw dealii::ExcNotImplemented();
+}
+
+template <int dim, int qdim>
+double FixedSourceP<dim, qdim>::get_norm() const {
+  const Transport<dim, qdim> &transport =
+      dynamic_cast<const Transport<dim, qdim>&>(
+          fixed_source.within_groups[0].transport.transport);
+  const dealii::Vector<double> &mode = caches.back().mode.block(0);
+  return transport.norm(mode);
 }
 
 template class FixedSourceP<1>;

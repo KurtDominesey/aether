@@ -49,6 +49,9 @@ class LinearInterface {
   double virtual enrich(const double factor) = 0;
   double virtual normalize() = 0;
   void virtual scale(double factor) = 0;
+  double virtual get_norm() const = 0;
+  void virtual solve_minimax(const double norm) = 0;
+  bool do_minimax = false;
 };
 
 }  // namespace aether::pgd::sn

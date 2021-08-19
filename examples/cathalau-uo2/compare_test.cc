@@ -21,11 +21,19 @@ class CathalauCompareTest : public CathalauTest,
 };
 
 TEST_P(CathalauCompareTest, Progressive) {
-  this->Compare(50, 50, 1e-4, 50, 1e-8, false, false, false);
+  this->Compare(50, 50, 1e-4, 50, 1e-8, false, false, false, false);
 }
 
 TEST_P(CathalauCompareTest, WithUpdate) {
-  this->Compare(50, 50, 1e-2, 300, 1e-10, true, false, false, false, false);
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, /*do minimax*/false,
+                /*precomputed_full*/true, /*precomputed_pgd*/true, 
+                /*do_eigenvalue*/false, /*full_only*/false);
+}
+
+TEST_P(CathalauCompareTest, MinimaxWithUpdate) {
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, /*do minimax*/true,
+                /*precomputed_full*/true, /*precomputed_pgd*/true, 
+                /*do_eigenvalue*/false, /*full_only*/false);
 }
 
 INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest,
@@ -47,25 +55,28 @@ class CathalauCompareSubspaceTest : public CathalauCompareTest {};
 
 TEST_P(CathalauCompareSubspaceTest, PgdEnergy) {
   const int num_modes_s = std::get<2>(this->GetParam());
-  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true, 
-                false, num_modes_s, false, true);
+  this->Compare(50, 50, 1e-2, 300, 1e-10, /*do update*/true, 
+                /*do minimax*/false, /*precomputed_full*/true, 
+                /*precompute_pgd*/true,  /*do_eigenvalue*/true, 
+                /*full_only*/false, num_modes_s, /*guess_svd*/false, 
+                /*guess_spatioangular*/true);
 }
 
 TEST_P(CathalauCompareSubspaceTest, PgdBoth) {
   const int num_modes_s = std::get<2>(this->GetParam());
-  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true, 
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, false, true, true, true, 
                 false, num_modes_s, false, false);
 }
 
 TEST_P(CathalauCompareSubspaceTest, SvdEnergy) {
   const int num_modes_s = std::get<2>(this->GetParam());
-  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true,
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, false, true, true, true,
                 false, num_modes_s, true, true);
 }
 
 TEST_P(CathalauCompareSubspaceTest, SvdBoth) {
   const int num_modes_s = std::get<2>(this->GetParam());
-  this->Compare(50, 50, 1e-2, 300, 1e-10, true, true, true, true,
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, false, true, true, true,
                 false, num_modes_s, true, false);
 }
 

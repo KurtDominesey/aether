@@ -32,9 +32,11 @@ double EnergyMgFull::step(dealii::Vector<double> &delta,
   set_source(coefficients_b, coefficients_x);
   // matrix.print(std::cout);
   // source.print(std::cout);
+  dealii::FullMatrix<double> matrix_copy(matrix);
   matrix.gauss_jordan();
   dealii::Vector<double> solution(modes.back());
   matrix.vmult(solution, source);
+  matrix = matrix_copy;  // reset matrix to original state -- not inverted!
   ////
   // dealii::FullMatrix<double> matrix_n(matrix.m()+1, matrix.n()+1);
   // for (int i = 0; i < matrix.m(); ++i)
@@ -63,6 +65,16 @@ double EnergyMgFull::step(dealii::Vector<double> &delta,
 void EnergyMgFull::take_step(const double factor, 
                              const dealii::Vector<double> &delta) {
   modes.back().add(factor, delta);
+}
+
+void EnergyMgFull::solve_minimax(const double norm) {
+  // assume matrix is already correctly set
+  // (by a previous call to step)
+  dealii::FullMatrix<double> matrix_T;
+  matrix_T.copy_transposed(matrix);
+  matrix_T.gauss_jordan();
+  matrix_T.vmult(test_funcs.back(), modes.back());
+  test_funcs.back() *= norm;
 }
 
 double EnergyMgFull::get_residual(
@@ -205,6 +217,7 @@ double EnergyMgFull::line_search(
 
 double EnergyMgFull::enrich(const double factor) {
   modes.emplace_back(mgxs.total.size());
+  test_funcs.emplace_back(mgxs.total.size());
   return 0;
 }
 
@@ -279,7 +292,8 @@ void EnergyMgFull::get_inner_products(
     std::vector<InnerProducts> &inner_products_x,
     std::vector<double> &inner_products_b,
     const int m_row, const int m_col_start) {
-  dealii::Vector<double> &left = modes[m_row];
+  dealii::Vector<double> &left = 
+      do_minimax ? test_funcs[m_row] : modes[m_row];
   get_inner_products_b(inner_products_b, left);
   AssertDimension(modes.size(), inner_products_x.size());
   for (int m = m_col_start; m < modes.size(); ++m) {
@@ -435,6 +449,18 @@ void EnergyMgFull::update(
       modes[m][g] = solution_u[mm+g];
     }
   }
+}
+
+double EnergyMgFull::get_norm() const {
+  double norm = 0;
+  const int num_groups = modes.back().size();
+  for (int g = 0; g < num_groups; ++g) {
+    int g_rev = num_groups - 1 - g;
+    double width = std::log(mgxs.group_structure[g+1]/mgxs.group_structure[g]);
+    AssertThrow(width > 0, dealii::ExcDivideByZero());
+    norm += std::pow(modes.back()[g_rev], 2) / width;
+  }
+  return norm;
 }
 
 }  // namespace aether::pgd::sn

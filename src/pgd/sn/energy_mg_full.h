@@ -29,6 +29,7 @@ class EnergyMgFull : public LinearUpdatableInterface {
             std::vector<double> coefficients_b,
             double omega = 1.0);
   void take_step(const double factor, const dealii::Vector<double> &delta);
+  void solve_minimax(const double norm);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
                           std::vector<double> &inner_products_b);
   void get_inner_products(std::vector<InnerProducts> &inner_products_x,
@@ -57,6 +58,7 @@ class EnergyMgFull : public LinearUpdatableInterface {
   void scale(double factor);
   double get_residual(std::vector<InnerProducts> coefficients_x,
                       std::vector<double> coefficients_b);
+  double get_norm() const;
   void update(std::vector<std::vector<InnerProducts>> coefficients_x,
               std::vector<std::vector<double>> coefficients_b);
   std::vector<dealii::Vector<double>> modes;
@@ -66,6 +68,7 @@ class EnergyMgFull : public LinearUpdatableInterface {
  protected:
   dealii::FullMatrix<double> matrix;
   dealii::Vector<double> source;
+  std::vector<dealii::Vector<double>> test_funcs;
   virtual void set_matrix(InnerProducts coefficients_x);
   virtual void set_source(std::vector<double> coefficients_b, 
                           std::vector<InnerProducts> coefficients_x);

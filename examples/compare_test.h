@@ -224,6 +224,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
                const int max_iters_fullorder,
                const double tol_fullorder,
                const bool do_update,
+               const bool do_minimax=false,
                const bool precomputed_full=true,
                const bool precomputed_pgd=true,
                const bool do_eigenvalue=false,
