@@ -714,7 +714,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
   pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
   const std::string filename_pgd = filebase + "_pgd_" +
       (do_update ? "update" : "prog") +
-      (do_minimax ? "_minimax_" : "") + ".h5";
+      (do_minimax ? "_minimax" : "") + ".h5";
   if (precomputed_pgd) {
     // read from file
     HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::open);
