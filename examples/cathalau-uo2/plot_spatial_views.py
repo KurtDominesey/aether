@@ -80,6 +80,11 @@ def plot_spatial_view(filename, savebase):
             colorbar.ScalarBarLength = 0.85
             colorbar.UseCustomLabels = True
             dmin,  dmax = reader.PointData[field].GetRange()
+            if 'd' in field:
+                dmin, _ = reader.PointData[field.replace('d', 'm')].GetRange()
+            else:
+                _, dmax = reader.PointData[field.replace('m', 'd')].GetRange()
+            colorfunc.RescaleTransferFunction(dmin, dmax)
             colorbar.CustomLabels = \
                 np.linspace(dmin, dmax, 4, endpoint=False)[1:]
         else:
