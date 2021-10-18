@@ -7,6 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 JCP = None
+EIGEN = True
 
 def right_yticks():
     ax = plt.gca()
@@ -49,6 +50,8 @@ def plot_compare(filename, savename, **kwargs):
         ('error_svd_d', 'Error $\\psi$, SVD'),
         ('error_m', 'Error $\\phi$, PGD'),
         ('error_d', 'Error $\\psi$, PGD')])
+    if EIGEN:
+        labels['error_k'] = 'Error $k$ [pcm]'
     # for name in table.dtype.names:
     for name in labels.keys():
         if name not in table.dtype.names:
@@ -95,13 +98,27 @@ def plot_compare(filename, savename, **kwargs):
         #     kwargs['color'] = plt.gca().lines[-1].get_color()
         #     kwargs['ls'] = '--'
         xdata = enrichments
-        ydata = table[name] / table['error_d'][0]
+        if name == 'error_k':
+            ydata = table[name]
+            col = 'C4'
+            kwargs_line['color'] = col
+            kwargs_line['marker'] = '*'
+            ax = plt.gca()
+            plt.gca().twinx()
+            plt.grid(color=col, ls='--', alpha=0.5)
+            plt.gca().spines['right'].set_color(col)
+            plt.tick_params(axis='y', which='both', labelcolor=col, color=col)
+            plt.yscale('log')
+        else:
+            ydata = table[name] / table['error_d'][0]
         ydata = np.abs(ydata)
         if ydata[0] == 0:
             ydata = ydata[1:]
             xdata = xdata[:-1]
         # ydata /= ydata[0]
         plt.plot(xdata, ydata, **kwargs_line)
+        if name == 'error_k':
+            plt.sca(ax)
         if 'error' in name and 'svd' not in name:
             print(name, ' & '.join('%.2e' % y for y in ydata[10::10]))
     # plt.xticks(refinements)
@@ -122,7 +139,10 @@ def plot_compare(filename, savename, **kwargs):
 
 def main(fuel, ext):
     name_base = 'GroupStructure_CathalauCompareTest{algorithm}_{fuel}_{param}'
-    algorithms = ('Progressive', 'WithUpdate') #('Progressive', 'WithUpdate')
+    if not EIGEN:
+        algorithms = ('Progressive', 'WithUpdate')
+    else:
+        algorithms = ('WithEigenUpdate', 'MinimaxWithEigenUpdate')
     # params = range(9)
     params = ['CASMO-'+str(num) for num in (70,)]
     params += ['XMAS-172', 'SHEM-361'] # 'CCFE-709', 'UKAEA-1102']
@@ -153,9 +173,12 @@ def main(fuel, ext):
             # color = 'C'+str(i)
             color = None
             plt.gca().set_prop_cycle(None)
-            plot_compare(name+'.txt', name+'.'+ext, 
-                         label=label, color=color, 
-                         markevery=2, markersize=2.75)
+            try:
+                plot_compare(name+'.txt', name+'.'+ext, 
+                            label=label, color=color, 
+                            markevery=2, markersize=2.75)
+            except OSError:
+                pass
             # plt.gca().yaxis.get_ticklocs(minor=True)
             # plt.gca().minorticks_on()
             plt.gca().tick_params(axis='y', which='both', left=True)
@@ -172,15 +195,19 @@ def main(fuel, ext):
             else:
                 pass
             if i == 0:
-                fancy = {'Progressive': 'Progressive', 
-                         'WithUpdate': 'With Update'}
-                plt.title(fancy[algorithm])
+                try:
+                    fancy = {'Progressive': 'Progressive',
+                             'WithUpdate': 'With Update'}
+                    plt.title(fancy[algorithm])
+                except KeyError:
+                    plt.title(algorithm)
             # plt.close()
             handles, desc = plt.gca().get_legend_handles_labels()
             if j == ncols - 1:
                 pass
-                right_yticks()
-                plt.setp(axij.get_yticklabels(), visible=False)
+                if not EIGEN:
+                    right_yticks()
+                    plt.setp(axij.get_yticklabels(), visible=False)
     rect = [0.03, 0.025, 1, 0.925]
     if JCP:
         rect[-1] = 0.915
@@ -198,7 +225,10 @@ def main(fuel, ext):
                         ncol=math.ceil(len(handles)/2),
                         bbox_to_anchor=bbox_to_anchor)
     # plt.tight_layout(pad=0.02)
-    plt.savefig('compare-{fuel}.pdf'.format(fuel=fuel))
+    if not EIGEN:
+        plt.savefig('compare-{fuel}.pdf'.format(fuel=fuel))
+    else:
+        plt.savefig('compare-eigen-{fuel}.pdf'.format(fuel=fuel))
 
 if __name__ == '__main__':
     # python plot_compare.py uo2 pdf

@@ -36,6 +36,18 @@ TEST_P(CathalauCompareTest, MinimaxWithUpdate) {
                 /*do_eigenvalue*/false, /*full_only*/false);
 }
 
+TEST_P(CathalauCompareTest, WithEigenUpdate) {
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, /*do minimax*/false,
+                /*precomputed_full*/true, /*precomputed_pgd*/false, 
+                /*do_eigenvalue*/true, /*full_only*/false);
+}
+
+TEST_P(CathalauCompareTest, MinimaxWithEigenUpdate) {
+  this->Compare(50, 50, 1e-2, 300, 1e-10, true, /*do minimax*/true,
+                /*precomputed_full*/true, /*precomputed_pgd*/false, 
+                /*do_eigenvalue*/true, /*full_only*/false);
+}
+
 INSTANTIATE_TEST_CASE_P(GroupStructure, CathalauCompareTest,
     ::testing::Combine(
     ::testing::Values("uo2", "mox43"),
