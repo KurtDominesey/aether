@@ -293,7 +293,7 @@ void EnergyMgFull::get_inner_products(
     std::vector<double> &inner_products_b,
     const int m_row, const int m_col_start) {
   dealii::Vector<double> &left = 
-      do_minimax ? test_funcs[m_row] : modes[m_row];
+      (do_minimax && !test_funcs.empty()) ? test_funcs[m_row] : modes[m_row];
   get_inner_products_b(inner_products_b, left);
   AssertDimension(modes.size(), inner_products_x.size());
   for (int m = m_col_start; m < modes.size(); ++m) {

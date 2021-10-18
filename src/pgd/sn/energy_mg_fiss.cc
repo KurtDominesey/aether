@@ -268,14 +268,14 @@ double EnergyMgFiss::update(
       // std::cout << "biorthogonal? "
       //           // << (eigenvectors[0]*bx_adj) << " "
       //           << (eigenvectors_adj[0]*bx) << "\n";
-      if (modes_adj.empty())
-        modes_adj.resize(num_modes, dealii::Vector<double>(num_groups));
+      if (test_funcs.empty())
+        test_funcs.resize(num_modes, dealii::Vector<double>(num_groups));
     }
     for (int m = 0, i = 0; m < num_modes; ++m) {
       for (int g = 0; g < num_groups; ++g, ++i) {
         modes[m][g] = eigenvectors[0][i];
         if (do_adjoint) {
-          modes_adj[m][g] = eigenvectors_adj[0][i];
+          test_funcs[m][g] = eigenvectors_adj[0][i];
         }
       }
     }
