@@ -153,7 +153,8 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
 
   void RunPgd(pgd::sn::NonlinearGS &nonlinear_gs, const int num_modes,
               const int max_iters, const double tol, const bool do_update,
-              std::vector<int> &unconverged, std::vector<double> &residuals);
+              std::vector<int> &unconverged, std::vector<double> &residuals,
+              std::vector<double> *eigenvalues);
 
   double ComputeEigenvalue(
         FixedSourceProblem<dim, qdim, pgd::sn::Transport<dim, qdim>> &problem,

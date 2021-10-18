@@ -35,7 +35,8 @@ void CompareTest<dim, qdim>::RunPgd(pgd::sn::NonlinearGS &nonlinear_gs,
                                     const double tol, 
                                     const bool do_update,
                                     std::vector<int> &unconverged, 
-                                    std::vector<double> &residuals) {
+                                    std::vector<double> &residuals,
+                                    std::vector<double> *eigenvalues) {
   dealii::BlockVector<double> _;
   for (int m = 0; m < num_modes; ++m) {
     nonlinear_gs.enrich();
@@ -62,7 +63,9 @@ void CompareTest<dim, qdim>::RunPgd(pgd::sn::NonlinearGS &nonlinear_gs,
     nonlinear_gs.finalize();
     if (do_update) {
       // if (m > 0)
-      nonlinear_gs.update();
+      double eigenvalue = nonlinear_gs.update();
+      if (eigenvalues != nullptr)
+        eigenvalues->push_back(eigenvalue);
     }
   }
 }
@@ -712,35 +715,46 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
   pgd::sn::FissionSourceP fission_source_p(
     problem.fixed_source, problem.fission, mgxs_pseudo, mgxs_one);
   pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
+  pgd::sn::EnergyMgFull& energy_op = 
+      do_eigenvalue ? energy_fiss : energy_mg;
+  pgd::sn::FixedSourceP<dim>& spatioangular_op = 
+      do_eigenvalue ? fission_source_p : fixed_source_p;
   const std::string filename_pgd = filebase + "_pgd_" +
       (do_update ? "update" : "prog") +
-      (do_minimax ? "_minimax" : "") + ".h5";
+      (do_minimax ? "_minimax" : "") +
+      (do_eigenvalue ? "_k" : "") + ".h5";
+  std::vector<double> eigenvalues;
   if (precomputed_pgd) {
     // read from file
     HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::open);
+    if (do_eigenvalue) {
+      eigenvalues = 
+          file.open_dataset("eigenvalues").read<std::vector<double>>();
+    }
     for (int m = 0; m < num_modes; ++m) {
       const std::string mm = std::to_string(m);
-      fixed_source_p.enrich(0);
-      fixed_source_p.caches.back().mode = file.open_dataset(
+      spatioangular_op.enrich(0);
+      spatioangular_op.caches.back().mode = file.open_dataset(
           "modes_spaceangle"+mm).read<dealii::Vector<double>>();
-      fixed_source_p.set_cache(fixed_source_p.caches.back());
-      energy_mg.modes.push_back(file.open_dataset(
+      spatioangular_op.set_cache(spatioangular_op.caches.back());
+      energy_op.modes.push_back(file.open_dataset(
           "modes_energy"+mm).read<dealii::Vector<double>>());
     }
+    std::cout <<"read precomputed pgd\n";
   } else {
     // run pgd
-    std::vector<pgd::sn::LinearInterface*> linear_ops;
+    std::vector<pgd::sn::LinearInterface*> linear_ops = 
+        {&energy_op, &spatioangular_op};
     std::unique_ptr<pgd::sn::NonlinearGS> nonlinear_gs;
+    energy_op.do_minimax = do_minimax;
+    spatioangular_op.do_minimax = do_minimax;
     if (do_eigenvalue) {
-      linear_ops = {&energy_fiss, &fission_source_p};
       nonlinear_gs =
           std::make_unique<pgd::sn::EigenGS>(linear_ops, num_materials, 1);
       auto eigen_gs = dynamic_cast<pgd::sn::EigenGS*>(nonlinear_gs.get());
-      eigen_gs->initialize_guess();
+      double k0 = eigen_gs->initialize_guess();
+      std::cout << "initial k (guess): " << k0 << "\n";
     } else {
-      energy_mg.do_minimax = do_minimax;
-      fixed_source_p.do_minimax = do_minimax;
-      linear_ops = {&energy_mg, &fixed_source_p};
       nonlinear_gs = std::make_unique<pgd::sn::NonlinearGS>(
           linear_ops, num_materials, 1, num_sources);
     }
@@ -748,8 +762,29 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     std::vector<double> residuals;
     std::cout << "run pgd\n";
     RunPgd(*nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-            do_update, unconverged, residuals);
+            do_update, unconverged, residuals, 
+            do_eigenvalue ? &eigenvalues : nullptr);
     std::cout << "done running pgd\n";
+    if (do_eigenvalue) {
+      // normalize by l2 norm of expanded flux
+      dealii::BlockVector<double> flux_pgd(flux_full);
+      flux_pgd = 0;
+      for (int m = 0; m < num_modes; ++m) {
+        for (int g = 0; g < num_groups; ++g) {
+          flux_pgd.block(g).add(energy_op.modes[m][g], 
+                                spatioangular_op.caches[m].mode.block(0));
+        }
+      }
+      double norm_expanded = flux_pgd.l2_norm();
+      for (int m = 0; m < num_modes; ++m)
+        energy_op.modes[m] /= norm_expanded;
+      sum = 0;
+      for (int i = 0; i < flux_pgd.size(); ++i)
+        sum += flux_pgd[i];
+      if (sum < 0)
+        for (int m = 0; m < num_modes; ++m)
+          energy_op.modes[m] *= -1;
+    }
     std::ofstream unconverged_txt;
     unconverged_txt.open(this->GetTestName()+"_unconverged.txt", 
                         std::ios::trunc);
@@ -761,15 +796,18 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::create);
     for (int m = 0; m < num_modes; ++m) {
       const std::string mm = std::to_string(m);
-      file.write_dataset(
-          "modes_spaceangle"+mm, fixed_source_p.caches[m].mode.block(0));
-      file.write_dataset("modes_energy"+mm, energy_mg.modes[m]);
+      file.write_dataset("modes_spaceangle"+mm, 
+          spatioangular_op.caches[m].mode.block(0));
+      file.write_dataset("modes_energy"+mm, energy_op.modes[m]);
+    }
+    if (do_eigenvalue) {
+      file.write_dataset("eigenvalues", eigenvalues);
     }
   }
   std::vector<dealii::BlockVector<double>> modes_spaceangle(num_modes,
       dealii::BlockVector<double>(quadrature.size(), dof_handler.n_dofs()));
   for (int m = 0; m < num_modes; ++m) {
-    modes_spaceangle[m] = fixed_source_p.caches[m].mode.block(0);
+    modes_spaceangle[m] = spatioangular_op.caches[m].mode.block(0);
     if (guess_svd) {
       fixed_source_p.caches[m].mode.block(0) = svecs_spaceangle[m]; 
       energy_mg.modes[m] = svecs_energy[m];
@@ -886,6 +924,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
             adjoint_spaceangle[s];
       }
     }
+    energy_fiss.do_minimax = false;
     for (int i = 0; i <= jfnk_iters; ++i) {
       std::cout << "setting modes " << modes_all.l2_norm() << "\n";
       modes_all.block(0) /= modes_all.block(0).l2_norm();
@@ -1019,8 +1058,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
         } //catch (...) {}
         std::cout << "SPATIO-ANGULAR EIGENVALUE: " << eigenvalues[0] << std::endl;
         if (eigenvalues[0] < 0) {
-          eigenvalues[0] *= -1;
-          eigenvectors[0] *= -1;
+          // eigenvalues[0] *= -1;
+          // eigenvectors[0] *= -1;
         }
         modes_all.block(0) = eigenvectors[0];
         continue;
@@ -1192,27 +1231,35 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     table.add_value("error_svd_m", std::nan("p"));
   }
   std::cout << "get l2 errors pgd\n";
-  GetL2ErrorsDiscrete(l2_errors_d, modes_spaceangle, energy_mg.modes, 
+  GetL2ErrorsDiscrete(l2_errors_d, modes_spaceangle, energy_op.modes, 
                       flux_full, problem.transport, table, "error_d");
-  GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_mg.modes, 
+  GetL2ErrorsMoments(l2_errors_m, modes_spaceangle, energy_op.modes, 
                       flux_full, problem.transport, problem.d2m, table, 
                       "error_m");
-  GetL2Norms(l2_norms, modes_spaceangle, energy_mg.modes, problem.transport,
+  GetL2Norms(l2_norms, modes_spaceangle, energy_op.modes, problem.transport,
               table, "norm");
-  if (num_groups < 800) {
+  if (false) {
   std::cout << "residuals\n";
-  GetL2Residuals(l2_residuals, fixed_source_p.caches, energy_mg.modes, 
+  GetL2Residuals(l2_residuals, spatioangular_op.caches, energy_op.modes, 
                   source_full, problem.transport, problem.m2d, problem_full,
                   false, table, "residual");
   std::cout << "residuals streamed\n";
-  GetL2Residuals(l2_residuals_streamed, fixed_source_p.caches, 
-                  energy_mg.modes, source_full, problem.transport, problem.m2d,
+  GetL2Residuals(l2_residuals_streamed, spatioangular_op.caches, 
+                  energy_op.modes, source_full, problem.transport, problem.m2d,
                   problem_full, true, table, "residual_streamed");
   dealii::BlockVector<double> uncollided(source_full.get_block_indices());
   problem_full.sweep_source(uncollided, source_full);
-  GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_mg.modes, 
+  GetL2ResidualsFull(l2_residuals_swept, modes_spaceangle, energy_op.modes, 
                       uncollided, problem.transport, problem_full, table, 
                       "residual_swept");
+  }
+  if (do_eigenvalue) {
+    table.add_value("error_k", std::nan("k"));
+    for (int m = 0; m < num_modes; ++m) {
+      table.add_value("error_k", 1e5 * (eigenvalues[m] - eigenvalue_full));
+    }
+    table.set_scientific("error_k", true);
+    table.set_precision("error_k", 16);
   }
   if (num_modes_s > 0)
     this->WriteConvergenceTable(table, "_M"+std::to_string(num_modes_s));
