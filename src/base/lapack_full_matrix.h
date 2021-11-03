@@ -16,6 +16,10 @@
 #ifndef aether_lapack_full_matrix_h
 #define aether_lapack_full_matrix_h
 
+namespace aether {
+template <typename number>
+class PreconditionGrowingLU;  // forward declaration
+}
 
 #include <deal.II/base/config.h>
 
@@ -925,6 +929,8 @@ public:
                   const double       threshold   = 0.) const;
 
 private:
+  friend class aether::PreconditionGrowingLU<number>;
+
   /**
    * Internal function to compute various norms.
    */
