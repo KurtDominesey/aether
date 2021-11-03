@@ -2337,6 +2337,7 @@ LAPACKFullMatrix_<number>::print_formatted(std::ostream &     out,
   Assert((!this->empty()) || (this->n() + this->m() == 0), ExcInternalError());
   Assert(state == LAPACKSupport::matrix ||
            state == LAPACKSupport::inverse_matrix ||
+           state == LAPACKSupport::lu ||
            state == LAPACKSupport::cholesky,
          ExcState(state));
 
