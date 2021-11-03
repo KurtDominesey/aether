@@ -7,8 +7,8 @@ namespace {
 
 class PreconditionGrowingLUTest : public ::testing::Test {
  protected:
-  dealii::LAPACKFullMatrix<double> a, b, c, d, eye;
-  PreconditionGrowingLU<double> a_inv;
+  dealii::LAPACKFullMatrix_<double> a, b, c, d, eye;
+  PreconditionGrowingLU<double> a_lu;
 };
 
 TEST_F(PreconditionGrowingLUTest, GrowThrice) {
@@ -17,8 +17,9 @@ TEST_F(PreconditionGrowingLUTest, GrowThrice) {
   eye.reinit(block_size);
   for (int i = 0; i < block_size; ++i)
     a(i, i) = i + 1;
-  a_inv.initialize(a);
-  a_inv.inverse.mmult(eye, a);
+  a_lu.initialize(a);
+  eye = a;
+  a_lu.matrix.solve(eye);
   for (int i = 0; i < eye.m(); ++i)
     for (int j = 0; j < eye.n(); ++j)
       EXPECT_NEAR(eye(i, j), i == j, 1e-14);
@@ -46,12 +47,9 @@ TEST_F(PreconditionGrowingLUTest, GrowThrice) {
         }
       }
     }
-    // std::cout << "MATRIX:\n";
-    // a.print_formatted(std::cout);
-    a_inv.grow(b, c, d);
-    a_inv.inverse.mmult(eye, a);
-    // std::cout << "\nI:\n";
-    // eye.print_formatted(std::cout);
+    a_lu.grow(b, c, d);
+    eye = a;
+    a_lu.matrix.solve(eye);
     for (int i = 0; i < eye.m(); ++i)
       for (int j = 0; j < eye.n(); ++j)
         EXPECT_NEAR(eye(i, j), i == j, 1e-14);
