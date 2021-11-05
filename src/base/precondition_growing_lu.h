@@ -25,6 +25,10 @@ class PreconditionGrowingLU : public dealii::Subscriptor {
   void grow(dealii::LAPACKFullMatrix_<number> &a12, 
             dealii::LAPACKFullMatrix_<number> &a21, 
             dealii::LAPACKFullMatrix_<number> &a22);
+  void vmult(dealii::Vector<number> &dst, 
+             const dealii::Vector<number> &src) const;
+  void Tvmult(dealii::Vector<number> &dst,
+              const dealii::Vector<number> &src) const;
   dealii::LAPACKFullMatrix_<number> matrix;
 
  protected:

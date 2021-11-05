@@ -66,6 +66,20 @@ void PreconditionGrowingLU<number>::grow(
     matrix.ipiv.push_back(last+a22.ipiv[i]);
 }
 
+template <typename number>
+void PreconditionGrowingLU<number>::vmult(
+    dealii::Vector<number> &dst, const dealii::Vector<number> &src) const {
+  dst = src;
+  matrix.solve(dst, false);
+}
+
+template <typename number>
+void PreconditionGrowingLU<number>::Tvmult(
+    dealii::Vector<number> &dst, const dealii::Vector<number> &src) const {
+  dst = src;
+  matrix.solve(dst, true);
+}
+
 template class PreconditionGrowingLU<double>;
 // template class PreconditionGrowingLU<float>;
 
