@@ -11,6 +11,7 @@
 
 #include "pgd/sn/inner_products.h"
 #include "pgd/sn/linear_updatable_interface.h"
+#include "base/precondition_growing_lu.h"
 #include "base/mgxs.h"
 
 namespace aether::pgd::sn {
@@ -69,6 +70,7 @@ class EnergyMgFull : public LinearUpdatableInterface {
   dealii::FullMatrix<double> matrix;
   dealii::Vector<double> source;
   std::vector<dealii::Vector<double>> test_funcs;
+  PreconditionGrowingLU<double> lu;
   virtual void set_matrix(InnerProducts coefficients_x);
   virtual void set_source(std::vector<double> coefficients_b, 
                           std::vector<InnerProducts> coefficients_x);

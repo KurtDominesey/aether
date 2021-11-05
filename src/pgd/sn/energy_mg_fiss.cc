@@ -58,6 +58,39 @@ double EnergyMgFiss::update(
   }
   slowing.compress(dealii::VectorOperation::add);
   fission.compress(dealii::VectorOperation::add);
+  if (modes.size() == 1) {
+    dealii::LAPACKFullMatrix_<double> a(num_groups);
+    for (int g = 0; g < num_groups; ++g)
+      for (int gp = 0; gp < num_groups; ++gp)
+        a(g, gp) = slowing(g, gp);
+    lu.initialize(a);
+    std::cout << "init'd growing LU\n";
+  } else {
+    int last = size - num_groups;
+    dealii::LAPACKFullMatrix_<double> b, c, d;
+    b.reinit(last, num_groups);
+    c.reinit(num_groups, last);
+    d.reinit(num_groups);
+    for (int m = 0; m < num_modes; ++m) {
+      int mm = m * num_groups;
+      for (int g = 0; g < num_groups; ++g) {
+        for (int gp = 0; gp < num_groups; ++gp) {
+          if (m < num_modes - 1) {
+            b(mm+g, gp) = slowing(mm+g, last+gp);  // last block column
+            c(g, mm+gp) = slowing(last+g, mm+gp);  // last block row
+          } else {
+            d(g, gp) = slowing(last+g, last+gp);  // last diagonal block
+          }
+        }
+      }
+    }
+    std::cout << "growing LU\n";
+    lu.grow(b, c, d);
+    std::cout << "grew LU\n";
+  }
+  PETScWrappers::MatrixFreeWrapper<PreconditionGrowingLU<double>> lu_petsc(
+      MPI_COMM_WORLD, lu.matrix.m(), lu.matrix.n(), lu.matrix.m(), 
+      lu.matrix.n(), lu);
   // set solution vector
   // dealii::Vector<double> solution(modes.size() * num_groups);
   std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
@@ -76,6 +109,7 @@ double EnergyMgFiss::update(
   slowing.vmult(bx, eigenvectors[0]);
   double rayleigh = (eigenvectors[0] * ax) / (eigenvectors[0] * bx);
   std::cout << "rayleigh-e: " << rayleigh << "\n";
+  rayleigh = this->eigenvalue;
   // return rayleigh; //!!!
   // rayleigh = 0;  // !!
   // eigenvectors[0].compress(dealii::VectorOperation::unknown);
@@ -214,19 +248,15 @@ double EnergyMgFiss::update(
     // dealii::PETScWrappers::PreconditionSOR slowing_gs(slowing);
     // dealii::PETScWrappers::PreconditionParaSails slowing_pc(slowing,
     //     dealii::PETScWrappers::PreconditionParaSails::AdditionalData(0));
-    std::cout << "setting up PC\n";
-    if (preconditioner_ptr.get() == NULL) {
-      preconditioner_ptr = 
-        std::make_unique<dealii::PETScWrappers::PreconditionILU>(shifted);
-    }
-    dealii::PETScWrappers::PreconditionerBase &slowing_pc = *preconditioner_ptr;
     // dealii::PETScWrappers::PreconditionILU slowing_pc(shifted);
     // dealii::PETScWrappers::PreconditionParaSails slowing_pc(shifted,
     //     dealii::PETScWrappers::PreconditionParaSails::AdditionalData(0));
-    std::cout << "set up PC\n";
-    solver_inv.initialize(slowing_pc);
     // solver_inv.initialize(slowing_gs);
     // shift_invert.set_solver(solver_inv);
+    PETScWrappers::PreconditionerShell pc_mat(lu_petsc);
+    dealii::PETScWrappers::SolverPreOnly solver_pc(control_inv);
+    solver_pc.initialize(pc_mat);
+    shift_invert.set_solver(solver_pc);
     shift_invert.set_matrix_mode(ST_MATMODE_INPLACE);
     if (eps_type == "krylovschur")
       eigensolver.set_transformation(shift_invert);
