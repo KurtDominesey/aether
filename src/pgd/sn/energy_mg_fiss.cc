@@ -63,7 +63,7 @@ double EnergyMgFiss::update(
     for (int g = 0; g < num_groups; ++g)
       for (int gp = 0; gp < num_groups; ++gp)
         a(g, gp) = slowing(g, gp);
-    lu.initialize(a);
+    gs_lu.initialize(a);
     std::cout << "init'd growing LU\n";
   } else {
     int last = size - num_groups;
@@ -85,12 +85,13 @@ double EnergyMgFiss::update(
       }
     }
     std::cout << "growing LU\n";
-    lu.grow(b, c, d);
+    gs_lu.grow(b, c, d);
     std::cout << "grew LU\n";
   }
-  PETScWrappers::MatrixFreeWrapper<PreconditionGrowingLU<double>> lu_petsc(
-      MPI_COMM_WORLD, lu.matrix.m(), lu.matrix.n(), lu.matrix.m(), 
-      lu.matrix.n(), lu);
+  gs_lu.matrix = &slowing;
+  PETScWrappers::MatrixFreeWrapper<PreconditionBlockGrowingLU<
+        dealii::PETScWrappers::SparseMatrix, double>> lu_petsc(
+      MPI_COMM_WORLD, size, size, size, size, gs_lu);
   // set solution vector
   // dealii::Vector<double> solution(modes.size() * num_groups);
   std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
