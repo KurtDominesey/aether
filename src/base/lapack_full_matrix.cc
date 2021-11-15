@@ -261,8 +261,9 @@ LAPACKFullMatrix_<number>::LAPACKFullMatrix_(const size_type m, const size_type 
 template <typename number>
 LAPACKFullMatrix_<number>::LAPACKFullMatrix_(const LAPACKFullMatrix_ &M)
   : TransposeTable<number>(M)
-  , state(matrix)
-  , property(general)
+  , state(M.state)
+  , property(M.property)
+  , ipiv(M.ipiv)
 {}
 
 
@@ -273,6 +274,7 @@ LAPACKFullMatrix_<number>::operator=(const LAPACKFullMatrix_<number> &M)
   TransposeTable<number>::operator=(M);
   state                           = M.state;
   property                        = M.property;
+  ipiv                            = M.ipiv;
   return *this;
 }
 
