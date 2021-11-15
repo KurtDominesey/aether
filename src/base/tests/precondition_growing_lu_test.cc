@@ -1,4 +1,5 @@
 #include "base/precondition_growing_lu.h"
+#include "base/precondition_block_growing_lu.h"
 #include "gtest/gtest.h"
 
 namespace aether {
@@ -55,6 +56,52 @@ TEST_F(PreconditionGrowingLUTest, GrowThrice) {
         EXPECT_NEAR(eye(i, j), i == j, 1e-14);
   }
 }
+
+class PreconditionBlockGrowingLUTest : public ::testing::Test {
+ protected:
+  dealii::Vector<double> v, av, iv;
+  dealii::LAPACKFullMatrix_<double> a, d;
+  PreconditionBlockGrowingLU<dealii::LAPACKFullMatrix_<double>, double> a_jac;
+};
+
+TEST_F(PreconditionBlockGrowingLUTest, Jacobi) {
+  int block_size = 5;
+  v.reinit(block_size);
+  av.reinit(block_size);
+  iv.reinit(block_size);
+  a.reinit(block_size);
+  for (int i = 0; i < block_size; ++i) {
+    a(i, i) = i + 1;
+    v = std::pow(i, 2);
+  }
+  a.vmult(av, v);
+  a_jac.initialize(a);
+  a_jac.matrix = &a;
+  a_jac.vmult(iv, av);
+  for (int i = 0; i < v.size(); ++i)
+    EXPECT_NEAR(iv[i], v[i], 1e-14);
+  for (int num_blocks = 1; num_blocks <= 3; ++num_blocks) {
+    int size = num_blocks * block_size;
+    d.reinit(block_size);
+    a.grow_or_shrink(a.m()+block_size);
+    v.grow_or_shrink(v.size()+block_size);
+    av.reinit(v.size());
+    iv.reinit(v.size());
+    int last = num_blocks * block_size;
+    for (int i = 0; i < block_size; ++i) {
+      for (int j = 0; j < block_size; ++j) {
+        d(i, j) = (i == j) * std::pow(i+2, 2);
+        a(last+i, last+j) = d(i, j);
+      }
+    }
+    a.vmult(av, v);
+    a_jac.initialize(d);
+    a_jac.vmult(iv, av);
+    for (int i = 0; i < v.size(); ++i)
+      EXPECT_NEAR(iv[i], v[i], 1e-14);
+  }
+}
+
 
 }  // namespace
 
