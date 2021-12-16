@@ -9,6 +9,19 @@ import matplotlib.pyplot as plt
 JCP = None
 EIGEN = True
 
+def tick_every_decade(ax):
+    locmaj = matplotlib.ticker.LogLocator(base=10, numticks=np.inf)
+    ax.yaxis.set_major_locator(locmaj)
+    locmin = matplotlib.ticker.LogLocator(
+        base=10, subs=[i*0.1 for i in range(10)], numticks=np.inf)
+    ax.yaxis.set_minor_locator(locmin)
+    # locmaj = ax.yaxis.get_major_locator()
+    # locs = locmaj()
+    # numdecs = math.log10(locs[-1] / locs[0])
+    # locmaj.set_params(numdecs=numdecs, numticks=numdecs)
+    # locmin = ax.yaxis.get_minor_locator()
+    # locmin.set_params(subs=np.arange(1, 10), numdecs=numdecs, numticks=9*numdecs)
+
 def right_yticks():
     ax = plt.gca()
     # ax.minorticks_on()
@@ -37,7 +50,7 @@ def right_yticks():
     plt.grid(visible=False)
     plt.setp(ax2.get_yticklabels(), visible=False)
 
-def plot_compare(filename, savename, **kwargs):
+def plot_compare(filename, savename, ax2j0, **kwargs):
     print(filename)
     table = np.genfromtxt(filename, names=True)
     enrichments = list(range(table.shape[0]))
@@ -53,6 +66,7 @@ def plot_compare(filename, savename, **kwargs):
     if EIGEN:
         labels['error_k'] = 'Error $k$ [pcm]'
     # for name in table.dtype.names:
+    ax2 = None
     for name in labels.keys():
         if name not in table.dtype.names:
             continue
@@ -99,13 +113,16 @@ def plot_compare(filename, savename, **kwargs):
         #     kwargs['ls'] = '--'
         xdata = enrichments
         if name == 'error_k':
-            ydata = table[name]
+            ydata = table[name] / 1e5
             col = 'C4'
             kwargs_line['color'] = col
             kwargs_line['marker'] = '*'
             ax = plt.gca()
-            plt.gca().twinx()
-            plt.grid(color=col, ls='--', alpha=0.5)
+            ax2 = plt.gca().twinx()
+            if ax2j0 is not None:
+                ax2j0.get_shared_y_axes().join(ax2j0, ax2)
+            plt.grid(False)
+            # plt.grid(color=col, ls=':', alpha=0.5)
             plt.gca().spines['right'].set_color(col)
             plt.tick_params(axis='y', which='both', labelcolor=col, color=col)
             plt.yscale('log')
@@ -134,8 +151,9 @@ def plot_compare(filename, savename, **kwargs):
     locmaj.set_params(numdecs=numdecs, numticks=numdecs)
     locmin = plt.gca().yaxis.get_minor_locator()
     locmin.set_params(subs=np.arange(1, 10), numdecs=numdecs, numticks=9*numdecs)
-    plt.savefig(savename)
+    # plt.savefig(savename)
     # plt.close()
+    return ax2
 
 def main(fuel, ext):
     name_base = 'GroupStructure_CathalauCompareTest{algorithm}_{fuel}_{param}'
@@ -150,6 +168,7 @@ def main(fuel, ext):
     ncols = len(algorithms)
     ij = 0
     for i, param in enumerate(params):
+        ax2j0 = None
         for j, algorithm in enumerate(algorithms):
             # if param == 'SHEM-361' and algorithm == 'WithUpdate':
             #     break
@@ -174,11 +193,18 @@ def main(fuel, ext):
             color = None
             plt.gca().set_prop_cycle(None)
             try:
-                plot_compare(name+'.txt', name+'.'+ext, 
-                            label=label, color=color, 
-                            markevery=2, markersize=2.75)
+                ax2ij = plot_compare(name+'.txt', name+'.'+ext, ax2j0,
+                                     label=label, color=color, 
+                                     markevery=2, markersize=2.75)
+                assert ax2ij is not None
+                if j == 0:
+                    ax2j0 = ax2ij
+                    ax2j0.yaxis.set_tick_params(labelright=False)
+                tick_every_decade(ax2ij)
             except OSError:
                 pass
+            locmaj = matplotlib.ticker.MultipleLocator(base=10)
+            axij.xaxis.set_major_locator(locmaj)
             # plt.gca().yaxis.get_ticklocs(minor=True)
             # plt.gca().minorticks_on()
             plt.gca().tick_params(axis='y', which='both', left=True)
@@ -186,9 +212,10 @@ def main(fuel, ext):
                 plt.setp(axij.get_yticklabels(), visible=False)
             else:
                 pass
-            if j == ncols - 1:
+            if (not EIGEN and j == ncols - 1) or (EIGEN and j == 0):
+                labelpad = 9 if EIGEN else 4
                 axij.yaxis.set_label_position('right')
-                plt.ylabel(param)
+                plt.ylabel(param, labelpad=labelpad)
             if i < nrows - 1:
                 plt.setp(axij.get_xticklabels(), visible=False)
                 plt.gca().xaxis.set_ticklabels([])
@@ -197,7 +224,9 @@ def main(fuel, ext):
             if i == 0:
                 try:
                     fancy = {'Progressive': 'Progressive',
-                             'WithUpdate': 'With Update'}
+                             'WithUpdate': 'With Update',
+                             'WithEigenUpdate': 'Galerkin',
+                             'MinimaxWithEigenUpdate': 'Minimax'}
                     plt.title(fancy[algorithm])
                 except KeyError:
                     plt.title(algorithm)
@@ -208,9 +237,15 @@ def main(fuel, ext):
                 if not EIGEN:
                     right_yticks()
                     plt.setp(axij.get_yticklabels(), visible=False)
+        if EIGEN:
+            tick_every_decade(ax2j0)
+            ymin, ymax = ax2j0.get_ylim()
+            ax2j0.set_ylim(max(1e-6, ymin), ymax)
     rect = [0.03, 0.025, 1, 0.925]
     if JCP:
         rect[-1] = 0.915
+    if EIGEN:
+        rect[-2] = 0.97
     plt.tight_layout(pad=0.2, h_pad=0.5, w_pad=0.5, 
                      rect=rect)
     ax0 = plt.gcf().add_subplot(1, 1, 1, frame_on=False)
@@ -218,6 +253,13 @@ def main(fuel, ext):
     ax0.set_yticks([])
     ax0.set_xlabel('Modes $M$', labelpad=20 if not JCP else 17.5)
     ax0.set_ylabel('Normalized $L^2$ Error', labelpad=32.5 if not JCP else 30)
+    if EIGEN:
+        ax2 = ax0.twinx()
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+        for side in ('left', 'right', 'bottom', 'top'):
+            ax2.spines[side].set_visible(False)
+        ax2.set_ylabel('$k$-Eigenvalue Error', labelpad=32.5, color='C4')
     bbox_to_anchor = [0.49, 1.14]
     if JCP:
         bbox_to_anchor[1] = 1.165
@@ -228,7 +270,7 @@ def main(fuel, ext):
     if not EIGEN:
         plt.savefig('compare-{fuel}.pdf'.format(fuel=fuel))
     else:
-        plt.savefig('compare-eigen-{fuel}.pdf'.format(fuel=fuel))
+        plt.savefig('compare-eigen-{fuel}-8.pdf'.format(fuel=fuel))
 
 if __name__ == '__main__':
     # python plot_compare.py uo2 pdf
