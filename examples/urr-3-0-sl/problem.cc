@@ -48,18 +48,32 @@ int Problem::run_fixed_source() {
   const int size = this->dof_handler.n_dofs() * this->quadrature->size();
   dealii::BlockVector<double> flux(num_groups, size);
   dealii::BlockVector<double> source(num_groups, size);
-  for (int g = 0; g < num_groups; ++g) {
-    dealii::Vector<double> scalar(this->dof_handler.n_dofs());
-    Source<1, double> func(1., this->mgxs->scatter[g][0][0], 1.);
-    dealii::VectorTools::interpolate(this->dof_handler, func, scalar);
+  dealii::BlockVector<double> uncollided(num_groups, size);
+  bool isotropic = true;
+  if (isotropic) {
     for (int n = 0; n < this->quadrature->size(); ++n) {
-        int nn = n * this->dof_handler.n_dofs();
-        for (int i = 0 ; i < this->dof_handler.n_dofs(); ++i) {
-          source.block(g)[nn+i] = scalar[i];
+      boundary_conditions[0][0].block(n) = 1.;
+    }
+  } else {  // beam source
+  for (int g = 0; g < num_groups; ++g) {
+      dealii::Vector<double> scalar(this->dof_handler.n_dofs());
+      double intensity = 1. * (mgxs->scatter[g][0][0] / mgxs->total[0][0]);
+      Source<1, double> func(intensity, mgxs->total[0][0], 1.);
+      dealii::VectorTools::interpolate(this->dof_handler, func, scalar);
+      for (int n = 0; n < this->quadrature->size(); ++n) {
+          int nn = n * this->dof_handler.n_dofs();
+          for (int i = 0 ; i < this->dof_handler.n_dofs(); ++i) {
+            source.block(g)[nn+i] = scalar[i];
+        }
       }
     }
   }
-  solver.solve(this->problem->fixed_source, flux, source, 
+  // sweep source
+  for (int g = 0; g < num_groups; ++g) {
+    problem->fixed_source.within_groups[g].transport.vmult(
+        uncollided.block(g), source.block(g), false);
+  }
+  solver.solve(this->problem->fixed_source, flux, uncollided, 
                fixed_source_gs);
   std::cout << "FIXED\n";
   this->print_currents(flux);
