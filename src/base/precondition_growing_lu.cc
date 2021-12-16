@@ -23,6 +23,12 @@ void PreconditionGrowingLU<number>::grow(
   AssertDimension(a12.n(), block_size);
   AssertDimension(a21.m(), block_size);
   AssertDimension(a21.n(), block_size*num_blocks);
+  AssertDimension(a22.m(), block_size);
+  AssertThrow(a22.n() == block_size, dealii::ExcInvalidState());
+  AssertThrow(a12.m() == block_size*num_blocks, dealii::ExcInvalidState());
+  AssertThrow(a12.n() == block_size, dealii::ExcInvalidState());
+  AssertThrow(a21.m() == block_size, dealii::ExcInvalidState());
+  AssertThrow(a21.n() == block_size*num_blocks, dealii::ExcInvalidState());
   const dealii::types::blas_int bs = num_blocks * block_size;
   const dealii::types::blas_int s = block_size;
   const dealii::types::blas_int one = 1;
