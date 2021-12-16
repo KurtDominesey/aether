@@ -58,26 +58,36 @@ double EnergyMgFiss::update(
   }
   slowing.compress(dealii::VectorOperation::add);
   fission.compress(dealii::VectorOperation::add);
-  if (modes.size() == 1) {
+  const int num_blocks = num_modes;
+  int num_subblocks = (modes.size()-1) % num_blocks;
+  std::cout << "num_subblocks: " << num_subblocks << "\n";
+  int last = size - num_groups;
+  if (num_subblocks == 0) {
     dealii::LAPACKFullMatrix_<double> a(num_groups);
     for (int g = 0; g < num_groups; ++g)
       for (int gp = 0; gp < num_groups; ++gp)
-        a(g, gp) = slowing(g, gp);
+        a(g, gp) = slowing(last+g, last+gp);
+    if (num_modes == 1)
+      gs_lu.blocks.clear();
     gs_lu.initialize(a);
     std::cout << "init'd growing LU\n";
   } else {
-    int last = size - num_groups;
+    int m0 = num_modes - 1 - num_subblocks;
     dealii::LAPACKFullMatrix_<double> b, c, d;
-    b.reinit(last, num_groups);
-    c.reinit(num_groups, last);
+    b.reinit(num_subblocks*num_groups, num_groups);
+    c.reinit(num_groups, num_subblocks*num_groups);
     d.reinit(num_groups);
-    for (int m = 0; m < num_modes; ++m) {
+    std::cout << "num modes: " << num_modes 
+              << ", m0: " << m0
+              << ", last:" << last << "\n";
+    for (int m = m0; m < num_modes; ++m) {
       int mm = m * num_groups;
+      int mo = (m - m0) * num_groups;
       for (int g = 0; g < num_groups; ++g) {
         for (int gp = 0; gp < num_groups; ++gp) {
           if (m < num_modes - 1) {
-            b(mm+g, gp) = slowing(mm+g, last+gp);  // last block column
-            c(g, mm+gp) = slowing(last+g, mm+gp);  // last block row
+            b(mo+g, gp) = slowing(mm+g, last+gp);  // last block column
+            c(g, mo+gp) = slowing(last+g, mm+gp);  // last block row
           } else {
             d(g, gp) = slowing(last+g, last+gp);  // last diagonal block
           }
@@ -217,7 +227,7 @@ double EnergyMgFiss::update(
     // aether::PETScWrappers::PreconditionerShell shifted_gs_pc(shifted_gs_mf);
     // dealii::SolverControl control_dummy(1, 0);
     // dealii::PETScWrappers::SolverPreOnly solver_pc(control_dummy);
-    dealii::IterationNumberControl control_pc(10, 0);
+    dealii::IterationNumberControl control_pc(50, 0);
     dealii::PETScWrappers::SolverGMRES solver_pc(control_pc);
     // solver_pc.initialize(shifted_gs_pc);
     solver_pc.initialize(preconditioner);
@@ -238,10 +248,12 @@ double EnergyMgFiss::update(
           rayleigh /*1.32665514562608*/));
     // dealii::SLEPcWrappers::TransformationShift shift_invert(MPI_COMM_WORLD);
     // shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
-    dealii::IterationNumberControl control_inv(10, 0);
+    dealii::IterationNumberControl control_inv(5, 0);
     // dealii::PETScWrappers::SparseDirectMUMPS solver_inv(control_inv);
-    dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD,
-        dealii::PETScWrappers::SolverGMRES::AdditionalData(10));
+    // dealii::PETScWrappers::SolverGMRES solver_inv(control_inv,
+    //                                               MPI_COMM_WORLD);
+    // dealii::PETScWrappers::SolverGMRES solver_inv(control_inv, MPI_COMM_WORLD,
+    //     dealii::PETScWrappers::SolverGMRES::AdditionalData(30));
     // aether::PETScWrappers::SolverFGMRES solver_inv(
     //     control_inv, MPI_COMM_WORLD, 
     //     aether::PETScWrappers::SolverFGMRES::AdditionalData(10));
@@ -255,10 +267,10 @@ double EnergyMgFiss::update(
     // solver_inv.initialize(slowing_gs);
     // shift_invert.set_solver(solver_inv);
     PETScWrappers::PreconditionerShell pc_mat(lu_petsc);
-    dealii::PETScWrappers::SolverPreOnly solver_pc(control_inv);
-    solver_pc.initialize(pc_mat);
-    shift_invert.set_solver(solver_pc);
-    shift_invert.set_matrix_mode(ST_MATMODE_INPLACE);
+    dealii::PETScWrappers::SolverPreOnly solver_inv(control_inv);
+    solver_inv.initialize(pc_mat);
+    shift_invert.set_solver(solver_inv);
+    shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
     if (eps_type == "krylovschur")
       eigensolver.set_transformation(shift_invert);
   // }
