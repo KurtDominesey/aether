@@ -180,6 +180,17 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       dealii::ConvergenceTable &table,
       const std::string &key);
 
+  void GetL2ErrorsFissionSource(
+      std::vector<double> &l2_errors,
+      const std::vector<dealii::BlockVector<double>> &modes_spaceangle,
+      const std::vector<dealii::Vector<double>> &modes_energy,
+      const dealii::BlockVector<double> &reference,
+      const pgd::sn::Transport<dim, qdim> &transport,
+      const DiscreteToMoment<qdim> &d2m,
+      const Production<dim> &production,
+      dealii::ConvergenceTable &table,
+      const std::string &key);
+
   void GetL2Norms(
       std::vector<double> &l2_norms,
       const std::vector<dealii::BlockVector<double>> &modes_spaceangle,
@@ -197,6 +208,17 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       const MomentToDiscrete<qdim> &m2d,
       const FixedSourceProblem<dim, qdim> &problem,
       const bool do_stream,
+      dealii::ConvergenceTable &table,
+      const std::string &key);
+
+  void GetL2ResidualsEigen(
+      std::vector<double> &l2_residuals,
+      const std::vector<pgd::sn::Cache> &caches,
+      const std::vector<dealii::Vector<double>> &modes_energy,
+      const pgd::sn::Transport<dim, qdim> &transport,
+      const MomentToDiscrete<qdim> &m2d,
+      const FixedSourceProblem<dim, qdim> &problem,
+      const std::vector<double> &eigenvalues,
       dealii::ConvergenceTable &table,
       const std::string &key);
 
