@@ -47,6 +47,7 @@ class ExampleTest : public ::testing::Test {
   dealii::DoFHandler<dim> dof_handler;
   QPglc<qdim> quadrature;
   std::unique_ptr<Mgxs> mgxs;
+  std::string testname;
 
   std::string GetTestName() const {
     const ::testing::TestInfo* const test_info =

@@ -23,6 +23,7 @@ class CathalauTest : virtual public ExampleTest<dim_, qdim_> {
   std::vector<int> max_levels = {2, 4, 4, 2, 2};
 
   void SetUp() override {
+    this->testname = this->GetTestName();
     SetUp(false);
   }
 
