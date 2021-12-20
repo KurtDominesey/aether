@@ -508,6 +508,85 @@ void CompareTest<dim, qdim>::GetL2ResidualsEigen(
 }
 
 template <int dim, int qdim>
+void CompareTest<dim, qdim>::GetL2ResidualsEigenMoments(
+    std::vector<double> &l2_residuals,
+    const std::vector<pgd::sn::Cache> &caches,
+    const std::vector<dealii::Vector<double>> &modes_energy,
+    const pgd::sn::Transport<dim, qdim> &transport,
+    const DiscreteToMoment<qdim> &d2m,
+    const FixedSourceProblem<dim, qdim> &problem,
+    const std::vector<double> &eigenvalues,
+    dealii::ConvergenceTable &table,
+    const std::string &key) {
+  const int num_groups = mgxs->total.size();
+  dealii::BlockVector<double> residual(num_groups, dof_handler.n_dofs());
+  dealii::BlockVector<double> flux(residual);
+  dealii::Vector<double> residual_l2(dof_handler.n_dofs());
+  dealii::BlockVector<double> streamed_d(
+      quadrature.size(), dof_handler.n_dofs());
+  dealii::BlockVector<double> streamed_m(1, dof_handler.n_dofs());
+  std::vector<dealii::types::global_dof_index> dof_indices(
+      dof_handler.get_fe().dofs_per_cell);
+  std::vector<dealii::BlockVector<double>> boundary_conditions;
+  for (int m = 0; m < l2_residuals.size(); ++m) {
+    // get norm of residual
+    double l2_flux = 0;
+    for (int g = 0; g < num_groups; ++g) {
+      int g_rev = num_groups - 1 - g;
+      double width =
+          std::log(mgxs->group_structure[g_rev+1]
+                    /mgxs->group_structure[g_rev]);
+      AssertThrow(width > 0, dealii::ExcInvalidState());
+      transport.collide_ordinate(residual_l2, residual.block(g));
+      l2_residuals[m] += (residual.block(g) * residual_l2) / width;
+      transport.collide_ordinate(residual_l2, flux.block(g));
+      l2_flux += (flux.block(g) * residual_l2)  / width;
+    }
+    l2_flux = std::sqrt(l2_flux);
+    l2_residuals[m] = m ? (std::sqrt(l2_residuals[m]) /(eigenvalues[m-1]*l2_flux)) 
+                        : std::nan("z");
+    table.add_value(key, l2_residuals[m]);
+    if (m == l2_residuals.size()-1)
+      continue;
+    // update flux
+    for (int g = 0; g < num_groups; ++g) {
+      flux.block(g).add(modes_energy[m][g], caches[m].moments.block(0));
+    }
+    // update residual
+    streamed_d = caches[m].streamed.block(0);
+    transport.vmult_mass_inv(streamed_d);
+    d2m.vmult(streamed_m, streamed_d);
+    for (int g = 0; g < num_groups; ++g) {
+      int c = 0;
+      for (auto cell = dof_handler.begin_active(); cell != dof_handler.end();
+            ++cell, ++c) {
+        if (!cell->is_locally_owned()) {
+          --c;
+          continue;
+        }
+        cell->get_dof_indices(dof_indices);
+        const int j = cell->material_id();
+        for (const dealii::types::global_dof_index i: dof_indices) {
+          double dof_m = streamed_m.block(0)[i] * modes_energy[m][g];
+          dof_m -= mgxs->total[g][j] * caches[m].moments.block(0)[i] 
+                    * modes_energy[m][g];
+          for (int gp = 0; gp < num_groups; ++gp)
+            dof_m += mgxs->scatter[g][gp][j] * caches[m].moments.block(0)[i]
+                      * modes_energy[m][gp];
+          dof_m *= -eigenvalues[m];
+          for (int gp = 0; gp < num_groups; ++gp)
+            dof_m -= mgxs->chi[g][j] * mgxs->nu_fission[gp][j] 
+                      * caches[m].moments.block(0)[i] * modes_energy[m][gp];
+          residual.block(g)[i] -= dof_m;
+        }
+      }
+    }
+  }
+  table.set_scientific(key, true);
+  table.set_precision(key, 16);
+}
+
+template <int dim, int qdim>
 void CompareTest<dim, qdim>::GetL2ResidualsFull(
     std::vector<double> &l2_residuals,
     const std::vector<dealii::BlockVector<double>> &modes_spaceangle,

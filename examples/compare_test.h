@@ -222,6 +222,17 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       dealii::ConvergenceTable &table,
       const std::string &key);
 
+  void GetL2ResidualsEigenMoments(
+      std::vector<double> &l2_residuals,
+      const std::vector<pgd::sn::Cache> &caches,
+      const std::vector<dealii::Vector<double>> &modes_energy,
+      const pgd::sn::Transport<dim, qdim> &transport,
+      const DiscreteToMoment<qdim> &d2m,
+      const FixedSourceProblem<dim, qdim> &problem,
+      const std::vector<double> &eigenvalues,
+      dealii::ConvergenceTable &table,
+      const std::string &key);
+
   void GetL2ResidualsFull(
       std::vector<double> &l2_residuals,
       const std::vector<dealii::BlockVector<double>> &modes_spaceangle,
