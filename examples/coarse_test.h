@@ -24,8 +24,11 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const std::vector<int> &g_maxes,
                      const std::vector<std::string> &materials,
                      std::vector<double> factors = {},
-                     const bool precomputed=false,
-                     const bool should_write_mgxs=true) {
+                     const bool precomputed_full=false,
+                     const bool precomputed_cp=false,
+                     const bool precomputed_ip=false,
+                     const bool should_write_mgxs=true,
+                     const bool do_eigenvalue=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -52,20 +55,28 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         source_full.block(g).add(
             sources_energy[j][g], sources_spaceangle[j].block(0));
     using TransportType = pgd::sn::Transport<dim, qdim>;
-    FixedSourceProblem<dim, qdim, TransportType> problem_full(
+    FissionProblem<dim, qdim, TransportType> problem_full(
         dof_handler, quadrature, *mgxs, boundary_conditions);
     // TransportType transport = problem_full.transport.transport;
+    double eigenvalue = 0;
     const std::string filename_h5 = this->GetTestName() + ".h5";
     namespace HDF5 = dealii::HDF5;
-    if (precomputed) {
+    if (precomputed_full) {
       HDF5::File file(filename_h5, HDF5::File::FileAccessMode::open);
       flux_full = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+      if (do_eigenvalue)
+        eigenvalue = file.get_attribute<double>("k_eigenvalue");
     } else {
       std::vector<double> history_data;
-      CompareTest<dim, qdim>::RunFullOrder(flux_full, source_full, problem_full, 
-                                           max_iters_fullorder, tol_fullorder, 
-                                           &history_data);
-      this->WriteFlux(flux_full, history_data, filename_h5);
+      if (!do_eigenvalue)
+        CompareTest<dim, qdim>::RunFullOrder(flux_full, source_full, problem_full, 
+                                             max_iters_fullorder, tol_fullorder, 
+                                             &history_data);
+      else
+        eigenvalue = CompareTest<dim, qdim>::RunFullOrderCriticality(
+            flux_full, source_full, problem_full, max_iters_fullorder, 
+            tol_fullorder, &history_data);
+      this->WriteFlux(flux_full, history_data, filename_h5, eigenvalue);
     }
     this->PlotFlux(flux_full, problem_full.d2m, mgxs->group_structure, "full");
     // get k1 (first iteration eigenvalue)
@@ -227,20 +238,54 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     // Run coarse group
     std::vector<std::vector<dealii::BlockVector<double>>>
         boundary_conditions_coarse(num_groups_coarse);
-    FixedSourceProblem<dim, qdim> problem_coarse(
+    FissionProblem<dim, qdim> problem_coarse(
           dof_handler, quadrature, mgxs_coarse, boundary_conditions_coarse);
     dealii::BlockVector<double> flux_coarse_cp(
         flux_coarsened.get_block_indices());
-    this->RunFullOrder(flux_coarse_cp, source_coarse, problem_coarse,
-                       max_iters_fullorder, tol_fullorder);
+    double eigenvalue_cp = 0;
+    const std::string filename_cp_h5 = this->GetTestName() + "-cp.h5";
+    if (precomputed_cp) {
+      HDF5::File file(filename_cp_h5, HDF5::File::FileAccessMode::open);
+      flux_coarse_cp = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+      if (do_eigenvalue)
+        eigenvalue_cp = file.get_attribute<double>("k_eigenvalue");
+    } else {
+      std::vector<double> history_data;
+      if (!do_eigenvalue)
+        this->RunFullOrder(flux_coarse_cp, source_coarse, problem_coarse,
+                          max_iters_fullorder, tol_fullorder, &history_data);
+      else
+        eigenvalue_cp = this->RunFullOrderCriticality(
+            flux_coarse_cp, source_coarse, problem_coarse, max_iters_fullorder, 
+            tol_fullorder, &history_data);
+      this->WriteFlux(flux_coarse_cp, history_data, filename_cp_h5, eigenvalue_cp);
+    }
     // Run coarse group, inconsistent P
-    FixedSourceProblem<dim, qdim> problem_coarse_ip(
+    FissionProblem<dim, qdim> problem_coarse_ip(
           dof_handler, quadrature, mgxs_coarse_ip, boundary_conditions_coarse);
     dealii::BlockVector<double> flux_coarse_ip(
         flux_coarse_cp.get_block_indices());
-    this->RunFullOrder(flux_coarse_ip, source_coarse, problem_coarse_ip, 
-                       max_iters_fullorder, tol_fullorder);
+    double eigenvalue_ip = 0;
+    const std::string filename_ip_h5 = this->GetTestName() + "-ip.h5";
+    if (precomputed_ip) {
+      HDF5::File file(filename_ip_h5, HDF5::File::FileAccessMode::open);
+      flux_coarse_ip = file.open_dataset("flux_full").read<dealii::Vector<double>>();
+      if (do_eigenvalue)
+        eigenvalue_ip = file.get_attribute<double>("k_eigenvalue");
+    } else {
+      std::vector<double> history_data;
+      if (!do_eigenvalue)
+        this->RunFullOrder(flux_coarse_ip, source_coarse, problem_coarse_ip, 
+                          max_iters_fullorder, tol_fullorder, &history_data);
+      else
+        eigenvalue_ip = this->RunFullOrderCriticality(
+            flux_coarse_ip, source_coarse, problem_coarse_ip, 
+            max_iters_fullorder, tol_fullorder, &history_data);
+      this->WriteFlux(flux_coarse_ip, history_data, filename_ip_h5, eigenvalue_ip);
+    }
     // Run coarse group with PGD cross-sections
+    if (do_eigenvalue)
+      mgxs_coarses.clear();
     std::vector<dealii::BlockVector<double>> flux_coarses_cp(mgxs_coarses.size(),
         flux_coarse_cp.get_block_indices());
     std::vector<dealii::BlockVector<double>> flux_coarses_ip(flux_coarses_cp);
@@ -263,6 +308,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     std::cout << "init'd transport\n";
     DiscreteToMoment<qdim> &d2m = problem_full.d2m;
     std::cout << "init'd d2m\n";
+    std::vector<double> eigenvalues = {eigenvalue_cp, eigenvalue_ip};
     std::vector<std::string> labels = {"cp", "ip"};
     for (int c = 0; c < labels.size(); ++c) {
       dealii::BlockVector<double> &flux_coarse = 
@@ -280,6 +326,19 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       GetL2ErrorsCoarseMoments(l2_errors_coarse_m_abs, flux_coarse, 
                               flux_coarsened, transport, d2m, false, table, 
                               "coarse_m_abs"+label, l2_norms_m);
+      if (do_eigenvalue) {
+        double l2_error_d = 0;
+        double l2_error_m = 0;
+        for (int g = 0; g < num_groups_coarse; ++g) {
+          l2_error_d += std::pow(l2_errors_coarse_d_abs[g], 2);
+          l2_error_m += std::pow(l2_errors_coarse_m_abs[g], 2);
+        }
+        l2_error_d = std::sqrt(l2_error_d);
+        l2_error_m = std::sqrt(l2_error_m);
+        std::cout << labels[c] << "\n" << "l2 error (d, m): " 
+                  << l2_error_d << ", " << l2_error_m << "\n"
+                  << "dk (pcm): " << (1e5*(eigenvalues[c]-eigenvalue)) << "\n";
+      }
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
                                 flux_coarsened, transport, true, table, 
                                 "coarse_d_rel"+label, l2_norms_d);
