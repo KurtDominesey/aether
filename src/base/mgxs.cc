@@ -216,6 +216,8 @@ Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
   for (int g_coarse = 0; g_coarse < num_groups_coarse; ++g_coarse) {
     int g_min = g_coarse == 0 ? 0 : g_maxes[g_coarse-1];
     int g_max = g_maxes[g_coarse];
+    std::vector<double> production(num_materials);
+    std::vector<double> emission(num_materials);
     std::vector<double> denominator(length);
     std::vector<double> collision(length);
     std::vector<std::vector<double>> scattering(num_groups_coarse,
@@ -223,6 +225,10 @@ Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
     for (int g = g_min; g < g_max; ++g) {
       for (int j = 0; j < num_materials; ++j) {
         for (int ell = 0; ell <= order; ++ell) {
+          if (ell == 0) {
+            production[j] += mgxs.nu_fission[g][j] * spectra[j].block(ell)[g];
+            emission[j] += mgxs.chi[g][j];
+          }
           int jl = j + ell * num_materials;
           collision[jl] += mgxs.total[g][j] * spectra[j].block(ell)[g];
           denominator[jl] += spectra[j].block(ell)[g];
@@ -242,6 +248,8 @@ Mgxs collapse_mgxs(const std::vector<dealii::BlockVector<double>> &spectra,
       }
     }
     for (int j = 0; j < num_materials; ++j) {
+      mgxs_coarse.nu_fission[g_coarse][j] = production[j] / denominator[j];
+      mgxs_coarse.chi[g_coarse][j] = emission[j];
       switch (correction) {
         case CONSISTENT_P:
           mgxs_coarse.total[g_coarse][j] = collision[j] / denominator[j]; 
