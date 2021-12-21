@@ -139,6 +139,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       }
       group_structure_coarse[g_coarse+1] = mgxs->group_structure[g_max];
     }
+    if (do_eigenvalue)
+      flux_coarsened /= flux_coarsened.l2_norm();
     this->PlotFlux(flux_coarsened, problem_full.d2m, group_structure_coarse, 
                    "full_coarsened");
     // ERASE FULL-ORDER FINE-GROUP FLUX TO SAVE MEMORY
