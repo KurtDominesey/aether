@@ -186,15 +186,19 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     const int incr = 10;
     std::vector<Mgxs> mgxs_coarses;
     std::vector<Mgxs> mgxs_coarses_ip;
+    std::vector<dealii::BlockVector<double>> modes_spaceangle;
     if (do_eigenvalue) {
       std::vector<int> unconverged;
       std::vector<double> residuals;
       this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
                    do_update, unconverged, residuals, &eigenvalues);
+      for (int m = 0; m < num_modes; ++m) {
+        modes_spaceangle.emplace_back(quadrature.size(), dof_handler.n_dofs());
+        modes_spaceangle.back() = spatioangular_op.caches[m].mode.block(0);
+      }
     } else {
       // Can't call RunPgd because we need the modes before they're updated in
       // a later enrichment iteration.
-      std::vector<dealii::BlockVector<double>> modes_spaceangle;
       dealii::BlockVector<double> _;
       for (int m = 0; m < num_modes; ++m) {
         nonlinear_gs.enrich();
@@ -244,6 +248,9 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     dealii::BlockVector<double> flux_coarsened_pgd(
         flux_coarsened.get_block_indices());
     dealii::BlockVector<double> flux_coarsened_svd(flux_coarsened_pgd);
+    std::vector<dealii::Vector<double>> modes_coarsened(
+        num_modes, dealii::Vector<double>(num_groups_coarse));
+    auto svecs_coarsened = modes_coarsened;
     for (int m = 0; m < num_modes; ++m) {
       dealii::Vector<double> svec_spaceangle(svecs_spaceangle[m].size());
       svec_spaceangle = svecs_spaceangle[m];
@@ -255,11 +262,30 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
               energy_op.modes[m][g], spatioangular_op.caches[m].mode.block(0));
           flux_coarsened_svd.block(g_coarse).add(
               svecs_energy[m][g], svec_spaceangle);
+          if (do_eigenvalue) {
+            modes_coarsened[m][g_coarse] += energy_op.modes[m][g];
+            svecs_coarsened[m][g_coarse] += svecs_energy[m][g];
+          }
         }
       }
-      if ((m+1) % incr == 0) {
+      if ((m+1) % incr == 0 && !do_eigenvalue) {
         fluxes_coarsened_pgd.push_back(flux_coarsened_pgd);
         fluxes_coarsened_svd.push_back(flux_coarsened_svd);
+      }
+    }
+    if (do_eigenvalue) {
+      double sum = 0;
+      for (const double &v: flux_coarsened_pgd)
+        sum += v;
+      double norm_pgd = flux_coarsened_pgd.l2_norm();
+      double norm_svd = flux_coarsened_svd.l2_norm();
+      if (sum < 0)
+        norm_pgd *= -1;
+      flux_coarsened_pgd /= norm_pgd;
+      flux_coarsened_svd /= norm_svd;
+      for (int m = 0; m < num_modes; ++m) {
+        modes_coarsened[m] /= norm_pgd;
+        svecs_coarsened[m] /= norm_svd;
       }
     }
     // Run coarse group
@@ -399,10 +425,38 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                                  "coarse_m_rel"+labelm, l2_norms_m);
       }
     }
+    dealii::ConvergenceTable table_modal;
     for (int d = 0; d < 2; ++d) {
       std::vector<dealii::BlockVector<double>> &fluxes_coarsened = 
           d ? fluxes_coarsened_svd : fluxes_coarsened_pgd;
-      const std::string decomp = d ? "svd" : "pgd";                 
+      const std::string decomp = d ? "svd" : "pgd";
+      if (do_eigenvalue) {
+        if (decomp != "pgd")
+          continue; // TODO: impl for svd
+        std::vector<double> l2_errors_d(num_modes+1);
+        auto l2_errors_m = l2_errors_d;
+        auto l2_errors_q = l2_errors_d;
+        this->GetL2ErrorsDiscrete(
+            l2_errors_d, modes_spaceangle, modes_coarsened, flux_coarsened, 
+            transport, table_modal, "l2_error_d");
+        this->GetL2ErrorsMoments(
+            l2_errors_m, modes_spaceangle, modes_coarsened, flux_coarsened,
+            transport, d2m, table_modal, "l2_error_m");
+        this->GetL2ErrorsFissionSource(
+            l2_errors_q, modes_spaceangle, modes_coarsened, flux_coarsened,
+            transport, d2m, problem_coarse.production, table_modal, 
+            "l2_error_q");
+        table_modal.add_value("error_k", std::nan("k"));
+        for (int m = 0; m < num_modes; ++m)
+          table_modal.add_value("error_k", 1e5*(eigenvalues[m]-eigenvalue));
+        table_modal.set_scientific("error_k", true);
+        table_modal.set_precision("error_k", 16);
+        for (const std::string suffix: {"d", "m", "q"}) {
+          const std::string key = "l2_error_" + suffix;
+          table_modal.set_scientific(key, true);
+          table_modal.set_precision(key, 16);
+        }
+      }              
       for (int i = 0; i < fluxes_coarsened.size(); ++i) {
         std::vector<double> l2_errors_decomp_d_rel;
         std::vector<double> l2_errors_decomp_m_rel;
@@ -445,6 +499,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     table.set_precision("l2_norm_d", 16);
     table.set_precision("l2_norm_m", 16);
     this->WriteConvergenceTable(table);
+    if (do_eigenvalue)
+      this->WriteConvergenceTable(table_modal, "-modal");
   }
 
   void GetL2ErrorsCoarseDiscrete(
