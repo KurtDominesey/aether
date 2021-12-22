@@ -355,6 +355,12 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     }
     // Post process
     std::cout << "post-processing\n";
+    std::vector<double> lethargy_widths(num_groups_coarse);
+    for (int g = 0; g < num_groups_coarse; ++g) {
+      int g_rev = num_groups - 1 - g;
+      lethargy_widths[g] = std::log(
+          mgxs->group_structure[g_rev+1]/mgxs->group_structure[g_rev]);
+    }
     std::vector<double> l2_norms_d;
     std::vector<double> l2_norms_m;
     TransportType& transport = problem.transport;
@@ -383,8 +389,10 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         double l2_error_d = 0;
         double l2_error_m = 0;
         for (int g = 0; g < num_groups_coarse; ++g) {
-          l2_error_d += std::pow(l2_errors_coarse_d_abs[g], 2);
-          l2_error_m += std::pow(l2_errors_coarse_m_abs[g], 2);
+          l2_error_d += std::pow(l2_errors_coarse_d_abs[g], 2) 
+                        / lethargy_widths[g];
+          l2_error_m += std::pow(l2_errors_coarse_m_abs[g], 2)
+                        / lethargy_widths[g];
         }
         l2_error_d = std::sqrt(l2_error_d);
         l2_error_m = std::sqrt(l2_error_m);
