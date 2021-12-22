@@ -153,66 +153,91 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     for (int j = 0; j < num_materials; ++j) {
       mgxs_one.total[0][j] = 1;
       mgxs_one.scatter[0][0][j] = 1;
+      mgxs_one.chi[0][j] = 1;
+      mgxs_one.nu_fission[0][j] = 1;
+      mgxs_pseudo.chi[0][j] = 1;
     }
     using TransportType = pgd::sn::Transport<dim, qdim>;
     using TransportBlockType = pgd::sn::TransportBlock<dim, qdim>;
-    FixedSourceProblem<dim, qdim, TransportType, TransportBlockType> problem(
+    FissionProblem<dim, qdim, TransportType, TransportBlockType> problem(
         dof_handler, quadrature, mgxs_pseudo, boundary_conditions_one);
     pgd::sn::FixedSourceP fixed_source_p(
         problem.fixed_source, mgxs_pseudo, mgxs_one, sources_spaceangle);
+    pgd::sn::FissionSourceP fission_source_p(
+        problem.fixed_source, problem.fission, mgxs_pseudo, mgxs_one);
     pgd::sn::EnergyMgFull energy_mg(*mgxs, sources_energy);
+    pgd::sn::EnergyMgFiss energy_fiss(*mgxs);
+    pgd::sn::EnergyMgFull& energy_op = 
+        do_eigenvalue ? energy_fiss : energy_mg;
+    pgd::sn::FixedSourceP<dim>& spatioangular_op = 
+        do_eigenvalue ? fission_source_p : fixed_source_p;
     std::vector<pgd::sn::LinearInterface*> linear_ops = 
-        {&energy_mg, &fixed_source_p};
-    pgd::sn::NonlinearGS nonlinear_gs(linear_ops, num_materials, 1, num_sources);
+        {&energy_op, &spatioangular_op};
+    pgd::sn::NonlinearGS fixed_gs(linear_ops, num_materials, 1, num_sources);
+    pgd::sn::EigenGS eigen_gs(linear_ops, num_materials, 1);
+    pgd::sn::NonlinearGS& nonlinear_gs = do_eigenvalue ? eigen_gs : fixed_gs;
+    if (do_eigenvalue) {
+      double k0 = eigen_gs.initialize_guess();
+      std::cout << "initial k (guess): " << k0 << "\n";
+    }
     // run pgd
+    std::vector<double> eigenvalues;
     std::vector<int> m_coarses = {1, 10, 20, 30};
     const int incr = 10;
-    std::vector<dealii::BlockVector<double>> modes_spaceangle;
     std::vector<Mgxs> mgxs_coarses;
     std::vector<Mgxs> mgxs_coarses_ip;
-    dealii::BlockVector<double> _;
-    for (int m = 0; m < num_modes; ++m) {
-      nonlinear_gs.enrich();
-      for (int k = 0; k < max_iters_nonlinear; ++k) {
-        try {
-          double residual = nonlinear_gs.step(_, _);
-          if (residual < tol_nonlinear)
+    if (do_eigenvalue) {
+      std::vector<int> unconverged;
+      std::vector<double> residuals;
+      this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
+                   do_update, unconverged, residuals, &eigenvalues);
+    } else {
+      // Can't call RunPgd because we need the modes before they're updated in
+      // a later enrichment iteration.
+      std::vector<dealii::BlockVector<double>> modes_spaceangle;
+      dealii::BlockVector<double> _;
+      for (int m = 0; m < num_modes; ++m) {
+        nonlinear_gs.enrich();
+        for (int k = 0; k < max_iters_nonlinear; ++k) {
+          try {
+            double residual = nonlinear_gs.step(_, _);
+            if (residual < tol_nonlinear)
+              break;
+          } catch (dealii::SolverControl::NoConvergence &failure) {
+            failure.print_info(std::cout);
             break;
-        } catch (dealii::SolverControl::NoConvergence &failure) {
-          failure.print_info(std::cout);
-          break;
+          }
         }
+        nonlinear_gs.finalize();
+        if (do_update) {
+          nonlinear_gs.update();
+        }
+        // post-process
+        modes_spaceangle.emplace_back(quadrature.size(), dof_handler.n_dofs());
+        modes_spaceangle.back() = fixed_source_p.caches.back().mode.block(0);
+        if (m+1 == m_coarses[mgxs_coarses.size()]) {
+          mgxs_coarses.push_back(
+              GetMgxsCoarse(modes_spaceangle, energy_mg.modes, 
+                            problem_full.transport, problem.d2m, *mgxs, g_maxes, 
+                            0, CONSISTENT_P));
+          mgxs_coarses_ip.push_back(
+              GetMgxsCoarse(modes_spaceangle, energy_mg.modes,
+                            problem_full.transport, problem.d2m, *mgxs, g_maxes,
+                            1, INCONSISTENT_P));
+        }
+        // get k1
+        dealii::BlockVector<double> flux_pgd(
+            num_groups, quadrature.size()*dof_handler.n_dofs());
+        for (int mm = 0; mm <= m; ++mm) {
+          for (int g = 0; g < num_groups; ++g)
+            flux_pgd.block(g).add(energy_mg.modes[mm][g],
+                                  fixed_source_p.caches[mm].mode.block(0));
+        }
+        double _ = 0;
+        double k1_pgd = this->ComputeEigenvalue(problem_full, flux_pgd, 
+                                                source_full, *mgxs, _);
       }
-      nonlinear_gs.finalize();
-      if (do_update) {
-        nonlinear_gs.update();
-      }
-      // post-process
-      modes_spaceangle.emplace_back(quadrature.size(), dof_handler.n_dofs());
-      modes_spaceangle.back() = fixed_source_p.caches.back().mode.block(0);
-      if (m+1 == m_coarses[mgxs_coarses.size()]) {
-        mgxs_coarses.push_back(
-            GetMgxsCoarse(modes_spaceangle, energy_mg.modes, 
-                          problem_full.transport, problem.d2m, *mgxs, g_maxes, 
-                          0, CONSISTENT_P));
-        mgxs_coarses_ip.push_back(
-            GetMgxsCoarse(modes_spaceangle, energy_mg.modes,
-                          problem_full.transport, problem.d2m, *mgxs, g_maxes,
-                          1, INCONSISTENT_P));
-      }
-      // get k1
-      dealii::BlockVector<double> flux_pgd(
-          num_groups, quadrature.size()*dof_handler.n_dofs());
-      for (int mm = 0; mm <= m; ++mm) {
-        for (int g = 0; g < num_groups; ++g)
-          flux_pgd.block(g).add(energy_mg.modes[mm][g],
-                                fixed_source_p.caches[mm].mode.block(0));
-      }
-      double _ = 0;
-      double k1_pgd = this->ComputeEigenvalue(problem_full, flux_pgd, 
-                                              source_full, *mgxs, _);
     }
-    modes_spaceangle.clear();
     std::cout << "done running pgd\n";
     std::vector<dealii::BlockVector<double>> fluxes_coarsened_pgd;
     std::vector<dealii::BlockVector<double>> fluxes_coarsened_svd;
@@ -227,7 +252,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         int g_max = g_maxes[g_coarse];
         for (int g = g_min; g < g_max; ++g) {
           flux_coarsened_pgd.block(g_coarse).add(
-              energy_mg.modes[m][g], fixed_source_p.caches[m].mode.block(0));
+              energy_op.modes[m][g], spatioangular_op.caches[m].mode.block(0));
           flux_coarsened_svd.block(g_coarse).add(
               svecs_energy[m][g], svec_spaceangle);
         }
@@ -310,7 +335,7 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     std::cout << "init'd transport\n";
     DiscreteToMoment<qdim> &d2m = problem_full.d2m;
     std::cout << "init'd d2m\n";
-    std::vector<double> eigenvalues = {eigenvalue_cp, eigenvalue_ip};
+    std::vector<double> eigenvalues_coarse = {eigenvalue_cp, eigenvalue_ip};
     std::vector<std::string> labels = {"cp", "ip"};
     for (int c = 0; c < labels.size(); ++c) {
       dealii::BlockVector<double> &flux_coarse = 
@@ -337,9 +362,10 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         }
         l2_error_d = std::sqrt(l2_error_d);
         l2_error_m = std::sqrt(l2_error_m);
+        double dk = (eigenvalues_coarse[c] - eigenvalue) * 1e5;
         std::cout << labels[c] << "\n" << "l2 error (d, m): " 
                   << l2_error_d << ", " << l2_error_m << "\n"
-                  << "dk (pcm): " << (1e5*(eigenvalues[c]-eigenvalue)) << "\n";
+                  << "dk [pcm]: " << dk << "\n";
       }
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
                                 flux_coarsened, transport, true, table, 
