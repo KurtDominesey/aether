@@ -64,7 +64,13 @@ def plot_compare(filename, savename, ax2j0, **kwargs):
         ('error_m', 'Error $\\phi$, PGD'),
         ('error_d', 'Error $\\psi$, PGD')])
     if EIGEN:
+        reorder = ['error_svd_m', 'error_svd_d', 'residual_m', 'residual',
+                   'norm', 'error_q', 'error_m', 'error_d']
+        labels['residual_m'] = 'Residual, Scalar'
+        labels['residual'] = 'Residual, Angular'
         labels['error_q'] = 'Error $q$, PGD'
+        for key in reorder:
+            labels.move_to_end(key)
         labels['error_k'] = 'Error $k$ [pcm]'
     # for name in table.dtype.names:
     ax2 = None
@@ -130,10 +136,10 @@ def plot_compare(filename, savename, ax2j0, **kwargs):
             plt.gca().spines['right'].set_color(col)
             plt.tick_params(axis='y', which='both', labelcolor=col, color=col)
             plt.yscale('log')
-        elif 'error' in name:
-            ydata = table[name] / table[name][0]
-        elif EIGEN and name == 'residual':
-            ydata = table[name]
+        # elif 'error' in name:
+        #     ydata = table[name] / table[name][0]
+        # elif EIGEN and 'residual' in name:
+        #     ydata = table[name]
         else:
             ydata = table[name] / table['error_d'][0]
         ydata = np.abs(ydata)
@@ -278,7 +284,7 @@ def main(fuel, ext):
     if not EIGEN:
         plt.savefig('compare-{fuel}.pdf'.format(fuel=fuel))
     else:
-        plt.savefig('compare-eigen-{fuel}-10.pdf'.format(fuel=fuel))
+        plt.savefig('compare-eigen-{fuel}-11.pdf'.format(fuel=fuel))
 
 if __name__ == '__main__':
     # python plot_compare.py uo2 pdf
