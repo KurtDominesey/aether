@@ -139,8 +139,17 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
       }
       group_structure_coarse[g_coarse+1] = mgxs->group_structure[g_max];
     }
-    if (do_eigenvalue)
-      flux_coarsened /= flux_coarsened.l2_norm();
+    dealii::Vector<double> produced;
+    if (do_eigenvalue) {
+      double norm = flux_coarsened.l2_norm();
+      flux_coarsened /= norm;
+      flux_full /= norm;
+      dealii::BlockVector<double> flux_full_m(num_groups, dof_handler.n_dofs());
+      for (int g = 0; g < num_groups; ++g)
+        problem_full.d2m.vmult(flux_full_m.block(g), flux_full.block(g));
+      produced.reinit(dof_handler.n_dofs());
+      problem_full.production.vmult(produced, flux_full_m);
+    }
     this->PlotFlux(flux_coarsened, problem_full.d2m, group_structure_coarse, 
                    "full_coarsened");
     // ERASE FULL-ORDER FINE-GROUP FLUX TO SAVE MEMORY
@@ -396,9 +405,14 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         }
         l2_error_d = std::sqrt(l2_error_d);
         l2_error_m = std::sqrt(l2_error_m);
+        double l2_error_q = GetL2ErrorCoarseFissionSource(
+            flux_coarse, produced, transport, d2m, problem_coarse.production);
         double dk = (eigenvalues_coarse[c] - eigenvalue) * 1e5;
-        std::cout << labels[c] << "\n" << "l2 error (d, m): " 
-                  << l2_error_d << ", " << l2_error_m << "\n"
+        std::cout << labels[c] << "\n" << "l2 error (d, m, q): " 
+                  << std::scientific
+                  << l2_error_d << ", " 
+                  << l2_error_m << ", " 
+                  << l2_error_q << "\n"
                   << "dk [pcm]: " << dk << "\n";
       }
       GetL2ErrorsCoarseDiscrete(l2_errors_coarse_d_rel, flux_coarse, 
@@ -583,6 +597,24 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     }
     table.set_scientific(key, true);
     table.set_precision(key, 16);
+  }
+
+  double GetL2ErrorCoarseFissionSource(
+      const dealii::BlockVector<double> &flux_coarse,
+      const dealii::Vector<double> &produced_fine,
+      const pgd::sn::Transport<dim, qdim> &transport,
+      const sn::DiscreteToMoment<qdim> &d2m,
+      const sn::Production<dim> &production) {
+    const int num_groups = flux_coarse.n_blocks();
+    dealii::BlockVector<double> flux_coarse_m(num_groups, dof_handler.n_dofs());
+    for (int g = 0; g < num_groups; ++g)
+      d2m.vmult(flux_coarse_m.block(g), flux_coarse.block(g));
+    dealii::Vector<double> diff(dof_handler.n_dofs());
+    dealii::Vector<double> diff_l2(diff);
+    production.vmult(diff, flux_coarse_m);
+    diff -= produced_fine;
+    transport.collide_ordinate(diff_l2, diff);
+    return std::sqrt(diff * diff_l2);
   }
 
   Mgxs GetMgxsCoarse(
