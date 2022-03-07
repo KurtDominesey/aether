@@ -453,7 +453,7 @@ void CompareTest<dim, qdim>::GetL2ResidualsEigen(
       }
     }
     l2_flux = std::sqrt(l2_flux);
-    l2_residuals[m] = m ? (std::sqrt(l2_residuals[m])/(eigenvalues[m-1]*l2_flux)) 
+    l2_residuals[m] = m ? (std::sqrt(l2_residuals[m]))//(eigenvalues[m-1]*l2_flux)) 
                         : std::nan("z");
     table.add_value(key, l2_residuals[m]);
     if (m == l2_residuals.size()-1)
@@ -543,7 +543,7 @@ void CompareTest<dim, qdim>::GetL2ResidualsEigenMoments(
       l2_flux += (flux.block(g) * residual_l2)  / width;
     }
     l2_flux = std::sqrt(l2_flux);
-    l2_residuals[m] = m ? (std::sqrt(l2_residuals[m]) /(eigenvalues[m-1]*l2_flux)) 
+    l2_residuals[m] = m ? (std::sqrt(l2_residuals[m])) //(eigenvalues[m-1]*l2_flux)) 
                         : std::nan("z");
     table.add_value(key, l2_residuals[m]);
     if (m == l2_residuals.size()-1)
@@ -1522,9 +1522,13 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
                       "residual_swept");
   } else {
     std::vector<double> l2_errors_q(num_modes+1);
+    std::vector<double> l2_residuals_m(num_modes+1);
     GetL2ErrorsFissionSource(l2_errors_q, modes_spaceangle, energy_op.modes, 
                              flux_full, problem.transport, problem.d2m, 
                              problem_full.production, table, "error_q");
+    GetL2ResidualsEigenMoments(l2_residuals_m, spatioangular_op.caches, energy_op.modes, 
+                               problem.transport, problem.d2m, problem_full, 
+                               eigenvalues, table, "residual_m");
     GetL2ResidualsEigen(l2_residuals, spatioangular_op.caches, energy_op.modes, 
                         problem.transport, problem.m2d, problem_full, 
                         eigenvalues, table, "residual");
