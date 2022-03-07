@@ -165,6 +165,8 @@ void FixedSourceS<dim, qdim>::get_inner_products_lhs(
     int matl = cell->material_id();
     for (int m = 0, mg = 0; m < num_modes; ++m) {
       for (int g = 0; g < num_groups; ++g, ++mg) {
+        AssertThrow(modes.block(mg).size() == left.size(), 
+                    dealii::ExcInvalidState());
         for (int mp = 0; mp < num_modes; ++mp) {
           int mpg = mp * num_groups + g;
           for (int n = 0; n < transport.quadrature.size(); ++n) {
