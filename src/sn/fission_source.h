@@ -20,6 +20,7 @@ class FissionSource {
                 const PreconditionType &preconditioner);
   void vmult(dealii::BlockVector<double> &dst,
              const dealii::BlockVector<double> &src) const;
+  bool precondition_only = false;
 
  protected:
   const FixedSource<dim, qdim> &fixed_source;
@@ -43,7 +44,11 @@ void FissionSource<dim, qdim, SolverType, PreconditionType>::
           const dealii::BlockVector<double> &src) const {
   dealii::BlockVector<double> fissioned(src.get_block_indices());
   fission.vmult(fissioned, src);
-  solver.solve(fixed_source, dst, fissioned, preconditioner);
+  if (precondition_only) {
+    preconditioner.vmult(dst, fissioned);
+  } else {
+    solver.solve(fixed_source, dst, fissioned, preconditioner);
+  }
 }
 
 #ifdef DEAL_II_WITH_PETSC
