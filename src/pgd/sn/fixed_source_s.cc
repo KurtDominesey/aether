@@ -135,7 +135,6 @@ void FixedSourceS<dim, qdim>::get_inner_products_lhs(
   const int num_ordinates = d2m.n_block_cols();
   const int num_dofs = modes.block(0).size() / num_ordinates;
   AssertDimension(modes.block(0).size(), num_ordinates*num_dofs);
-  AssertDimension(modes.block(0).size(), src.block(0).size());
   dealii::BlockVector<double> streamed(modes);
   dealii::BlockVector<double> modes_lm(modes.n_blocks(), num_dofs);
   dealii::BlockVector<double> scattered(modes);
