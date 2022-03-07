@@ -21,6 +21,7 @@
 #include "base/lapack_full_matrix.h"
 #include "base/petsc_precondition_matrix.h"
 #include "base/petsc_precondition_shell.h"
+#include "base/slepc_solver.h"
 #include "base/slepc_transformation_preconditioner.h"
 #include "sn/fixed_source_problem.h"
 #include "sn/fission_problem.h"
@@ -88,7 +89,7 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       const FissionProblem<dim, qdim, TransportType> &problem,
       const int max_iters, const double tol,
       std::vector<double> *history_data = nullptr) {
-    const bool use_slepc = flux.n_blocks() < 300;
+    const bool use_slepc = false; //flux.n_blocks() < 300;
     dealii::SolverControl control(max_iters, tol);
     control.enable_history_data();
     if (use_slepc) {
@@ -108,12 +109,40 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       //   eigenvectors[0][i] = uncollided[i];
       eigenvectors[0] /= eigenvectors[0].l2_norm();
       std::vector<double> eigenvalues = {1.0};
-      dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
-      eigensolver.set_initial_space(eigenvectors);
-      try {
-        eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
-      } catch (dealii::SolverControl::NoConvergence &failure) {
-        failure.print_info(std::cout);
+      bool use_davidson = false;
+      if (use_davidson) {
+        dealii::SLEPcWrappers::SolverGeneralizedDavidson eigensolver(control);
+        eigensolver.set_initial_space(eigenvectors);
+        try {
+          eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+        }
+      } else {  // shift-and-invert Rayleigh
+        aether::SLEPcWrappers::SolverRayleigh eigensolver(control);
+        eigensolver.set_initial_space(eigenvectors);
+        using ShiftInvert = dealii::SLEPcWrappers::TransformationShiftInvert;
+        ShiftInvert shift_invert(
+            MPI_COMM_WORLD, ShiftInvert::AdditionalData(eigenvalues[0]));
+        shift_invert.set_matrix_mode(ST_MATMODE_SHELL);
+        dealii::ReductionControl control_si(50, 1e-8, 1-2);
+        dealii::PETScWrappers::SolverGMRES solver_si(control_si, MPI_COMM_WORLD);
+        dealii::ReductionControl control_wg(250, 1e-8, 1e-2);
+        dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+        FixedSourceGS fixed_source_gs(problem.fixed_source, solver_wg);
+        aether::PETScWrappers::BlockBlockWrapper fixed_source_gs_petsc(
+            num_groups, quadrature.size(), MPI_COMM_WORLD, 
+            dof_handler.n_dofs(), dof_handler.n_dofs(), fixed_source_gs);
+        aether::PETScWrappers::PreconditionerShell fixed_source_gs_pc(
+            fixed_source_gs_petsc);
+        solver_si.initialize(fixed_source_gs_pc);
+        shift_invert.set_solver(solver_si);
+        eigensolver.set_transformation(shift_invert);
+        try {
+          eigensolver.solve(fission, fixed_source, eigenvalues, eigenvectors);
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+        }
       }
       if (history_data != nullptr)
         *history_data = control.get_history_data();
@@ -125,7 +154,9 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
     } else {
       // dealii::BlockVector<double> uncollided(source.get_block_indices());
       // problem.sweep_source(uncollided, source);
-      dealii::ReductionControl control_wg(100, 1e-10, 1e-2);
+      // dealii::ReductionControl control_wg(10, 1e-8, 1e-2);
+      dealii::IterationNumberControl control_wg(10, 1e-10);
+      // dealii::IterationNumberControl control_wg(50, 1e-10);
       dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
       FixedSourceGS preconditioner(problem.fixed_source, solver_wg);
       // dealii::SolverControl control_fs(1, std::numeric_limits<double>::infinity);
@@ -139,13 +170,48 @@ class CompareTest : virtual public ExampleTest<dim, qdim> {
       });
       FissionSource fission_source(problem.fixed_source, problem.fission, 
                                    solver_fs, preconditioner);
-      dealii::GrowingVectorMemory<dealii::BlockVector<double>> memory;
-      dealii::EigenPower<dealii::BlockVector<double>> eigensolver(control, 
-                                                                  memory);
+      fission_source.precondition_only = false;
       double k = 1.0;
       flux = 1;
       flux /= flux.l2_norm();
-      eigensolver.solve(k, fission_source, flux);
+      bool use_rayleigh = false;
+      if (use_rayleigh) {
+        const int num_groups = mgxs->total.size();
+        ::aether::PETScWrappers::BlockBlockWrapper fission_source_petsc(
+            num_groups, quadrature.size(), MPI_COMM_WORLD, 
+            dof_handler.n_dofs(), dof_handler.n_dofs(), fission_source);
+        const int size = dof_handler.n_dofs() * quadrature.size() * num_groups;
+        std::vector<dealii::PETScWrappers::MPI::Vector> eigenvectors;
+        eigenvectors.emplace_back(MPI_COMM_WORLD, size, size);
+        eigenvectors[0] = flux[0];
+        std::vector<double> eigenvalues = {k};
+        aether::SLEPcWrappers::SolverRayleigh eigensolver(control);
+        eigensolver.set_initial_space(eigenvectors);
+        using Shift = dealii::SLEPcWrappers::TransformationShift;
+        Shift shift(MPI_COMM_WORLD, Shift::AdditionalData(k));
+        shift.set_matrix_mode(ST_MATMODE_SHELL);
+        dealii::PETScWrappers::SolverGMRES solver_shift(control_fs, MPI_COMM_WORLD);
+        dealii::PETScWrappers::PreconditionNone pc_identity(fission_source_petsc);
+        solver_shift.initialize(pc_identity);
+        shift.set_solver(solver_shift);
+        eigensolver.set_transformation(shift);
+        try {
+          eigensolver.solve(fission_source_petsc, eigenvalues, eigenvectors);
+        } catch (dealii::SolverControl::NoConvergence &failure) {
+          failure.print_info(std::cout);
+        }
+        if (history_data != nullptr)
+          *history_data = control.get_history_data();
+        for (int i = 0; i < size; ++i)
+          flux[i] = eigenvectors[0][i];
+        k = eigenvalues[0];
+      } else {
+        dealii::GrowingVectorMemory<dealii::BlockVector<double>> memory;
+        using EigenPower = dealii::EigenPower<dealii::BlockVector<double>>;
+        EigenPower eigensolver(control, memory);//,
+                               //EigenPower::AdditionalData(1.1447201471513586));
+        eigensolver.solve(k, fission_source, flux);
+      }
       std::cout << "k-eigenvalue: " << std::setprecision(10) << k << std::endl;
       return k;
     }
