@@ -28,7 +28,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const bool precomputed_cp=false,
                      const bool precomputed_ip=false,
                      const bool should_write_mgxs=true,
-                     const bool do_eigenvalue=false) {
+                     const bool do_eigenvalue=false,
+                     const bool do_minimax=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -59,7 +60,11 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
         dof_handler, quadrature, *mgxs, boundary_conditions);
     // TransportType transport = problem_full.transport.transport;
     double eigenvalue = 0;
-    const std::string filename_h5 = this->GetTestName() + ".h5";
+    // const std::string filebase = 
+    //     this-> materials[2] + "_" + this->group_structure;
+    const std::string filename_h5 = 
+        // filebase + (do_eigenvalue ? "" : "_k") + "_full.h5";
+        this->GetTestName() + ".h5";
     namespace HDF5 = dealii::HDF5;
     if (precomputed_full) {
       HDF5::File file(filename_h5, HDF5::File::FileAccessMode::open);
@@ -185,6 +190,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     pgd::sn::NonlinearGS fixed_gs(linear_ops, num_materials, 1, num_sources);
     pgd::sn::EigenGS eigen_gs(linear_ops, num_materials, 1);
     pgd::sn::NonlinearGS& nonlinear_gs = do_eigenvalue ? eigen_gs : fixed_gs;
+    energy_op.do_minimax = do_minimax;
+    spatioangular_op.do_minimax = do_minimax;
     if (do_eigenvalue) {
       double k0 = eigen_gs.initialize_guess();
       std::cout << "initial k (guess): " << k0 << "\n";
@@ -520,9 +527,10 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     table.set_precision("source_coarse", 16);
     table.set_precision("l2_norm_d", 16);
     table.set_precision("l2_norm_m", 16);
-    this->WriteConvergenceTable(table);
+    const std::string suffix = do_minimax ? "-minimax" : "";
+    this->WriteConvergenceTable(table, suffix);
     if (do_eigenvalue)
-      this->WriteConvergenceTable(table_modal, "-modal");
+      this->WriteConvergenceTable(table_modal, "-modal" + suffix);
   }
 
   void GetL2ErrorsCoarseDiscrete(

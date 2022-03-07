@@ -29,9 +29,34 @@ TEST_P(CathalauCoarseTest, UniformFissionSource) {
   this->CompareCoarse(50, 50, 1e-4, true, 50, 1e-8, this->g_maxes, this->materials, {}, false);
 }
 
+// Running this method more than once causes a seg fault in collapse_spectra.
+// Debugger doesn't give many clues--unsure why it only works on the first go.
+// Workaround is to run each test individually. TODO: fix it properly
 TEST_P(CathalauCoarseTest, Criticality) {
-  this->CompareCoarse(3, 50, 1e-4, true, 100, 1e-6, this->g_maxes, this->materials, {},
-                      true, true, true, true, true);
+  const int num_modes = 50;
+  const int iters_nl = 50;
+  const double tol_nl = 1e-4;
+  const bool do_update = true;
+  const int iters_fom = 250;
+  const double tol_fom = 1e-8;
+  // galerkin (do_minimax is false)
+  // this->CompareCoarse(
+  //     num_modes, iters_nl, tol_nl, do_update, iters_fom, tol_fom, 
+  //     this->g_maxes, this->materials, {},
+  //     /*precomputed_full*/true, /*precomputed_cp*/true, /*precomputed_ip*/true, 
+  //     /*should_write_mgxs*/true,  /*do_eigenvalue*/true, /*do_minimax*/false);
+  // minimax
+  this->CompareCoarse(
+      50, iters_nl, tol_nl, do_update, iters_fom, tol_fom, 
+      this->g_maxes, this->materials, {},
+      /*precomputed_full*/true, /*precomputed_cp*/true, /*precomputed_ip*/true, 
+      /*should_write_mgxs*/false,  /*do_eigenvalue*/true, /*do_minimax*/true);
+  // this->CompareCoarse(50, 50, 1e-4, true, 250, 1e-8, this->g_maxes, 
+  //                     this->materials, {},
+  //                     /*precomputed_full*/false, /*precomputed_cp*/false, 
+  //                     /*precomputed_ip*/false, /*should_write_mgxs*/true, 
+  //                     /*do_eigenvalue*/true, do_minimax);
+
 }
 
 INSTANTIATE_TEST_CASE_P(Fuel, CathalauCoarseTest,
