@@ -29,7 +29,8 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
                      const bool precomputed_ip=false,
                      const bool should_write_mgxs=true,
                      const bool do_eigenvalue=false,
-                     const bool do_minimax=false) {
+                     const bool do_minimax=false,
+                     const bool precomputed_eigen_pgd=false) {
     const int num_groups = mgxs->total.size();
     const int num_materials = mgxs->total[0].size();
     // Create sources
@@ -192,10 +193,6 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     pgd::sn::NonlinearGS& nonlinear_gs = do_eigenvalue ? eigen_gs : fixed_gs;
     energy_op.do_minimax = do_minimax;
     spatioangular_op.do_minimax = do_minimax;
-    if (do_eigenvalue) {
-      double k0 = eigen_gs.initialize_guess();
-      std::cout << "initial k (guess): " << k0 << "\n";
-    }
     // run pgd
     std::vector<double> eigenvalues;
     std::vector<int> m_coarses = {1, 10, 20, 30};
@@ -206,8 +203,30 @@ class CoarseTest : virtual public CompareTest<dim, qdim> {
     if (do_eigenvalue) {
       std::vector<int> unconverged;
       std::vector<double> residuals;
-      this->RunPgd(nonlinear_gs, num_modes, max_iters_nonlinear, tol_nonlinear,
-                   do_update, unconverged, residuals, &eigenvalues);
+      if (precomputed_eigen_pgd) {
+        const std::string filename_pgd = this->GetTestName() + "_pgd" +
+            (do_minimax ? "_minimax" : "") + ".h5";
+        HDF5::File file(filename_pgd, HDF5::File::FileAccessMode::open);
+        eigenvalues = 
+            file.open_dataset("eigenvalues").read<std::vector<double>>();
+        for (int m = 0; m < num_modes; ++m) {
+          const std::string mm = std::to_string(m);
+          spatioangular_op.enrich(0);
+          spatioangular_op.caches.back().mode = file.open_dataset(
+              "modes_spaceangle"+mm).read<dealii::Vector<double>>();
+          spatioangular_op.set_cache(spatioangular_op.caches.back());
+          energy_op.modes.push_back(file.open_dataset(
+              "modes_energy"+mm).read<dealii::Vector<double>>());
+        }
+      }
+      else {
+        double k0 = eigen_gs.initialize_guess();
+        std::cout << "initial k (guess): " << k0 << "\n";
+        eigenvalues.push_back(k0);
+        this->RunPgd(nonlinear_gs, do_eigenvalue ? num_modes-1 : num_modes, 
+                     max_iters_nonlinear, tol_nonlinear, do_update, unconverged,
+                     residuals, &eigenvalues);
+      }
       for (int m = 0; m < num_modes; ++m) {
         modes_spaceangle.emplace_back(quadrature.size(), dof_handler.n_dofs());
         modes_spaceangle.back() = spatioangular_op.caches[m].mode.block(0);
