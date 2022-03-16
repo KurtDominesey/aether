@@ -37,8 +37,8 @@ TEST_P(CathalauCoarseTest, Criticality) {
   const int iters_nl = 50;
   const double tol_nl = 1e-4;
   const bool do_update = true;
-  const int iters_fom = 250;
-  const double tol_fom = 1e-8;
+  const int iters_fom = 300;
+  const double tol_fom = 1e-10;
   // galerkin (do_minimax is false)
   // this->CompareCoarse(
   //     num_modes, iters_nl, tol_nl, do_update, iters_fom, tol_fom, 
@@ -50,7 +50,7 @@ TEST_P(CathalauCoarseTest, Criticality) {
       50, iters_nl, tol_nl, do_update, iters_fom, tol_fom, 
       this->g_maxes, this->materials, {},
       /*precomputed_full*/true, /*precomputed_cp*/true, /*precomputed_ip*/true, 
-      /*should_write_mgxs*/false,  /*do_eigenvalue*/true, /*do_minimax*/true);
+      /*should_write_mgxs*/false,  /*do_eigenvalue*/true, /*do_minimax*/false, true);
   // this->CompareCoarse(50, 50, 1e-4, true, 250, 1e-8, this->g_maxes, 
   //                     this->materials, {},
   //                     /*precomputed_full*/false, /*precomputed_cp*/false, 
