@@ -32,11 +32,9 @@ double EnergyMgFull::step(dealii::Vector<double> &delta,
   set_source(coefficients_b, coefficients_x);
   // matrix.print(std::cout);
   // source.print(std::cout);
-  dealii::FullMatrix<double> matrix_copy(matrix);
   matrix.gauss_jordan();
   dealii::Vector<double> solution(modes.back());
   matrix.vmult(solution, source);
-  matrix = matrix_copy;  // reset matrix to original state -- not inverted!
   ////
   // dealii::FullMatrix<double> matrix_n(matrix.m()+1, matrix.n()+1);
   // for (int i = 0; i < matrix.m(); ++i)
@@ -68,11 +66,10 @@ void EnergyMgFull::take_step(const double factor,
 }
 
 void EnergyMgFull::solve_minimax(const double norm) {
-  // assume matrix is already correctly set
+  // assume matrix is already correctly set and inverted
   // (by a previous call to step)
   dealii::FullMatrix<double> matrix_T;
   matrix_T.copy_transposed(matrix);
-  matrix_T.gauss_jordan();
   matrix_T.vmult(test_funcs.back(), modes.back());
   test_funcs.back() *= norm;
 }
