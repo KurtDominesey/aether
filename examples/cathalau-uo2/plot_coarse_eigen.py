@@ -4,17 +4,25 @@ import matplotlib.pyplot as plt
 
 
 COARSE_ERRORS = {
-    'uo2-cp': [2.8349414788e-05, 1.1303807790e-05, 6.7131348459e-07], #[2.834933e-05, 1.130357e-05, 6.747873e-07],
-    'uo2-ip': [ 2.6872516703e-05, 9.2828191263e-06, 1.9444144078e-06], #[2.834933e-05, 1.130357e-05, 6.747873e-07],
-    'mox43-cp': [2.7380848040e-05, 1.0986542717e-05, 1.1885623885e-06], #[2.7380907222e-05, 1.0986762769e-05, 1.1859501066e-06],
-    'mox43-ip': [2.6722863787e-05, 8.5678407364e-06, 1.6855014258e-06] #[2.6722035540e-05, 8.5649046124e-06, 1.6755661632e-06]
+    'uo2-cp': [2.8349415852e-05, 1.1303810906e-05, 6.7128896424e-07],
+    'uo2-ip': [2.6872510661e-05, 9.2828026425e-06, 1.9443769204e-06],
+    # 'uo2-cp': [2.8349414788e-05, 1.1303807790e-05, 6.7131348459e-07], #[2.834933e-05, 1.130357e-05, 6.747873e-07],
+    # 'uo2-ip': [ 2.6872516703e-05, 9.2828191263e-06, 1.9444144078e-06], #[2.834933e-05, 1.130357e-05, 6.747873e-07],
+    'mox43-cp': [2.7380849360e-05, 1.0986546449e-05, 1.1885643240e-06],
+    'mox43-ip': [2.6722866149e-05, 8.5678492688e-06, 1.6855109087e-06]
+    # 'mox43-cp': [2.7380848040e-05, 1.0986542717e-05, 1.1885623885e-06], #[2.7380907222e-05, 1.0986762769e-05, 1.1859501066e-06],
+    # 'mox43-ip': [2.6722863787e-05, 8.5678407364e-06, 1.6855014258e-06] #[2.6722035540e-05, 8.5649046124e-06, 1.6755661632e-06]
 }
 
 COARSE_DK = {
-    'uo2-cp': 1.2997302432e+02, #1.315941e+02,
-    'uo2-ip': 5.2168256969e+02, #1.315941e+02,
-    'mox43-cp': 1.2300433233e+02, #1.2095912371e+02,
-    'mox43-ip': 4.3047477151e+02 #4.2800804587e+02
+    'uo2-cp': 1.2996167473e+02,
+    'uo2-ip': 5.2167117071e+02,
+    # 'uo2-cp': 1.2997302432e+02, #1.315941e+02,
+    # 'uo2-ip': 5.2168256969e+02, #1.315941e+02,
+    'mox43-cp': 1.2300689344e+02,
+    'mox43-ip': 4.3047816335e+02
+    # 'mox43-cp': 1.2300433233e+02, #1.2095912371e+02,
+    # 'mox43-ip': 4.3047477151e+02 #4.2800804587e+02
 }
 
 
@@ -23,6 +31,7 @@ def share_ylim(ax1, ax2):
     ymin2, ymax2 = ax2.get_ylim()
     ymin = min(ymin1, ymin2)
     ymax = max(ymax1, ymax2)
+    ymax = min(5, ymax)
     ax1.set_ylim(ymin, ymax)
     ax2.set_ylim(ymin, ymax)
 
@@ -100,10 +109,10 @@ def main():
     markersize = 3.75
     kwargs = {'markevery': 2, 'markersize': markersize, 'alpha': alpha, 
               'zorder': 1.99}
-    axl = None
+    axl_prev = None
     axr_prev = None
     for i, (fuel, title) in enumerate(zip(fuels, titles)):
-        axl = plt.subplot(1, len(fuels), i+1, sharex=axl)
+        axl = plt.subplot(1, len(fuels), i+1, sharex=axl_prev)
         axr = plt.twinx()
         for proj, marker in zip(projs, markers):
             filename = filebase.format(fuel=fuel, proj=proj)
@@ -126,7 +135,9 @@ def main():
             # Actually sharing the axes makes it hard to set tick labels
             # visible on only one plot. Just set the ylims instead.
             share_ylim(axr, axr_prev)
+            share_ylim(axl, axl_prev)
         axr_prev = axr
+        axl_prev = axl
     add_frame_labels(markersize=markersize)
     plt.savefig('coarse_eigen-6.pdf')
 

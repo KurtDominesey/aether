@@ -1,13 +1,26 @@
 import collections
 import math
+from re import A
 import sys
 
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.markers import MarkerStyle
 
 JCP = None
 EIGEN = True
+
+def copy_line_properties(line_to, line_from):
+    # The matplotlib Line2D method `update_from` doesn't work for some reason.
+    # (The lines don't appear at all.)
+    # I suspect this is because of the call to Artist `update_from`.
+    attrs = ('linestyle', 'linewidth', 'color', 'markersize', 'markevery', 
+             'alpha', 'drawstyle')
+    for attr in attrs:
+        setattr(line_to, '_'+attr, getattr(line_from, '_'+attr))
+    line_to._marker = MarkerStyle(marker=line_from._marker)
 
 def tick_every_decade(ax):
     locmaj = matplotlib.ticker.LogLocator(base=10, numticks=np.inf)
@@ -251,10 +264,33 @@ def main(fuel, ext):
                 if not EIGEN:
                     right_yticks()
                     plt.setp(axij.get_yticklabels(), visible=False)
+            do_inset = (False and fuel == 'mox43'
+                             and algorithm == 'MinimaxWithEigenUpdate'
+                             and param == 'SHEM-361')
+            if do_inset:
+                inset = axij.inset_axes((0.55, 0.575, 0.4, 0.375))
+                # inset.grid(False)
+                for line in axij.get_lines():
+                    line_inset = Line2D(xdata=line.get_xdata(), 
+                                        ydata=line.get_ydata())
+                    # line_inset.update_from(line)
+                    copy_line_properties(line_inset, line)
+                    inset.add_line(line_inset)
+                # inset.set_ylim(0.5, inset.get_ylim()[1])
+                inset.autoscale()
+                inset.set_yscale('log')
+                inset.set_xlim(-0.5, 13)
+                inset.set_ylim(0.5, inset.get_ylim()[1])
+                inset.tick_params(axis='both', labelsize=6)
+                for ax in (axij, inset):
+                    ax.axvspan(*inset.get_xlim(), color='yellow', alpha=0.2)
+                plt.sca(axij)
         if EIGEN:
             tick_every_decade(ax2j0)
-            ymin, ymax = ax2j0.get_ylim()
-            ax2j0.set_ylim(max(1e-6, ymin), ymax)
+            ymin2, ymax2 = ax2j0.get_ylim()
+            ax2j0.set_ylim(max(1e-6, ymin2), ymax2)
+            ymin, ymax = axj0.get_ylim()
+            # axj0.set_ylim(ymin, min(1e1, ymax))
     rect = [0.03, 0.025, 1, 0.925]
     if JCP:
         rect[-1] = 0.915
