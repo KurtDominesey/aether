@@ -67,6 +67,8 @@ class FixedSource {
   const std::vector<WithinGroup<dim, qdim>> &within_groups;
   //! Moment to discrete operator, \f$M\f$
   const MomentToDiscrete<dim, qdim> &m2d;
+  //! Discrete to moment operator, \f$D\f$
+  const DiscreteToMoment<dim, qdim> &d2m;
   //! Whether the matrix is transposed.
   bool transposed = false;
 
@@ -77,8 +79,6 @@ class FixedSource {
   //! Ragged vector of vectors of upscattering blocks,
   //! \f$\Sigma_{s,g'\rightarrow g}\f$ where \f$g'>g\f$
   const std::vector<std::vector<ScatteringBlock<dim>>> &upscattering;
-  //! Discrete to moment operator, \f$D\f$
-  const DiscreteToMoment<dim, qdim> &d2m;
   friend class aether::pgd::sn::FixedSourceP<dim, qdim>;
   friend class aether::pgd::sn::FixedSourceS<dim, qdim>;
   friend class aether::pgd::sn::FixedSourceSGS<dim, qdim>;
