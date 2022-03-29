@@ -26,6 +26,12 @@ template <int dim, int qdim = dim == 1 ? 1 : 2,
           class TransportType = Transport<dim, qdim>,
           class TransportBlockType = TransportBlock<dim, qdim>>
 class FixedSourceProblem {
+ protected:
+  using BoundaryConditions = 
+      std::vector<std::vector<dealii::BlockVector<double>>>;
+  //! Vacuum boundary conditions, if needed
+  std::unique_ptr<BoundaryConditions> vacuum;
+
  public:
   /**
    * Constructor.
@@ -39,8 +45,21 @@ class FixedSourceProblem {
   FixedSourceProblem(const dealii::DoFHandler<dim> &dof_handler,
                      const QAngle<dim, qdim> &quadrature, 
                      const Mgxs &mgxs,
-                     const std::vector<std::vector<dealii::BlockVector<double>>>
-                         &boundary_conditions);
+                     const BoundaryConditions &boundary_conditions);
+
+  /**
+   * Constructor with vacuum boundaries for boundary_id 0.
+   * 
+   * @param dof_handler DoF handler for the mesh and finite elements.
+   * @param quadrature Angular quadrature.
+   * @param mgxs Multigroup cross-sections.
+   * @param boundary_conditions The values of the incident flux for each
+   *                            group, boundary ID, ordinate, and elemental DoF. 
+   */
+  FixedSourceProblem(const dealii::DoFHandler<dim> &dof_handler,
+                     const QAngle<dim, qdim> &quadrature, 
+                     const Mgxs &mgxs);
+
   /**
    * Apply a transport sweep to the source vector `src`.
    * 
@@ -86,6 +105,7 @@ FixedSourceProblem<dim, qdim, TransportType, TransportBlockType>::
   AssertDimension(num_groups, boundary_conditions.size());
   downscattering.resize(num_groups);
   upscattering.resize(num_groups);
+  std::cout << "num_groups: " << num_groups << "\n";
   for (int g = 0; g < num_groups; ++g) {
     AssertDimension(mgxs.scatter[g].size(), num_groups);
     auto transport_wg = std::make_shared<TransportBlockType>(
@@ -98,7 +118,25 @@ FixedSourceProblem<dim, qdim, TransportType, TransportBlockType>::
     for (int gp = g + 1; gp < num_groups; ++gp)  // from g' to g
       upscattering[g].emplace_back(scattering, mgxs.scatter[g][gp]);
   }
+  std::cout << "all done\n";
 }
+
+template <int dim, int qdim, class TransportType, class TransportBlockType>
+FixedSourceProblem<dim, qdim, TransportType, TransportBlockType>::
+    FixedSourceProblem(
+        const dealii::DoFHandler<dim> &dof_handler,
+        const QAngle<dim, qdim> &quadrature, 
+        const Mgxs &mgxs) 
+    : FixedSourceProblem(dof_handler, quadrature, mgxs, 
+        BoundaryConditions(mgxs.total.size(), 
+            std::vector<dealii::BlockVector<double>>(1, 
+                dealii::BlockVector<double>(
+                    quadrature.size(), 
+                    dof_handler.get_fe().dofs_per_cell
+                )
+            )
+        )
+    ) {}
 
 }  // namespace aether::sn
 
