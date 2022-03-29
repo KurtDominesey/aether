@@ -46,6 +46,17 @@ struct InnerProducts {
 
 InnerProducts operator*(const InnerProducts &a, const InnerProducts&b);
 
+template <int groupsND, int zonesND>
+struct InnerProducts2D1D {
+  using ArrayG = std::array<std::array<double, zonesND>, groupsND>;
+  using ArrayGG = std::array<ArrayG, groupsND>;
+  double leakage_co;  // coaxial or coplanar
+  double leakage_trans;  // transverse
+  ArrayG total;
+  ArrayG fission;
+  ArrayGG scattering;
+};
+
 }  // namespace aether::pgd::sn
 
 #endif  // AETHER_PGD_SN_INNER_PRODUCTS_H_
