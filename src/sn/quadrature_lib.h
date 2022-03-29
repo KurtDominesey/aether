@@ -26,6 +26,16 @@ class QPglc : public QAngle<dim, qdim> {
       const int n, const dealii::Tensor<1, dim> &normal) const override;
 };
 
+/**
+ * Degenerate 1D angular quadrature formed by $\mu=\pm 1$.
+ */
+class QForwardBackward : public QAngle<1, 1> {
+ public:
+  QForwardBackward();
+  int reflected_index(
+      const int n, const dealii::Tensor<1, 1> &normal) const override;
+};
+
 }  // namespace aether::sn
 
 #endif  // AETHER_SN_QUADRATURE_LIB_H_
