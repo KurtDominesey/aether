@@ -22,12 +22,18 @@ struct Mgxs {
    * Constructor.
    */
   Mgxs(int num_groups, int num_materials, int num_legendre)
-      : group_structure(num_groups + 1),
+      : num_groups(num_groups), 
+        num_materials(num_materials),
+        group_structure(num_groups + 1),
         total(num_groups, std::vector<double>(num_materials)),
         chi(num_groups, std::vector<double>(num_materials)),
         nu_fission(num_groups, std::vector<double>(num_materials)),
         scatter(num_groups, std::vector<std::vector<double>>(
                 num_groups, std::vector<double>(num_materials*num_legendre))) {}
+  //! Number of groups.
+  const int num_groups;
+  //! Number of materials.
+  const int num_materials;
   //! Deep-copy operator
   Mgxs& operator=(const Mgxs& other);
   //! Group boundaries in eV (electron volts).
