@@ -19,10 +19,12 @@ namespace aether::pgd::sn {
 
 struct Products {
   Products(int groups, int ords, int dofs)
-  : psi(groups, ords*dofs), phi(groups, dofs), streamed(groups, ords*dofs) {};
+  : psi(groups, ords*dofs), phi(groups, dofs), streamed(groups, ords*dofs),
+    test(groups, ords*dofs) {};
   dealii::BlockVector<double> psi;
   dealii::BlockVector<double> phi;
   dealii::BlockVector<double> streamed;
+  dealii::BlockVector<double> test;
 };
 
 template <int dim, int qdim = dim == 1 ? 1 : 2>
@@ -43,6 +45,7 @@ class FixedSource2D1D {
   std::vector<Products> prods;
   std::vector<InnerProducts2D1D> iprods_flux;
   std::vector<double> iprods_src;
+  bool is_minimax = false;
  protected:
   void set_products(Products &prod);
   void set_inner_prod_flux(const dealii::BlockVector<double> &test,
@@ -60,8 +63,8 @@ class FixedSource2D1D {
                 const std::vector<std::vector<int>> &materials,
                 const Mgxs &mgxs);
   void check_mgxs();
-  void solve_forward();
-  void solve_adjoint();
+  double solve_forward();
+  double solve_adjoint();
   const aether::sn::FixedSource<dim, qdim> &fixed_src;
   const std::vector<dealii::BlockVector<double>> &srcs;
   Mgxs &mgxs_rom;

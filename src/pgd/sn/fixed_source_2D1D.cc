@@ -42,6 +42,7 @@ void FixedSource2D1D<dim, qdim>::enrich() {
     }
   }
   prod.psi = 1;
+  prod.test = prod.psi;
   set_products(prod);
   prods.push_back(prod);
   iprods_flux.emplace_back(mgxs_rom.num_groups, mgxs_rom.num_materials);
@@ -57,6 +58,10 @@ void FixedSource2D1D<dim, qdim>::normalize() {
     prods.back().psi.block(g) /= norm;
     prods.back().phi.block(g) /= norm;
     prods.back().streamed.block(g) /= norm;
+    double norm_test = transport.inner_product(
+        prods.back().test.block(g), prods.back().test.block(g));
+    norm_test = std::sqrt(norm_test);
+    prods.back().test.block(g) /= norm_test;
   }
 }
 
@@ -75,9 +80,9 @@ void FixedSource2D1D<dim, qdim>::set_products(
 template <int dim, int qdim>
 void FixedSource2D1D<dim, qdim>::set_inner_prods() {
   for (int m = 0; m < prods.size(); ++m)
-    set_inner_prod_flux(prods.back().psi, prods[m], iprods_flux[m]);
+    set_inner_prod_flux(prods.back().test, prods[m], iprods_flux[m]);
   for (int s = 0; s < srcs.size(); ++s)
-    iprods_src[s] = inner_prod_src(prods.back().psi, srcs[s]);
+    iprods_src[s] = inner_prod_src(prods.back().test, srcs[s]);
 }
 
 template <int dim, int qdim>
@@ -305,6 +310,17 @@ void FixedSource2D1D<dim, qdim>::check_mgxs() {
 
 template <int dim, int qdim>
 double FixedSource2D1D<dim, qdim>::solve() {
+  double res_fwd = solve_forward();
+  if (is_minimax) {
+    solve_adjoint();
+  } else {
+    prods.back().test = prods.back().psi;
+  }
+  return res_fwd;
+}
+
+template <int dim, int qdim>
+double FixedSource2D1D<dim, qdim>::solve_forward() {
   dealii::ReductionControl control(500, 1e-2, 1e-8);
   // dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
   //     dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
@@ -317,6 +333,23 @@ double FixedSource2D1D<dim, qdim>::solve() {
   solver.solve(fixed_src, prods.back().psi, uncollided, 
                dealii::PreconditionIdentity());
   set_products(prods.back());
+  return control.initial_value() / uncollided.l2_norm();
+}
+
+template <int dim, int qdim>
+double FixedSource2D1D<dim, qdim>::solve_adjoint() {
+  dealii::ReductionControl control(500, 1e-4, 1e-8);
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
+      dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
+  uncollided = 0;
+  for (int g = 0; g < mgxs_rom.num_groups; ++g) {
+    fixed_src.within_groups[g].transport.Tvmult(
+        uncollided.block(g), prods.back().psi.block(g), false);
+  }
+  const_cast<bool&>(fixed_src.transposed) = !fixed_src.transposed;
+  solver.solve(fixed_src, prods.back().test, uncollided, 
+               dealii::PreconditionIdentity());
+  const_cast<bool&>(fixed_src.transposed) = !fixed_src.transposed;
   return control.initial_value() / uncollided.l2_norm();
 }
 

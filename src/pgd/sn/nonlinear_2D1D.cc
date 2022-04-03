@@ -17,7 +17,7 @@ void Nonlinear2D1D::enrich() {
 }
 
 double Nonlinear2D1D::iter() {
-  one_d.normalize();
+  // one_d.normalize();
   one_d.set_inner_prods();
   two_d.setup(one_d.iprods_flux, one_d.iprods_src, materials, mgxs);
   double r2 = two_d.solve();
@@ -29,7 +29,7 @@ double Nonlinear2D1D::iter() {
   std::cout << "2D: " << r2 << "  "
             << "1D: " << r1 << "  "
             << "2D/1D: " << r << "\n";
-  return 0;
+  return r;
 }
 
 }
