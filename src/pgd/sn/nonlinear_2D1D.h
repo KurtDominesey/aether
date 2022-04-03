@@ -6,38 +6,47 @@
 
 namespace aether::pgd::sn {
 
-template <int zones2D, int zones1D, int groups2D, int groups1D>
 class Nonlinear2D1D {
  public:
-  using OneD = FixedSource2D1D<1, 1, zones1D, groups1D>;
-  using TwoD = FixedSource2D1D<2, 2, zones2D, groups2D>;
-  Nonlinear2D1D(OneD &oneD, TwoD &twoD, const Mgxs &mgxs);
+  Nonlinear2D1D(FixedSource2D1D<1> &one_d, FixedSource2D1D<2> &two_d, 
+                const std::vector<std::vector<int>> &materials,
+                const Mgxs &mgxs);
   void enrich();
   double iter();
  protected:
-  OneD &oneD;
-  TwoD &twoD;
+  FixedSource2D1D<1> &one_d;
+  FixedSource2D1D<2> &two_d;
   const Mgxs &mgxs;
-  std::array<std::array<int, zones2D>, zones1D> materials;
+  const std::vector<std::vector<int>> &materials;
 };
 
-template <int zones2D, int zones1D, int groups2D, int groups1D>
-Nonlinear2D1D<zones2D, zones1D, groups2D, groups1D>::Nonlinear2D1D(
-    OneD &oneD, TwoD &twoD, const Mgxs &mgxs) 
-    : oneD(oneD), twoD(twoD), mgxs(mgxs) {}
+Nonlinear2D1D::Nonlinear2D1D(
+    FixedSource2D1D<1> &one_d, FixedSource2D1D<2> &two_d, 
+    const std::vector<std::vector<int>> &materials, const Mgxs &mgxs) 
+    : one_d(one_d), two_d(two_d), materials(materials), mgxs(mgxs) {}
 
-template <int zones2D, int zones1D, int groups2D, int groups1D>
-void Nonlinear2D1D<zones2D, zones1D, groups2D, groups1D>::enrich() {
-  oneD.enrich();
-  twoD.enrich();
+void Nonlinear2D1D::enrich() {
+  one_d.enrich();
+  two_d.enrich();
+  // one_d.normalize();
+  two_d.normalize();
+  one_d.set_inner_prods();
+  two_d.set_inner_prods();
 }
 
-template <int zones2D, int zones1D, int groups2D, int groups1D>
-double Nonlinear2D1D<zones2D, zones1D, groups2D, groups1D>::iter() {
-  oneD.setup<zones2D, groups2D, zones1D, zones2D>(
-      twoD.iprods_flux, twoD.iprods_src, materials, mgxs);
-  twoD.setup<zones1D, groups1D, zones1D, zones2D>(
-      oneD.iprods_flux, oneD.iprods_src, materials, mgxs);
+double Nonlinear2D1D::iter() {
+  one_d.normalize();
+  one_d.set_inner_prods();
+  two_d.setup(one_d.iprods_flux, one_d.iprods_src, materials, mgxs);
+  double r2 = two_d.solve();
+  two_d.normalize();
+  two_d.set_inner_prods();
+  one_d.setup(two_d.iprods_flux, two_d.iprods_src, materials, mgxs);
+  double r1 = one_d.solve();
+  double r = std::sqrt(r2*r2+r1*r1);
+  std::cout << "2D: " << r2 << "  "
+            << "1D: " << r1 << "  "
+            << "2D/1D: " << r << "\n";
   return 0;
 }
 
