@@ -113,7 +113,8 @@ class Transport {
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>>
                  &boundary_conditions,
-             const bool transposing=false) const;
+             const bool transposing=false,
+             const double leakage_trans=0) const;
 
   /**
    * Compute \f$L^{-1}q\f$.
@@ -128,7 +129,8 @@ class Transport {
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>>
                  &boundary_conditions,
-             const bool transposing=false) const;
+             const bool transposing=false,
+             const double leakage_trans=0) const;
 
   /**
    * Compute \f$L^{-1}q\f$.
@@ -144,7 +146,8 @@ class Transport {
              const std::vector<double> &cross_sections,
              const std::vector<dealii::BlockVector<double>> 
                  &boundary_conditions,
-             const bool transposing=false) const;
+             const bool transposing=false,
+             const double leakage_trans=0) const;
   
   /**
    * Return the number of blocks in a column.
@@ -193,7 +196,8 @@ class Transport {
                     const std::vector<double> &cross_sections,
                     const std::vector<dealii::BlockVector<double>>
                         &boundary_conditions,
-                    const bool transposing=false) const;
+                    const bool transposing=false,
+                    const double leakage_trans=0) const;
 
   //! Discrete ordinates (sweep directions).
   std::vector<Ordinate> ordinates;

@@ -79,6 +79,9 @@ class TransportBlock {
   //! Whether the matrix is transposed
   bool transposed = false;
 
+  //! Transverse leakage
+  double leakage_trans;
+
  protected:
   //! The total material cross-sections.
   const std::vector<double> &cross_sections;
@@ -98,9 +101,10 @@ void TransportBlock<dim, qdim>::vmult(VectorType &dst, const VectorType &src,
   transposing = transposing != transposed;  // (A^T)^T = A
   if (homogeneous)
     transport.vmult(dst, src, cross_sections, boundary_conditions_zero,
-                    transposing);
+                    transposing, leakage_trans);
   else
-    transport.vmult(dst, src, cross_sections, boundary_conditions, transposing);
+    transport.vmult(dst, src, cross_sections, boundary_conditions, transposing,
+                    leakage_trans);
 }
 
 template <int dim, int qdim>

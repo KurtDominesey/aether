@@ -203,7 +203,8 @@ void Transport<dim, qdim>::vmult(dealii::Vector<double> &dst,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
                                      &boundary_conditions,
-                                 const bool transposing) const {
+                                 const bool transposing,
+                                 const double leakage_trans) const {
   dealii::BlockVector<double> dst_b(quadrature.size(), dof_handler.n_dofs());
   dealii::BlockVector<double> src_b(quadrature.size(), dof_handler.n_dofs());
   dst_b = dst;
@@ -218,7 +219,8 @@ void Transport<dim, qdim>::vmult(dealii::PETScWrappers::MPI::Vector &dst,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
                                      &boundary_conditions,
-                                 const bool transposing) const {
+                                 const bool transposing,
+                                 const double leakage_trans) const {
   dealii::PETScWrappers::MPI::BlockVector dst_b(quadrature.size(), 
                                                 dst.get_mpi_communicator(), 
                                                 dof_handler.n_dofs(),
@@ -250,7 +252,8 @@ void Transport<dim, qdim>::vmult(dealii::BlockVectorBase<Vector> &dst,
                                  const std::vector<double> &cross_sections,
                                  const std::vector<dealii::BlockVector<double>>
                                      &boundary_conditions,
-                                 const bool transposing) const {
+                                 const bool transposing,
+                                 const double leakage_trans) const {
   const std::vector<dealii::types::boundary_id> &boundaries =
       dof_handler.get_triangulation().get_boundary_ids();
   int num_natural_boundaries = boundaries.size();
@@ -264,7 +267,7 @@ void Transport<dim, qdim>::vmult(dealii::BlockVectorBase<Vector> &dst,
   int num_octants = octant_directions.size();
   for (int oct = 0; oct < num_octants; ++oct) {
     vmult_octant(oct, dst, src, cross_sections, boundary_conditions, 
-                 transposing);
+                 transposing, leakage_trans);
   }
 }
 
@@ -275,7 +278,8 @@ void Transport<dim, qdim>::vmult_octant(
     const dealii::BlockVectorBase<Vector> &src,
     const std::vector<double> &cross_sections,
     const std::vector<dealii::BlockVector<double>> &boundary_conditions,
-    const bool transposing) const {
+    const bool transposing,
+    const double leakage_trans) const {
   const std::vector<int> &octant_to_global = octants_to_global[oct];
   const dealii::FiniteElement<dim> &fe = dof_handler.get_fe();
   std::vector<dealii::types::global_dof_index> dof_indices(fe.dofs_per_cell);
@@ -302,6 +306,11 @@ void Transport<dim, qdim>::vmult_octant(
   for (int n_oct = 0; n_oct < octant_to_global.size(); ++n_oct) {
     const int n = octant_to_global[n_oct];
     const Ordinate ordinate = transposing ? -ordinates[n] : ordinates[n];
+    double leakage_trans_n = leakage_trans;
+    if (!quadrature.is_degenerate())
+      leakage_trans_n *= dim == 1 
+          ? std::sqrt(1-std::pow(quadrature.angle(n)[0], 2))
+          : quadrature.angle(n)[0];
     for (int s = 0; s < sweep_orders[n].size(); ++s) {
       int c = sweep_orders[n][transposing ? sweep_orders[n].size()-1-s : s];
       const ActiveCell &cell = cells[c];
@@ -309,7 +318,7 @@ void Transport<dim, qdim>::vmult_octant(
         continue;
       cell->get_dof_indices(dof_indices);
       int material = cell->material_id();
-      double cross_section = cross_sections[material];
+      double cross_section = cross_sections[material] + leakage_trans_n;
       const auto &matrices = cell_matrices[c];
       // assemble volume source
       for (int i = 0; i < dof_indices.size(); ++i)
@@ -424,38 +433,44 @@ template void Transport<1>::vmult<dealii::Vector<double>>(
     const dealii::BlockVectorBase<dealii::Vector<double>>&,
     const std::vector<double>&, 
     const std::vector<dealii::BlockVector<double>>&,
-    const bool) const;
+    const bool,
+    const double) const;
 template void Transport<2>::vmult<dealii::Vector<double>>(
     dealii::BlockVectorBase<dealii::Vector<double>>&, 
     const dealii::BlockVectorBase<dealii::Vector<double>>&,
     const std::vector<double>&, 
     const std::vector<dealii::BlockVector<double>>&,
-    const bool) const;
+    const bool,
+    const double) const;
 template void Transport<3>::vmult<dealii::Vector<double>>(
     dealii::BlockVectorBase<dealii::Vector<double>>&, 
     const dealii::BlockVectorBase<dealii::Vector<double>>&,
     const std::vector<double>&, 
     const std::vector<dealii::BlockVector<double>>&,
-    const bool) const;
+    const bool,
+    const double) const;
 // Vector is dealii::PETScWrappers::VectorBase
 template void Transport<1>::vmult<dealii::PETScWrappers::MPI::Vector>(
     dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
     const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
     const std::vector<double>&, 
     const std::vector<dealii::BlockVector<double>>&,
-    const bool) const;
+    const bool,
+    const double) const;
 template void Transport<2>::vmult<dealii::PETScWrappers::MPI::Vector>(
     dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
     const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
     const std::vector<double>&, 
     const std::vector<dealii::BlockVector<double>>&,
-    const bool) const;
+    const bool,
+    const double) const;
 template void Transport<3>::vmult<dealii::PETScWrappers::MPI::Vector>(
     dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&, 
     const dealii::BlockVectorBase<dealii::PETScWrappers::MPI::Vector>&,
     const std::vector<double>&, 
     const std::vector<dealii::BlockVector<double>>&,
-    const bool) const;
+    const bool,
+    const double) const;
 
 template struct CellMatrices<1>;
 template struct CellMatrices<2>;
