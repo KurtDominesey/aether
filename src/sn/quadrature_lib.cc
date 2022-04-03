@@ -73,7 +73,7 @@ template class QPglc<2>;
 template class QPglc<3>;
 
 QForwardBackward::QForwardBackward() : QAngle(
-    std::vector<dealii::Point<1>>{dealii::Point<1>(-1), dealii::Point<1>(+1)},
+    std::vector<dealii::Point<1>>{dealii::Point<1>(0), dealii::Point<1>(1)},
     std::vector<double>{0.5, 0.5}) {}
 
 int QForwardBackward::reflected_index(
