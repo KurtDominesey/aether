@@ -8,6 +8,26 @@ Mgxs& Mgxs::operator=(const Mgxs &other) {
   chi = other.chi;
   nu_fission = other.nu_fission;
   scatter = other.scatter;
+  return *this;
+}
+
+Mgxs& Mgxs::operator*=(const double s) {
+  for (int g = 0; g < num_groups; ++g) {
+    for (int j = 0; j < num_materials; ++j) {
+      total[g][j] *= s;
+      chi[g][j] *= s;
+      nu_fission[g][j] *= s;
+    }
+    for (int gp = 0; gp < num_groups; ++gp)
+      for (int j = 0; j < num_materials; ++j)
+        scatter[g][gp][j] *= s;
+  }
+  return *this;
+}
+
+Mgxs& Mgxs::operator/=(const double s) {
+  (*this) *= 1. / s;
+  return *this;
 }
 
 Mgxs read_mgxs(

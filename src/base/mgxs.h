@@ -47,6 +47,10 @@ struct Mgxs {
   //! Scattering matrix by incoming group, outgoing group, material, and
   //! Legendre order.
   std::vector<std::vector<std::vector<double>>> scatter;
+  //! Multiplication by a scalar
+  Mgxs& operator*=(const double s);
+  //! Division by a scalar
+  Mgxs& operator/=(const double s);
 };
 
 /**
