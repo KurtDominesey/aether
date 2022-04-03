@@ -312,6 +312,16 @@ template <int dim, int qdim>
 double Transport<dim, qdim>::inner_product(
     const dealii::Vector<double> &left, 
     const dealii::Vector<double> &right) const {
+  if (left.size() == this->dof_handler.n_dofs() && 
+      right.size() == this->dof_handler.n_dofs()) {
+    dealii::Vector<double> right_l2(right);
+    vmult_mass(right_l2, right);
+    return left * right_l2;
+  } else {
+    unsigned int size = this->quadrature.size() * this->dof_handler.n_dofs();
+    AssertDimension(size, left.size());
+    AssertDimension(size, right.size());
+  }
   dealii::BlockVector<double> left_b(this->quadrature.size(),
                                      this->dof_handler.n_dofs());
   dealii::BlockVector<double> right_b(this->quadrature.size(),
