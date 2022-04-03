@@ -65,6 +65,13 @@ class QAngle : public dealii::Quadrature<qdim> {
    */
   virtual int reflected_index(
       const int n, const dealii::Tensor<1, dim> &normal) const;
+   /**
+    * Whether the quadrature lacks meaningful polar angles.
+    * 
+    * For `qdim` == 1, this means there are two polar angles, {$\pm 1,\mp 1$}.
+    * For `qdim` == 2, this means all polar angles are zero.
+    */
+   bool is_degenerate() const;
  protected:
   //! Vector of quadrature angles.
   std::vector<dealii::Point<qdim>> quadrature_angles;
@@ -77,7 +84,14 @@ class QAngle : public dealii::Quadrature<qdim> {
    * To be called after quadrature points and weights have been set.
    */
   void q_angle_init();
+  //! Whether the quadrature lacks meaningful polar angles.
+  bool _is_degenerate = true;
 };
+
+template <int dim, int qdim>
+inline bool QAngle<dim, qdim>::is_degenerate() const {
+  return _is_degenerate;
+}
 
 }  // namespace aether::sn
 

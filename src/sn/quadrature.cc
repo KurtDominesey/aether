@@ -177,6 +177,8 @@ void QAngle<dim, qdim>::q_angle_init() {
     if (dim == 1)
       ordinates[n][0] = polar;
     else {
+      if (_is_degenerate)
+        _is_degenerate = !polar;
       double proj = std::sqrt(1 - std::pow(polar, 2));
       ordinates[n][0] = proj * std::cos(quadrature_angles[n][1]);
       ordinates[n][1] = proj * std::sin(quadrature_angles[n][1]);
@@ -184,6 +186,12 @@ void QAngle<dim, qdim>::q_angle_init() {
         ordinates[n][2] = polar;
     }
   }
+  if (qdim == 1 && this->size() == 2)
+    // check if angles are {-1, +1} or {+1, -1}
+    _is_degenerate = std::abs(this->angle(0)[0]) == 1 &&
+                     this->angle(1)[0] == (this->angle(0)[0] * -1);
+  else
+    _is_degenerate = false;
 }
 
 template <int dim, int qdim>
