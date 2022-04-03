@@ -198,8 +198,12 @@ TEST_P(Test2D1D, FixedSource) {
   std::vector<unsigned int> order2(dof_handler2.n_dofs());
   sort_dofs<1>(dof_handler1, order1);
   sort_dofs<2>(dof_handler2, order2);
-  dof_handler1.renumber_dofs(order1);
-  dof_handler2.renumber_dofs(order2);
+  std::vector<unsigned int> reorder1(dof_handler1.n_dofs());
+  std::vector<unsigned int> reorder2(dof_handler2.n_dofs());
+  for (int i = 0; i < dof_handler1.n_dofs(); ++i)
+    reorder1[order1[i]] = i;
+  for (int i = 0; i < dof_handler2.n_dofs(); ++i)
+    reorder2[order2[i]] = i;
   auto mgxs = create_mgxs(GetParam());
   aether::Mgxs mgxs1(num_groups1, num_segments, 1);
   aether::Mgxs mgxs2(num_groups2, num_areas, 1);
@@ -284,8 +288,8 @@ TEST_P(Test2D1D, FixedSource) {
       for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
         int ii = i * dof_handler2.n_dofs();
         for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-          phi.block(g)[ii+j] += fs1.prods[m].phi.block(g1)[i] *
-                                fs2.prods[m].phi.block(g2)[j];
+          phi.block(g)[ii+j] += fs1.prods[m].phi.block(g1)[reorder1[i]] *
+                                fs2.prods[m].phi.block(g2)[reorder2[j]];
         }
       }
     }
