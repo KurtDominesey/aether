@@ -34,6 +34,17 @@ int main (int argc, char **argv) {
 
 namespace takeda::lwr {
 
+enum Benchmark {
+  LWR = 1,
+  FBR,
+  FBR_HET_Z,
+  FBR_HEX_Z
+};
+
+enum MgDim {
+  BOTH, ONE, TWO
+};
+
 const int fe_degree = 1;
 const int num_groups = 2;
 const int num_areas = 3;
@@ -90,7 +101,8 @@ TEST_P(Test3D, FixedSource) {
   ));
   aether::sn::FixedSourceProblem<3> prob(dof_handler, quadrature, mgxs, bc);
   dealii::SolverControl control_wg(100, 1e-2);
-  dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+  dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg,
+      dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(32));
   aether::sn::FixedSourceGS fixed_src_gs(prob.fixed_source, solver_wg);
   dealii::BlockVector<double> src(
       num_groups, quadrature.size()*dof_handler.n_dofs());
@@ -107,8 +119,12 @@ TEST_P(Test3D, FixedSource) {
         phi.block(g));
     prob.m2d.vmult(src.block(g), phi.block(g));
   }
-  dealii::BlockVector<double> flux(src);
-  fixed_src_gs.vmult(flux, src);
+  dealii::BlockVector<double> flux(src.get_block_indices());
+  dealii::BlockVector<double> uncollided(src.get_block_indices());
+  for (int g = 0; g < num_groups; ++g)
+    prob.fixed_source.within_groups[g].transport.vmult(
+        uncollided.block(g), src.block(g), false);
+  fixed_src_gs.vmult(flux, uncollided);
   dealii::DataOut<3> data_out;
   data_out.attach_dof_handler(dof_handler);
   for (int g = 0; g < num_groups; ++g) {
@@ -145,7 +161,7 @@ class Test2D1D : public ::testing::TestWithParam<bool> {
 };
 
 const int num_groups2 = num_groups;
-const int num_groups1 = num_groups; //1;
+const int num_groups1 = num_groups;
 
 template <int dim>
 using DoF = std::tuple<
@@ -175,7 +191,7 @@ struct CompareDoF {
 template <int dim>
 void sort_dofs(dealii::DoFHandler<dim> &dof_handler, 
                std::vector<unsigned int> &renumbering) {
-  dealii::MappingQGeneric<dim> mapping(fe_degree*dim);
+  dealii::MappingQGeneric<dim> mapping(fe_degree);
   std::vector<dealii::Point<dim>> points(dof_handler.n_dofs());
   dealii::DoFTools::map_dofs_to_support_points(mapping, dof_handler, points);
   std::vector<DoF<dim>> dofs;
@@ -235,9 +251,15 @@ TEST_P(Test2D1D, FixedSource) {
   dealii::MappingQGeneric<1> mapping1(fe_degree);
   dealii::MappingQGeneric<2> mapping2(fe_degree);
   for (int g = 0; g < num_groups1; ++g) {
+    double intensity = 1;
+    if (num_groups1 == num_groups) {
+      intensity *= mgxs.chi[g][0];
+      if (num_groups2 == num_groups)
+        intensity = std::sqrt(intensity);
+    }
     const dealii::ScalarFunctionFromFunctionObject<1> func1(
-        [] (const dealii::Point<1> &p, unsigned int=0) {
-          return uniform_source<1>(1, p);});
+        [intensity] (const dealii::Point<1> &p, unsigned int=0) {
+          return uniform_source<1>(intensity, p);});
     std::map<dealii::types::material_id, const dealii::Function<1>*> funcs1;
     funcs1[0] = &func1;
     dealii::VectorTools::interpolate_based_on_material_id(
@@ -245,7 +267,12 @@ TEST_P(Test2D1D, FixedSource) {
     problem1.m2d.vmult(srcs1[0].block(g), phi1);
   }
   for (int g = 0; g < num_groups2; ++g) {
-    double intensity = mgxs.chi[g][0];
+    double intensity = 1;
+    if (num_groups2 == num_groups) {
+      intensity *= mgxs.chi[g][0];
+      if (num_groups1 == num_groups)
+        intensity = std::sqrt(intensity);
+    }
     const dealii::ScalarFunctionFromFunctionObject<2> func2(
         [intensity] (const dealii::Point<2> &p, unsigned int=0) {
           return uniform_source<2>(intensity, p);});
@@ -261,12 +288,17 @@ TEST_P(Test2D1D, FixedSource) {
   aether::pgd::sn::FixedSource2D1D<2> fs2(
       problem2.fixed_source, srcs2, problem2.transport, mgxs2);
   std::vector<std::vector<int>> materials{{0, 1, 2}, {1, 1, 2}};
-  aether::pgd::sn::Nonlinear2D1D nonlinear2D1D(fs1, fs2, materials, mgxs);
-  const int num_modes = 1;
+  aether::pgd::sn::Nonlinear2D1D nonlinear2D1D(fs1, fs2, materials, mgxs,
+      num_groups1 == num_groups2);
+  bool is_minimax = false;
+  fs1.is_minimax = is_minimax;
+  fs2.is_minimax = is_minimax;
+  const int num_modes = 5;
   for (int m = 0; m < num_modes; ++m) {
+    std::cout << "mode " << m << "\n";
     nonlinear2D1D.enrich();
-    for (int nl = 0; nl < 20; ++nl) {
-      nonlinear2D1D.iter();
+    for (int nl = 0; nl < 10; ++nl) {
+      double r = nonlinear2D1D.iter();
     }
   }
   // Expand solution

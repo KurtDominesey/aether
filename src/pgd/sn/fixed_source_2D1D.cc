@@ -17,7 +17,7 @@ FixedSource2D1D<dim, qdim>::FixedSource2D1D(
   src.reinit(mgxs_rom.num_groups, 
       transport.quadrature.size()*transport.dof_handler.n_dofs());
   uncollided.reinit(src);
-  iprods_src.resize(srcs.size());
+  iprods_src.resize(srcs.size(), std::vector<double>(mgxs_rom.num_groups));
   std::vector<dealii::types::global_dof_index> dof_indices(
       transport.dof_handler.get_fe().dofs_per_cell);
   for (const auto &cell : transport.dof_handler.active_cell_iterators()) {
@@ -49,19 +49,30 @@ void FixedSource2D1D<dim, qdim>::enrich() {
 }
 
 template <int dim, int qdim>
-void FixedSource2D1D<dim, qdim>::normalize() {
+void FixedSource2D1D<dim, qdim>::normalize(bool groupwise) {
   // double norm = 0;  //prods.back().psi.l2_norm();
+  std::vector<double> norms_trial(mgxs_rom.num_groups);
+  std::vector<double> norms_test(mgxs_rom.num_groups);
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
-    double norm = transport.inner_product(
-        prods.back().psi.block(g), prods.back().psi.block(g));
-    norm = std::sqrt(norm);
-    prods.back().psi.block(g) /= norm;
-    prods.back().phi.block(g) /= norm;
-    prods.back().streamed.block(g) /= norm;
-    double norm_test = transport.inner_product(
-        prods.back().test.block(g), prods.back().test.block(g));
-    norm_test = std::sqrt(norm_test);
-    prods.back().test.block(g) /= norm_test;
+    norms_trial[g] = std::sqrt(transport.inner_product(
+        prods.back().psi.block(g), 
+        prods.back().psi.block(g)));
+    norms_test[g] = std::sqrt(transport.inner_product(
+        prods.back().test.block(g), 
+        prods.back().test.block(g)));
+  }
+  if (!groupwise) {
+    norms_trial.assign(norms_trial.size(), 
+        std::accumulate(norms_trial.begin(), norms_trial.end(), 0.));
+    norms_test.assign(norms_test.size(), 
+        std::accumulate(norms_test.begin(), norms_test.end(), 0.));
+  }
+  // for (int g = (dim % 2); g < mgxs_rom.num_groups; g += 2) {
+  for (int g = 0; g < mgxs_rom.num_groups; ++g) {
+    prods.back().psi.block(g) /= norms_trial[g];
+    prods.back().phi.block(g) /= norms_trial[g];
+    prods.back().streamed.block(g) /= norms_trial[g];
+    prods.back().test.block(g) /= norms_test[g];
   }
 }
 
@@ -82,7 +93,7 @@ void FixedSource2D1D<dim, qdim>::set_inner_prods() {
   for (int m = 0; m < prods.size(); ++m)
     set_inner_prod_flux(prods.back().test, prods[m], iprods_flux[m]);
   for (int s = 0; s < srcs.size(); ++s)
-    iprods_src[s] = inner_prod_src(prods.back().test, srcs[s]);
+    set_inner_prod_src(prods.back().test, srcs[s], iprods_src[s]);
 }
 
 template <int dim, int qdim>
@@ -141,46 +152,38 @@ void FixedSource2D1D<dim, qdim>::set_inner_prod_flux(
 }
 
 template <int dim, int qdim>
-double FixedSource2D1D<dim, qdim>::inner_prod_src(
+void FixedSource2D1D<dim, qdim>::set_inner_prod_src(
     const dealii::BlockVector<double> &test,
-    const dealii::BlockVector<double> &src) {
-  double iprod = 0;
+    const dealii::BlockVector<double> &src_s,
+    std::vector<double> &iprod) {
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
     double du = 1;  // lethargy widths
-    iprod += transport.inner_product(test.block(g), src.block(g)) / du;
+    iprod[g] = transport.inner_product(test.block(g), src_s.block(g)) / du;
   }
-  return iprod;
 }
 
 template <int dim, int qdim>
 void FixedSource2D1D<dim, qdim>::setup(
     std::vector<InnerProducts2D1D> coeffs_flux,
-    const std::vector<double> &coeffs_src,
+    const std::vector<std::vector<double>> &coeffs_src,
     const std::vector<std::vector<int>> &materials,
     const Mgxs &mgxs) {
-  set_source(coeffs_src, coeffs_flux.back().stream_co);
+  std::vector<double> denom(coeffs_flux.back().stream_co);
+  set_source(coeffs_src);
   set_mgxs(coeffs_flux.back(), materials, mgxs);
   coeffs_flux.pop_back();
   set_residual(coeffs_flux, materials, mgxs);
+  rescale_residual(denom);
 }
 
 template <int dim, int qdim>
 void FixedSource2D1D<dim, qdim>::set_source(
-    const std::vector<double> &coeffs_src, 
-    const std::vector<double> &denom) {
+    const std::vector<std::vector<double>> &coeffs_src) {
   AssertDimension(coeffs_src.size(), srcs.size());
   src = 0;
-  for (int i = 0; i < srcs.size(); ++i)
-    src.add(coeffs_src[i], srcs[i]);
-  if (denom.size() == 1)
-    src /= denom[0];
-  else if (src.n_blocks() == 1)
-    src /= std::accumulate(denom.begin(), denom.end(), 0.);
-  else if (denom.size() == src.n_blocks())
-    for (int g = 0; g < denom.size(); ++g)
-      src.block(g) /= denom[g];
-  else
-    AssertThrow(false, dealii::ExcInvalidState());
+  for (int s = 0; s < srcs.size(); ++s)
+    for (int g = 0; g < mgxs_rom.num_groups; ++g)
+      src.block(g).add(coeffs_src[s][g], srcs[s].block(g));
 }
 
 template <int dim, int qdim>
@@ -199,52 +202,84 @@ void FixedSource2D1D<dim, qdim>::set_residual(
   if (mg_md)
     AssertDimension(num_groups, num_groups_md);
   for (int m = 0; m < prods.size()-1; ++m) {
-    for (int g = 0; g < mgxs.num_groups; ++g) {
-      int g_nd = mg_nd ? g : 0;
-      int g_md = mg_md ? g : 0;
-      // subtract streamed flux
-      for (int n = 0, nk = 0; n < transport.quadrature.size(); ++n)
-        for (int k = 0; k < dof_zones.size(); ++k, ++nk)
-          src.block(g_nd)[nk] -= coeffs_flux[m].stream_co[g_nd] * 
-                                 prods[m].streamed.block(g_nd)[nk];
-      for (int k = 0; k < scaling.size(); ++k) {
-        scaling[k] = 0;
-        for (int j = 0; j < coeffs_flux[m].rxn.num_materials; ++j) {
-          int matl = dim == 1 ? materials[j][dof_zones[k]]
-                              : materials[dof_zones[k]][j];
-          scaling[k] += mgxs.total[g][matl] * coeffs_flux[m].rxn.total[g_md][j];
-        }
-      }
-      // subtract collided flux
-      for (int n = 0, nk = 0; n < transport.quadrature.size(); ++n) {
-        double leakage_trans = dim == 1
-            ? std::sqrt(1-std::pow(transport.quadrature.angle(n)[0], 2))
-            : transport.quadrature.angle(n)[0];
-        leakage_trans *= coeffs_flux[m].stream_trans[g_nd];
-        for (int k = 0; k < dof_zones.size(); ++k, ++nk)
-          src.block(g_nd)[nk] -= (scaling[k] + leakage_trans) *
-                                 prods[m].psi.block(g_nd)[nk];
-      }
-      for (int gp = 0; gp < mgxs.num_groups; ++gp) {
-        int gp_nd = mg_nd ? gp : 0;
-        int gp_md = mg_md ? gp : 0;
-        for (int k = 0; k < scaling.size(); ++k) {
-          scaling[k] = 0;
-          for (int j = 0; j < coeffs_flux[m].rxn.num_materials; ++j) {
-            int matl = dim == 1 ? materials[j][dof_zones[k]]
-                                : materials[dof_zones[k]][j];
-            scaling[k] -= mgxs.scatter[g][gp][matl] *
-                          coeffs_flux[m].rxn.scatter[g_md][gp_md][j];
+    Mgxs mgxs_m(mgxs_rom);
+    mgxs_m *= 0;
+    for (int i = 0; i < mgxs_rom.num_materials; ++i) {
+      for (int j = 0; j < coeffs_flux[m].rxn.num_materials; ++j) {
+        int matl = dim == 1 ? materials[i][j] : materials[j][i];
+        for (int g = 0; g < mgxs.num_groups; ++g) {
+          int g_nd = mg_nd ? g : 0;
+          int g_md = mg_md ? g : 0;
+          mgxs_m.total[g_nd][i] += mgxs.total[g][matl] *
+                                   coeffs_flux[m].rxn.total[g_md][j];
+          for (int gp = 0; gp < mgxs.num_groups; ++gp) {
+            int gp_nd = mg_nd ? gp : 0;
+            int gp_md = mg_md ? gp : 0;
+            mgxs_m.scatter[g_nd][gp_nd][i] += 
+                mgxs.scatter[g][gp][matl] *
+                coeffs_flux[m].rxn.scatter[g_md][gp_md][j];
           }
-          // add (isotropic) scattered flux
-          for (int n = 0, nk = 0; n < transport.quadrature.size(); ++n)
-            for (int k = 0; k < dof_zones.size(); ++k, ++nk)
-              src.block(g_nd)[nk] += scaling[k] *
-                                     prods[m].phi.block(gp_nd)[k];
         }
       }
     }
+    std::vector<double> stream_co(num_groups_nd);
+    std::vector<double> stream_trans(num_groups_nd);
+    if (num_groups_md == 1) {
+      stream_co.assign(num_groups_nd, coeffs_flux[m].stream_co[0]);
+      stream_trans.assign(num_groups_nd, coeffs_flux[m].stream_trans[0]);
+    } else if (num_groups_md == num_groups_nd) {
+      stream_co = coeffs_flux[m].stream_co;
+      stream_trans = coeffs_flux[m].stream_trans;
+    } else {
+      AssertDimension(num_groups_nd, 1);
+      stream_co.assign(num_groups_nd, std::accumulate(
+          coeffs_flux[m].stream_co.begin(), 
+          coeffs_flux[m].stream_co.end(), 
+          0.));
+      stream_trans.assign(num_groups_nd, std::accumulate(
+          coeffs_flux[m].stream_trans.begin(), 
+          coeffs_flux[m].stream_trans.end(), 
+          0.));
+    }
+    for (int g = 0; g < mgxs_m.num_groups; ++g) {
+      // subtract streamed flux
+      for (int n = 0, nk = 0; n < transport.quadrature.size(); ++n)
+        for (int k = 0; k < dof_zones.size(); ++k, ++nk)
+          src.block(g)[nk] -= stream_co[g] * prods[m].streamed.block(g)[nk];
+      // subtract collided flux
+      for (int n = 0, nk = 0; n < transport.quadrature.size(); ++n) {
+        double leakage_trans = stream_trans[g];
+        if (!transport.quadrature.is_degenerate())
+          leakage_trans *= dim == 1
+              ? std::sqrt(1-std::pow(transport.quadrature.angle(n)[0], 2))
+              : transport.quadrature.angle(n)[0];
+        for (int k = 0; k < dof_zones.size(); ++k, ++nk)
+          src.block(g)[nk] -= (mgxs_m.total[g][dof_zones[k]] + leakage_trans) *
+                              prods[m].psi.block(g)[nk];
+      }
+      for (int gp = 0; gp < mgxs_m.num_groups; ++gp) {
+        // add (isotropic) scattered flux
+        for (int n = 0, nk = 0; n < transport.quadrature.size(); ++n)
+          for (int k = 0; k < dof_zones.size(); ++k, ++nk)
+            src.block(g)[nk] += mgxs_m.scatter[g][gp][dof_zones[k]] *
+                                prods[m].phi.block(gp)[k];
+      }
+    }
   }
+}
+
+template <int dim, int qdim>
+void FixedSource2D1D<dim, qdim>::rescale_residual(
+    const std::vector<double> &denom) {
+  if (denom.size() == 1)
+    src /= denom[0];
+  else if (src.n_blocks() == 1)
+    src /= std::accumulate(denom.begin(), denom.end(), 0.);
+  else if (denom.size() == src.n_blocks())
+    for (int g = 0; g < denom.size(); ++g)
+      src.block(g) /= denom[g];
+  else
+    AssertThrow(false, dealii::ExcInvalidState());
 }
 
 template <int dim, int qdim>
@@ -260,6 +295,10 @@ void FixedSource2D1D<dim, qdim>::set_mgxs(
     AssertDimension(num_groups, num_groups_nd);
   if (mg_md)
     AssertDimension(num_groups, num_groups_md);
+  std::vector<double> stream_co(coeff_flux.stream_co);
+  if (mg_md && !mg_nd)
+    stream_co.assign(num_groups_md, 
+        std::accumulate(stream_co.begin(), stream_co.end(), 0.));
   mgxs_rom *= 0;
   for (int i = 0; i < mgxs_rom.num_materials; ++i) {
     for (int j = 0; j < coeff_flux.rxn.num_materials; ++j) {
@@ -269,14 +308,14 @@ void FixedSource2D1D<dim, qdim>::set_mgxs(
         int g_md = mg_md ? g : 0;
         mgxs_rom.total[g_nd][i] += mgxs.total[g][matl] *
                                    coeff_flux.rxn.total[g_md][j] /
-                                   coeff_flux.stream_co[g_md];
+                                   stream_co[g_md];
         for (int gp = 0; gp < mgxs.num_groups; ++gp) {
           int gp_nd = mg_nd ? gp : 0;
           int gp_md = mg_md ? gp : 0;
           mgxs_rom.scatter[g_nd][gp_nd][i] += 
               mgxs.scatter[g][gp][matl] *
               coeff_flux.rxn.scatter[g_md][gp_md][j] /
-              coeff_flux.stream_co[g_md];
+              stream_co[g_md];
         }
       }
     }
@@ -287,7 +326,7 @@ void FixedSource2D1D<dim, qdim>::set_mgxs(
     int g_nd = mg_nd ? g : 0;
     int g_md = mg_md ? g : 0;
     const_cast<double&>(fixed_src.within_groups[g_nd].transport.leakage_trans) += 
-        coeff_flux.stream_trans[g_md];
+        coeff_flux.stream_trans[g_md] / stream_co[g_md];
   }
 }
 
@@ -321,17 +360,19 @@ double FixedSource2D1D<dim, qdim>::solve() {
 
 template <int dim, int qdim>
 double FixedSource2D1D<dim, qdim>::solve_forward() {
-  dealii::ReductionControl control(500, 1e-2, 1e-8);
-  // dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
-  //     dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
-  dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
+  dealii::ReductionControl control_wg(100, 1e-4, 1e-9);
+  dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
+  aether::sn::FixedSourceGS fixed_src_gs(fixed_src, solver_wg);
+  dealii::ReductionControl control(500, 1e-4, 1e-8);
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
+      dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
+  // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
   uncollided = 0;
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
     fixed_src.within_groups[g].transport.vmult(
         uncollided.block(g), src.block(g), false);
   }
-  solver.solve(fixed_src, prods.back().psi, uncollided, 
-               dealii::PreconditionIdentity());
+  solver.solve(fixed_src, prods.back().psi, uncollided, fixed_src_gs);
   set_products(prods.back());
   return control.initial_value() / uncollided.l2_norm();
 }

@@ -9,6 +9,7 @@
 
 #include "base/mgxs.h"
 #include "sn/fixed_source.h"
+#include "sn/fixed_source_gs.h"
 #include "sn/quadrature.h"
 #include "pgd/sn/transport.h"
 #include "pgd/sn/transport_block.h"
@@ -35,26 +36,26 @@ class FixedSource2D1D {
                   const Transport<dim, qdim> &transport,
                   Mgxs &mgxs_rom);
   void enrich();
-  void normalize();
+  void normalize(bool groupwise);
   void setup(std::vector<InnerProducts2D1D> coeffs_flux,
-             const std::vector<double> &coeffs_src,
+             const std::vector<std::vector<double>> &coeffs_src,
              const std::vector<std::vector<int>> &materials,
              const Mgxs &mgxs);
   double solve();
   void set_inner_prods();
   std::vector<Products> prods;
   std::vector<InnerProducts2D1D> iprods_flux;
-  std::vector<double> iprods_src;
+  std::vector<std::vector<double>> iprods_src;
   bool is_minimax = false;
  protected:
   void set_products(Products &prod);
   void set_inner_prod_flux(const dealii::BlockVector<double> &test,
                            const Products &prod,
                            InnerProducts2D1D &iprod);
-  double inner_prod_src(const dealii::BlockVector<double> &test,
-                        const dealii::BlockVector<double> &src);
-  void set_source(const std::vector<double> &coeffs_src,
-                  const std::vector<double> &denom);
+  void set_inner_prod_src(const dealii::BlockVector<double> &test,
+                          const dealii::BlockVector<double> &src_s,
+                          std::vector<double> &iprod);
+  void set_source(const std::vector<std::vector<double>> &coeffs_src);
   void set_residual(
       const std::vector<InnerProducts2D1D> &coeffs_flux,
       const std::vector<std::vector<int>> &materials,
@@ -65,6 +66,7 @@ class FixedSource2D1D {
   void check_mgxs();
   double solve_forward();
   double solve_adjoint();
+  void rescale_residual(const std::vector<double> &denom);
   const aether::sn::FixedSource<dim, qdim> &fixed_src;
   const std::vector<dealii::BlockVector<double>> &srcs;
   Mgxs &mgxs_rom;

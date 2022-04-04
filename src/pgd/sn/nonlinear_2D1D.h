@@ -10,7 +10,8 @@ class Nonlinear2D1D {
  public:
   Nonlinear2D1D(FixedSource2D1D<1> &one_d, FixedSource2D1D<2> &two_d, 
                 const std::vector<std::vector<int>> &materials,
-                const Mgxs &mgxs);
+                const Mgxs &mgxs,
+                bool both_mg);
   void enrich();
   double iter();
  protected:
@@ -18,6 +19,7 @@ class Nonlinear2D1D {
   FixedSource2D1D<2> &two_d;
   const Mgxs &mgxs;
   const std::vector<std::vector<int>> &materials;
+  bool both_mg;
 };
 
 }  // namespace aether::pgd::sn
