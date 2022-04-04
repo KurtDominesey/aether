@@ -1084,8 +1084,7 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
         dof_handler, quadrature, mgxs_one, boundary_conditions, num_modes_s);
     // normalize
     for (int m = 0; m < num_modes_s; ++m) {
-      double norm_m = subspace_problem.transport.inner_product(
-          fixed_source_p.caches[m].mode.block(0), 
+      double norm_m = subspace_problem.transport.norm(
           fixed_source_p.caches[m].mode.block(0));
       fixed_source_p.caches[m].mode /= norm_m;
       energy_mg.modes[m] *= norm_m;
@@ -1104,8 +1103,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
     }
     double rayleigh = 0;
     if (guess_spatioangular) {
-      double norm_0 = subspace_problem.transport.inner_product(
-          modes.block(0), modes.block(0));
+      double norm_0 = subspace_problem.transport.norm(
+          modes.block(0));
       modes.block(0) /= norm_0;
       dealii::BlockVector<double> ax(modes);
       dealii::BlockVector<double> bx(modes);
@@ -1119,8 +1118,8 @@ void CompareTest<dim, qdim>::Compare(int num_modes,
       solver_sa.solve(subspace_problem.fixed_source_s, modes, ax, 
                       subspace_problem.fixed_source_s_gs);
       for (int m = 0; m < num_modes_s; ++m) {
-        double norm_m = subspace_problem.transport.inner_product(
-            modes.block(m), modes.block(m));
+        double norm_m = subspace_problem.transport.norm(
+            modes.block(m));
         modes.block(m) /= norm_m;
       }
       subspace_problem.fission_s.vmult(ax, modes);

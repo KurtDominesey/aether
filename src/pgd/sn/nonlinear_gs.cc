@@ -542,7 +542,7 @@ double NonlinearGS::line_search(
       double width = std::log(energy_mg.mgxs.group_structure[gg+1]
                               /energy_mg.mgxs.group_structure[gg]);
       width = 1;
-      c += std::pow(transport.inner_product(a, b), 2) / width;
+      c += transport.inner_product(a, b) / width;
     }
     // return c;
     return a * b;

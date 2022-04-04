@@ -65,7 +65,7 @@ class Transport : public aether::sn::Transport<dim, qdim> {
 template <int dim, int qdim>
 template <typename VectorType>
 double Transport<dim, qdim>::norm(const VectorType &v) const {
-  return inner_product(v, v);
+  return std::sqrt(inner_product(v, v));
 }
 
 }  // namespace aether::pgd::sn

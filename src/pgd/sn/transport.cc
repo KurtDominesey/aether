@@ -340,7 +340,7 @@ double Transport<dim, qdim>::inner_product(
   double sq = 0;
   for (int n = 0; n < this->quadrature.size(); ++n)
     sq += this->quadrature.weight(n) * (left.block(n) * right_l2.block(n));
-  return std::sqrt(sq);
+  return sq;
 }
 
 template class Transport<1>;
