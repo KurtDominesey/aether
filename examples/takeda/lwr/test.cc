@@ -34,14 +34,14 @@ int main (int argc, char **argv) {
 
 namespace takeda::lwr {
 
-enum Benchmark {
+enum Benchmark : int {
   LWR = 1,
-  FBR,
+  FBR_SMALL,
   FBR_HET_Z,
   FBR_HEX_Z
 };
 
-enum MgDim {
+enum MgDim  : int {
   BOTH, ONE, TWO
 };
 
@@ -141,7 +141,9 @@ INSTANTIATE_TEST_CASE_P(Rod, Test3D, ::testing::Bool(),
   return info.param ? "Rodded" : "Unrodded";
 });
 
-class Test2D1D : public ::testing::TestWithParam<bool> {
+using Param2D1D = std::tuple<bool, bool, int, bool>;
+
+class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
  protected:
   dealii::Triangulation<1> mesh1;
   dealii::Triangulation<2> mesh2;
@@ -159,9 +161,6 @@ class Test2D1D : public ::testing::TestWithParam<bool> {
     dof_handler2.initialize(mesh2, fe2);
   }
 };
-
-const int num_groups2 = num_groups;
-const int num_groups1 = num_groups;
 
 template <int dim>
 using DoF = std::tuple<
@@ -210,6 +209,12 @@ void sort_dofs(dealii::DoFHandler<dim> &dof_handler,
 }
 
 TEST_P(Test2D1D, FixedSource) {
+  const bool is_rodded = std::get<0>(GetParam());
+  const bool axial_polar = std::get<1>(GetParam());
+  const bool is_minimax = std::get<3>(GetParam());
+  const int mg_dim = std::get<2>(GetParam());
+  const int num_groups2 = (mg_dim == BOTH || mg_dim == TWO) ? num_groups : 1;
+  const int num_groups1 = (mg_dim == BOTH || mg_dim == ONE) ? num_groups : 1;
   std::vector<unsigned int> order1(dof_handler1.n_dofs());
   std::vector<unsigned int> order2(dof_handler2.n_dofs());
   sort_dofs<1>(dof_handler1, order1);
@@ -220,11 +225,19 @@ TEST_P(Test2D1D, FixedSource) {
     reorder1[order1[i]] = i;
   for (int i = 0; i < dof_handler2.n_dofs(); ++i)
     reorder2[order2[i]] = i;
-  auto mgxs = create_mgxs(GetParam());
+  auto mgxs = create_mgxs(is_rodded);
   aether::Mgxs mgxs1(num_groups1, num_segments, 1);
   aether::Mgxs mgxs2(num_groups2, num_areas, 1);
-  aether::sn::QPglc<2> quadrature2(4, 4);
-  aether::sn::QForwardBackward quadrature1;
+  const aether::sn::QPglc<2> quadrature2(axial_polar ? 0 : 4, 4);
+  const aether::sn::QPglc<1> q_gauss(4);
+  const aether::sn::QForwardBackward q_fb;
+  const aether::sn::QAngle<1> &quadrature1 = axial_polar
+      ? static_cast<const aether::sn::QAngle<1>&>(q_gauss) 
+      : static_cast<const aether::sn::QAngle<1>&>(q_fb);
+  AssertThrow(axial_polar == !quadrature1.is_degenerate(), 
+      dealii::ExcInvalidState());
+  AssertThrow(axial_polar == quadrature2.is_degenerate(), 
+      dealii::ExcInvalidState());
   bc1.resize(num_groups1, std::vector<dealii::BlockVector<double>>(1,
       dealii::BlockVector<double>(
           quadrature1.size(),
@@ -290,7 +303,6 @@ TEST_P(Test2D1D, FixedSource) {
   std::vector<std::vector<int>> materials{{0, 1, 2}, {1, 1, 2}};
   aether::pgd::sn::Nonlinear2D1D nonlinear2D1D(fs1, fs2, materials, mgxs,
       num_groups1 == num_groups2);
-  bool is_minimax = false;
   fs1.is_minimax = is_minimax;
   fs2.is_minimax = is_minimax;
   const int num_modes = 5;
@@ -356,9 +368,26 @@ TEST_P(Test2D1D, FixedSource) {
   data_out2.write_vtu(vtu_out2);
 }
 
-INSTANTIATE_TEST_CASE_P(Rod, Test2D1D, ::testing::Bool(),
-    [](const testing::TestParamInfo<bool>& info) {
-  return info.param ? "Rodded" : "Unrodded";
-});
+INSTANTIATE_TEST_CASE_P(Params, Test2D1D, ::testing::Combine(
+    ::testing::Bool(), ::testing::Bool(), ::testing::Range(0, 3), 
+    ::testing::Values(false)  // just Galerkin, no Minimax for now
+  ),
+  [] (const testing::TestParamInfo<Param2D1D>& info) {
+    std::string name;
+    name += "Rod";
+    name += std::get<0>(info.param) ? "Y" : "N";
+    name += "Pol";
+    name += std::get<1>(info.param) ? "1" : "2";
+    name += "Mg";
+    switch (std::get<2>(info.param)) {
+      case BOTH: name += "B"; break;
+      case ONE: name += "1"; break;
+      case TWO: name += "2"; break;
+      default: AssertThrow(false, dealii::ExcInvalidState());
+    }
+    name += std::get<3>(info.param) ? "Mmx" : "Gal";
+    return name;
+  }
+);
 
 }  // namespace takeda::lwr
