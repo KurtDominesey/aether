@@ -34,11 +34,11 @@ dealii::Quadrature<1> impose_polar_symmetry(
   for (int n = 0, nn = 0; nn < quadrature.size(); ++n, ++nn) {
     if (points[n][0] > 0.5) {
       weights[n] *= 2;
-      continue;
+    } else if (points[n][0] < 0.5) {
+      points.erase(points.begin() + n);
+      weights.erase(weights.begin() + n);
+      --n;
     }
-    points.erase(points.begin() + n);
-    weights.erase(weights.begin() + n);
-    --n;
   }
   return dealii::Quadrature<1>(points, weights);
 }
@@ -63,11 +63,11 @@ QAngle<dim, qdim>::QAngle(
     for (int n = 0, nn = 0; nn < sub_quadrature.size(); ++n, ++nn) {
       if (points[n][0] > 0.5) {
         weights[n] *= 2;
-        continue;
+      } else if (points[n][0] < 0.5) {
+        points.erase(points.begin() + n);
+        weights.erase(weights.begin() + n);
+        --n;
       }
-      points.erase(points.begin() + n);
-      weights.erase(weights.begin() + n);
-      --n;
     }
     Assert(points.size() == weights.size(), dealii::ExcInvalidState());
     Assert(weights.size() == sub_quadrature.size() / 2,
@@ -162,23 +162,27 @@ template <int dim, int qdim>
 void QAngle<dim, qdim>::q_angle_init() {
   if (dim == 2)  // assert polar symmetry
     for (int n = 0; n < this->size(); ++n)
-      Assert(this->quadrature_points[n][0] > 0.5,
+      Assert(this->quadrature_points[n][0] >= 0.5,
              dealii::ExcImpossibleInDimSpacedim(qdim, dim));
   quadrature_angles = this->quadrature_points;
   for (int n = 0; n < quadrature_angles.size(); ++n) {
-    quadrature_angles[n][0] *= 2;
-    quadrature_angles[n][0] -= 1;
+    if (quadrature_angles[n][0] == 0.5) {
+      quadrature_angles[n][0] = 0.0;  // exactly zero, no FP error
+    } else {
+      quadrature_angles[n][0] *= 2;
+      quadrature_angles[n][0] -= 1;
+    }
     if (qdim == 2)
       quadrature_angles[n][1] *= 2 * dealii::numbers::PI;
   }
   ordinates.resize(quadrature_angles.size(), dealii::Point<dim>());
   for (int n = 0; n < quadrature_angles.size(); ++n) {
     const double polar = quadrature_angles[n][0];
-    if (dim == 1)
+    if (dim == 1) {
       ordinates[n][0] = polar;
-    else {
+    } else {
       if (_is_degenerate)
-        _is_degenerate = !polar;
+        _is_degenerate = this->quadrature_points[n][0] == 0.5;
       double proj = std::sqrt(1 - std::pow(polar, 2));
       ordinates[n][0] = proj * std::cos(quadrature_angles[n][1]);
       ordinates[n][1] = proj * std::sin(quadrature_angles[n][1]);
@@ -186,12 +190,14 @@ void QAngle<dim, qdim>::q_angle_init() {
         ordinates[n][2] = polar;
     }
   }
-  if (qdim == 1 && this->size() == 2)
-    // check if angles are {-1, +1} or {+1, -1}
-    _is_degenerate = std::abs(this->angle(0)[0]) == 1 &&
-                     this->angle(1)[0] == (this->angle(0)[0] * -1);
-  else
-    _is_degenerate = false;
+  if (qdim == 1) {
+    if (this->size() == 2)
+      // check if angles are {-1, +1} or {+1, -1}
+      _is_degenerate = std::abs(this->angle(0)[0]) == 1 &&
+                       this->angle(1)[0] == (this->angle(0)[0] * -1);
+    else
+      _is_degenerate = false;
+  }
 }
 
 template <int dim, int qdim>
