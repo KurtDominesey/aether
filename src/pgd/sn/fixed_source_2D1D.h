@@ -70,6 +70,13 @@ class FixedSource2D1D {
   const aether::sn::FixedSource<dim, qdim> &fixed_src;
   const std::vector<dealii::BlockVector<double>> &srcs;
   Mgxs &mgxs_rom;
+  dealii::ReductionControl control_wg;
+  dealii::ReductionControl control;
+  using SolverWG = dealii::SolverGMRES<dealii::Vector<double>>;
+  using Solver = dealii::SolverGMRES<dealii::BlockVector<double>>;
+  SolverWG solver_wg;
+  Solver solver;
+  aether::sn::FixedSourceGS<SolverWG, dim, qdim> fixed_src_gs;
   dealii::BlockVector<double> src;
   dealii::BlockVector<double> uncollided;
   std::vector<int> dof_zones;

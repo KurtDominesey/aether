@@ -12,7 +12,12 @@ FixedSource2D1D<dim, qdim>::FixedSource2D1D(
       srcs(srcs),
       transport(transport),
       dof_zones(transport.dof_handler.n_dofs()), 
-      mgxs_rom(mgxs_rom) {
+      mgxs_rom(mgxs_rom),
+      control_wg(100, 1e-3, 1e-7),
+      solver_wg(control_wg, SolverWG::AdditionalData(32)),
+      control(100, 1e-2, 1e-6),
+      solver(control, Solver::AdditionalData(32)),
+      fixed_src_gs(fixed_src, solver_wg) {
   scaling.reinit(transport.dof_handler.n_dofs());
   src.reinit(mgxs_rom.num_groups, 
       transport.quadrature.size()*transport.dof_handler.n_dofs());
@@ -360,13 +365,6 @@ double FixedSource2D1D<dim, qdim>::solve() {
 
 template <int dim, int qdim>
 double FixedSource2D1D<dim, qdim>::solve_forward() {
-  dealii::ReductionControl control_wg(100, 1e-4, 1e-9);
-  dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg);
-  aether::sn::FixedSourceGS fixed_src_gs(fixed_src, solver_wg);
-  dealii::ReductionControl control(500, 1e-4, 1e-8);
-  dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
-      dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
-  // dealii::SolverRichardson<dealii::BlockVector<double>> solver(control);
   uncollided = 0;
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
     fixed_src.within_groups[g].transport.vmult(
@@ -379,17 +377,15 @@ double FixedSource2D1D<dim, qdim>::solve_forward() {
 
 template <int dim, int qdim>
 double FixedSource2D1D<dim, qdim>::solve_adjoint() {
-  dealii::ReductionControl control(500, 1e-4, 1e-8);
-  dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
-      dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(32));
   uncollided = 0;
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
     fixed_src.within_groups[g].transport.Tvmult(
         uncollided.block(g), prods.back().psi.block(g), false);
   }
+  fixed_src_gs.transposed = !fixed_src_gs.transposed;
   const_cast<bool&>(fixed_src.transposed) = !fixed_src.transposed;
-  solver.solve(fixed_src, prods.back().test, uncollided, 
-               dealii::PreconditionIdentity());
+  solver.solve(fixed_src, prods.back().test, uncollided, fixed_src_gs);
+  fixed_src_gs.transposed = !fixed_src_gs.transposed;
   const_cast<bool&>(fixed_src.transposed) = !fixed_src.transposed;
   return control.initial_value() / uncollided.l2_norm();
 }
