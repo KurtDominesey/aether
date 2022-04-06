@@ -315,7 +315,7 @@ double Transport<dim, qdim>::inner_product(
   if (left.size() == this->dof_handler.n_dofs() && 
       right.size() == this->dof_handler.n_dofs()) {
     dealii::Vector<double> right_l2(right);
-    vmult_mass(right_l2, right);
+    collide_ordinate(right_l2, right);
     return left * right_l2;
   } else {
     unsigned int size = this->quadrature.size() * this->dof_handler.n_dofs();
