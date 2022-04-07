@@ -56,7 +56,12 @@ const std::string dir_out = "out/";
 const int fe_degree = 1;
 const int num_groups = 2;
 const int num_areas = 3;
-const int num_segments = 2; 
+const int num_segments = 2;
+
+
+///////////////////////
+// 3D Test (Ref. Soln.)
+///////////////////////
 
 class Test3D : public ::testing::TestWithParam<bool> {
  protected:
@@ -153,26 +158,10 @@ INSTANTIATE_TEST_CASE_P(Rod, Test3D, ::testing::Bool(),
   return info.param ? "Rodded" : "Unrodded";
 });
 
-using Param2D1D = std::tuple<bool, bool, int, bool>;
 
-class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
- protected:
-  dealii::Triangulation<1> mesh1;
-  dealii::Triangulation<2> mesh2;
-  dealii::DoFHandler<1> dof_handler1;
-  dealii::DoFHandler<2> dof_handler2;
-  std::vector<std::vector<dealii::BlockVector<double>>> bc1;
-  std::vector<std::vector<dealii::BlockVector<double>>> bc2;
-
-  void SetUp() override {
-    create_mesh(mesh1);
-    create_mesh(mesh2);
-    dealii::FE_DGQ<1> fe1(1);
-    dealii::FE_DGQ<2> fe2(1);
-    dof_handler1.initialize(mesh1, fe1);
-    dof_handler2.initialize(mesh2, fe2);
-  }
-};
+//////////////
+// 2D/1D Tests
+//////////////
 
 template <int dim>
 using DoF = std::tuple<
@@ -199,9 +188,15 @@ struct CompareDoF {
   }
 };
 
+/**
+ * Sort DoFs by z-, y-, and x-coordinates (in that order).
+ * 
+ * The returned numbering is the opposite of that which should be passed to
+ * dealii::DoFHandler<dim>.renumber_dofs.
+ */
 template <int dim>
-void sort_dofs(dealii::DoFHandler<dim> &dof_handler, 
-               std::vector<unsigned int> &renumbering) {
+std::vector<unsigned int> sort_dofs(dealii::DoFHandler<dim> &dof_handler) {
+  std::vector<unsigned int> renumbering(dof_handler.n_dofs());
   dealii::MappingQGeneric<dim> mapping(fe_degree);
   std::vector<dealii::Point<dim>> points(dof_handler.n_dofs());
   dealii::DoFTools::map_dofs_to_support_points(mapping, dof_handler, points);
@@ -217,51 +212,128 @@ void sort_dofs(dealii::DoFHandler<dim> &dof_handler,
   CompareDoF<dim> comparator;
   std::stable_sort(dofs.begin(), dofs.end(), comparator);
   for (unsigned int i = 0; i < dof_handler.n_dofs(); ++i)
-    renumbering[std::get<2>(dofs[i])] = i;
+    renumbering[i] = std::get<2>(dofs[i]);
+  return renumbering;
 }
 
-TEST_P(Test2D1D, FixedSource) {
+using Param2D1D = std::tuple<bool, bool, int, bool>;
+
+class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
+ protected:
   const bool is_rodded = std::get<0>(GetParam());
   const bool axial_polar = std::get<1>(GetParam());
   const bool is_minimax = std::get<3>(GetParam());
   const int mg_dim = std::get<2>(GetParam());
   const int num_groups2 = (mg_dim == BOTH || mg_dim == TWO) ? num_groups : 1;
   const int num_groups1 = (mg_dim == BOTH || mg_dim == ONE) ? num_groups : 1;
-  std::vector<unsigned int> order1(dof_handler1.n_dofs());
-  std::vector<unsigned int> order2(dof_handler2.n_dofs());
-  sort_dofs<1>(dof_handler1, order1);
-  sort_dofs<2>(dof_handler2, order2);
-  std::vector<unsigned int> reorder1(dof_handler1.n_dofs());
-  std::vector<unsigned int> reorder2(dof_handler2.n_dofs());
-  for (int i = 0; i < dof_handler1.n_dofs(); ++i)
-    reorder1[order1[i]] = i;
-  for (int i = 0; i < dof_handler2.n_dofs(); ++i)
-    reorder2[order2[i]] = i;
-  auto mgxs = create_mgxs(is_rodded);
-  aether::Mgxs mgxs1(num_groups1, num_segments, 1);
-  aether::Mgxs mgxs2(num_groups2, num_areas, 1);
-  const aether::sn::QPglc<2> quadrature2(axial_polar ? 0 : 4, 4);
-  const aether::sn::QPglc<1> q_gauss(4);
+  const aether::Mgxs mgxs = create_mgxs(is_rodded);
+  aether::Mgxs mgxs1{num_groups1, num_segments, 1};
+  aether::Mgxs mgxs2{num_groups2, num_areas, 1};
+  const aether::sn::QPglc<2> quadrature2{axial_polar ? 0 : 4, 4};
+  const aether::sn::QPglc<1> q_gauss{4};
   const aether::sn::QForwardBackward q_fb;
   const aether::sn::QAngle<1> &quadrature1 = axial_polar
       ? static_cast<const aether::sn::QAngle<1>&>(q_gauss) 
       : static_cast<const aether::sn::QAngle<1>&>(q_fb);
-  AssertThrow(axial_polar == !quadrature1.is_degenerate(), 
-      dealii::ExcInvalidState());
-  AssertThrow(axial_polar == quadrature2.is_degenerate(), 
-      dealii::ExcInvalidState());
-  bc1.resize(num_groups1, std::vector<dealii::BlockVector<double>>(1,
-      dealii::BlockVector<double>(
-          quadrature1.size(),
-          dof_handler1.get_fe().dofs_per_cell
-      )
-  ));
-  bc2.resize(num_groups2, std::vector<dealii::BlockVector<double>>(1,
-      dealii::BlockVector<double>(
-          quadrature2.size(),
-          dof_handler2.get_fe().dofs_per_cell
-      )
-  ));
+  const aether::sn::QPglc<3> quadrature3{4, 4};
+  const dealii::FE_DGQ<1> fe1{fe_degree};
+  const dealii::FE_DGQ<2> fe2{fe_degree};
+  const dealii::FE_DGQ<3> fe3{fe_degree};
+  dealii::Triangulation<1> mesh1;
+  dealii::Triangulation<2> mesh2;
+  dealii::Triangulation<3> mesh3;
+  dealii::DoFHandler<1> dof_handler1;
+  dealii::DoFHandler<2> dof_handler2;
+  dealii::DoFHandler<3> dof_handler3;
+  std::vector<unsigned int> order1, order2, order3;
+  dealii::MappingQGeneric<1> mapping1{fe_degree};
+  dealii::MappingQGeneric<2> mapping2{fe_degree};
+  const std::vector<std::vector<dealii::BlockVector<double>>> bc1{
+    num_groups, std::vector<dealii::BlockVector<double>>{
+      1, dealii::BlockVector<double>{quadrature1.size(), fe1.dofs_per_cell}
+    }
+  };
+  const std::vector<std::vector<dealii::BlockVector<double>>> bc2{
+    num_groups, std::vector<dealii::BlockVector<double>>{
+      1, dealii::BlockVector<double>{quadrature2.size(), fe2.dofs_per_cell}
+    }
+  };
+  
+  void SetUp() override {
+    AssertThrow(axial_polar == !quadrature1.is_degenerate(), 
+        dealii::ExcInvalidState());
+    AssertThrow(axial_polar == quadrature2.is_degenerate(), 
+        dealii::ExcInvalidState());
+    create_mesh(mesh1);
+    create_mesh(mesh2);
+    create_mesh(mesh3);
+    dof_handler1.initialize(mesh1, fe1);
+    dof_handler2.initialize(mesh2, fe2);
+    dof_handler3.initialize(mesh3, fe3);
+    AssertThrow(dof_handler3.n_dofs() == 
+                dof_handler1.n_dofs()*dof_handler2.n_dofs(),
+                dealii::ExcInvalidState());
+    order1 = sort_dofs(dof_handler1);
+    order2 = sort_dofs(dof_handler2);
+    order3 = sort_dofs(dof_handler3);
+  }
+};
+
+class QuadratureAligner {
+ public:
+  QuadratureAligner(const aether::sn::QAngle<3> &q3,
+                    const aether::sn::QAngle<2> &q2,
+                    const aether::sn::QAngle<1> &q1,
+                    const double tol) :
+      q3(q3), q2(q2), q1(q1),
+      qp(q3.get_tensor_basis()[0]), qa(q3.get_tensor_basis()[1]), 
+      halfpol(qp.size()/2), tol(tol), 
+      cache(q3.size(), std::make_pair(q3.size(), q3.size())) {};
+
+  void operator()(const int n3, int &n1, int &n2) const {
+    std::tie(n1, n2) = cache[n3];
+    if (n1 == q3.size() || n2 == q3.size()) {  //  invalid, not in cache
+      const dealii::Point<2> &a3 = q3.angle(n3);
+      int np = n3 % qp.size();
+      int na = n3 / qp.size();
+      if (q2.is_degenerate()) {
+        n1 = np;
+        n2 = na;
+        AssertThrow(!q1.is_degenerate(), 
+                    dealii::ExcMessage("One quadrature must not be degenerate"));
+        AssertThrow(std::abs(a3[0]-q1.angle(n1)[0]) < tol, 
+                    dealii::ExcMessage("Different polar angles"));
+        AssertThrow(std::abs(a3[1]-q2.angle(n2)[1]) < tol, 
+                    dealii::ExcMessage("Different azimuthal angles"));
+      } else {
+        n1 = np >= halfpol;
+        n2 = na * halfpol + (n1 ? np - halfpol : halfpol - 1 - np);
+        AssertThrow(q1.is_degenerate(), 
+                    dealii::ExcMessage("One quadrature must be degenerate"));
+        AssertThrow(a3[0] * q1.angle(n1)[0] > 0, 
+                    dealii::ExcMessage("Opposite polar orientations"));
+        AssertThrow(std::abs(std::abs(a3[0])-q2.angle(n2)[0]) < tol &&
+                    std::abs(a3[1]-q2.angle(n2)[1]) < tol,
+                    dealii::ExcMessage("Different angles"));
+      }
+      AssertIndexRange(n1, q1.size());
+      AssertIndexRange(n2, q2.size());
+      cache[n3] = std::make_pair(n1, n2);
+    }
+  };
+
+ protected:
+  const aether::sn::QAngle<3> &q3;  // 3D quadrature
+  const aether::sn::QAngle<2> &q2;  // 2D quadrature
+  const aether::sn::QAngle<1> &q1;  // 1D quadrature
+  const dealii::Quadrature<1> &qp;  // Polar basis of 3D quadrature
+  const dealii::Quadrature<1> &qa;  // Azimuthal basis of 3D quadrature
+  const int halfpol;
+  const double tol;
+  mutable std::vector<std::pair<int, int>> cache;
+};
+
+TEST_P(Test2D1D, FixedSource) {
   aether::sn::FixedSourceProblem<1, 1, aether::pgd::sn::Transport<1>, 
                                        aether::pgd::sn::TransportBlock<1> >
       problem1(dof_handler1, quadrature1, mgxs1, bc1);
@@ -273,8 +345,6 @@ TEST_P(Test2D1D, FixedSource) {
   srcs2.emplace_back(num_groups2, quadrature2.size()*dof_handler2.n_dofs());
   dealii::Vector<double> phi1(dof_handler1.n_dofs());
   dealii::Vector<double> phi2(dof_handler2.n_dofs());
-  dealii::MappingQGeneric<1> mapping1(fe_degree);
-  dealii::MappingQGeneric<2> mapping2(fe_degree);
   for (int g = 0; g < num_groups1; ++g) {
     double intensity = 1;
     if (num_groups1 == num_groups) {
@@ -317,7 +387,7 @@ TEST_P(Test2D1D, FixedSource) {
       num_groups1 == num_groups2);
   fs1.is_minimax = is_minimax;
   fs2.is_minimax = is_minimax;
-  const int num_modes = 10;
+  const int num_modes = 30;
   const double tol = 1e-2;
   std::vector<std::chrono::duration<double>> runtimes(num_modes+1);
   runtimes[0] = std::chrono::duration<double>::zero();
@@ -334,29 +404,12 @@ TEST_P(Test2D1D, FixedSource) {
     runtimes[m+1] = end - start;
   }
   // Expand solution
-  aether::sn::QPglc<3> quadrature3(4, 4);
-  dealii::Triangulation<3> mesh3;
-  create_mesh(mesh3);
-  dealii::FE_DGQ<3> fe3(fe_degree);
-  dealii::DoFHandler<3> dof_handler3;
-  dof_handler3.initialize(mesh3, fe3);
   aether::pgd::sn::Transport<3> transport3(dof_handler3, quadrature3);
   aether::sn::DiscreteToMoment<3> d2m(quadrature3);
-  // Sort all the DoFs into a known order
-  std::vector<unsigned int> order3(dof_handler3.n_dofs());
-  sort_dofs<3>(dof_handler3, order3);
-  std::vector<unsigned int> reorder3(dof_handler3.n_dofs());
-  for (int i = 0; i < dof_handler3.n_dofs(); ++i)
-    reorder3[order3[i]] = i;
-  // dof_handler3.renumber_dofs(order3);
-  AssertThrow(
-      dof_handler3.n_dofs() == dof_handler1.n_dofs()*dof_handler2.n_dofs(),
-      dealii::ExcInvalidState()
-  );
-  dealii::BlockVector<double> psi_ref(num_groups,
-      quadrature3.size()*dof_handler3.n_dofs());
+  dealii::BlockVector<double> psi_ref(
+      num_groups, quadrature3.size()*dof_handler3.n_dofs());
   dealii::BlockVector<double> phi_ref(num_groups, dof_handler3.n_dofs());
-  // Compute error
+  // Compute error against ref. soln.
   std::string name_ref = "RodTest3DFixedSource";
   name_ref += is_rodded ? "Rodded" : "Unrodded";
   H5::File h5_ref(dir_out+name_ref+".h5", H5::File::FileAccessMode::open);
@@ -367,10 +420,7 @@ TEST_P(Test2D1D, FixedSource) {
     d2m.vmult(phi_ref.block(g), psi_ref.block(g));
   }
   dealii::BlockVector<double> phi(phi_ref);
-  const dealii::Quadrature<1> &q_polar = quadrature3.get_tensor_basis()[0];
-  const dealii::Quadrature<1> &q_azim  = quadrature3.get_tensor_basis()[1];
-  const int half_polar = q_polar.size() / 2;
-  const double qtol = 1e-12;  // tolerance for quadrature angles
+  const QuadratureAligner q_align(quadrature3, quadrature2, quadrature1, 1e-12);
   std::ofstream csv_out(dir_out+test_name()+".csv");
   csv_out << std::setprecision(std::numeric_limits<double>::max_digits10)
           << std::scientific
@@ -391,41 +441,22 @@ TEST_P(Test2D1D, FixedSource) {
       for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
         int ii = i * dof_handler2.n_dofs();
         for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-          phi_ref.block(g)[reorder3[ii+j]] -=
-              fs1.prods[m].phi.block(g1)[reorder1[i]] *
-              fs2.prods[m].phi.block(g2)[reorder2[j]];
+          phi_ref.block(g)[order3[ii+j]] -=
+              fs1.prods[m].phi.block(g1)[order1[i]] *
+              fs2.prods[m].phi.block(g2)[order2[j]];
         }
       }
-      for (int n = 0; n < quadrature3.size(); ++n) {
-        const dealii::Point<2> &qn = quadrature3.angle(n);
-        int n_polar = n % q_polar.size();
-        int n_azim  = n / q_polar.size();
-        int n1 = n_polar;
-        int n2 = n_azim;
-        if (axial_polar) {
-          AssertThrow(std::abs(qn[0]-quadrature1.angle(n1)[0]) < qtol, 
-                      dealii::ExcMessage("Different polar angles"));
-          AssertThrow(std::abs(qn[1]-quadrature2.angle(n2)[1]) < qtol, 
-                      dealii::ExcMessage("Different azimuthal angles"));
-        } else {
-          n1 = n_polar >= half_polar;
-          n2 = n_azim * half_polar + (n1 ? 
-               n_polar - half_polar : half_polar - 1 - n_polar);
-          AssertThrow(qn[0] * quadrature1.angle(n1)[0] > 0, 
-                      dealii::ExcMessage("Opposite polar orientations"));
-          AssertThrow(std::abs(std::abs(qn[0])-quadrature2.angle(n2)[0]) < qtol
-                      && std::abs(qn[1]-quadrature2.angle(n2)[1]) < qtol,
-                      dealii::ExcMessage("Different angles"));
-        }
+      for (int n = 0, n1, n2; n < quadrature3.size(); ++n) {
+        q_align(n, n1, n2);
         n1 *= dof_handler1.n_dofs();
         n2 *= dof_handler2.n_dofs();
         int nn = n * dof_handler3.n_dofs();
         for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
           int ii = i * dof_handler2.n_dofs();
           for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-            psi_ref.block(g)[nn+reorder3[ii+j]] -=
-                fs1.prods[m].psi.block(g1)[n1+reorder1[i]] *
-                fs2.prods[m].psi.block(g2)[n2+reorder2[j]];
+            psi_ref.block(g)[nn+order3[ii+j]] -=
+                fs1.prods[m].psi.block(g1)[n1+order1[i]] *
+                fs2.prods[m].psi.block(g2)[n2+order2[j]];
           }
         }
       }
