@@ -36,7 +36,7 @@ class FixedSource2D1D {
                   const Transport<dim, qdim> &transport,
                   Mgxs &mgxs_rom);
   void enrich();
-  void normalize(bool groupwise);
+  void normalize(bool groupwise, bool discrete=true);
   void setup(std::vector<InnerProducts2D1D> coeffs_flux,
              const std::vector<std::vector<double>> &coeffs_src,
              const std::vector<std::vector<int>> &materials,

@@ -54,17 +54,22 @@ void FixedSource2D1D<dim, qdim>::enrich() {
 }
 
 template <int dim, int qdim>
-void FixedSource2D1D<dim, qdim>::normalize(bool groupwise) {
+void FixedSource2D1D<dim, qdim>::normalize(bool groupwise, bool discrete) {
   // double norm = 0;  //prods.back().psi.l2_norm();
   std::vector<double> norms_trial(mgxs_rom.num_groups);
   std::vector<double> norms_test(mgxs_rom.num_groups);
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
-    norms_trial[g] = std::sqrt(transport.inner_product(
-        prods.back().psi.block(g), 
-        prods.back().psi.block(g)));
-    norms_test[g] = std::sqrt(transport.inner_product(
-        prods.back().test.block(g), 
-        prods.back().test.block(g)));
+    if (discrete) {  // l2 norm (of a vector)
+      norms_trial[g] = prods.back().psi.block(g).l2_norm();
+      norms_test[g] = prods.back().psi.block(g).l2_norm();
+    } else {  // L2 norm (of a function)
+      norms_trial[g] = std::sqrt(transport.inner_product(
+          prods.back().psi.block(g), 
+          prods.back().psi.block(g)));
+      norms_test[g] = std::sqrt(transport.inner_product(
+          prods.back().test.block(g), 
+          prods.back().test.block(g)));
+    }
   }
   if (!groupwise) {
     norms_trial.assign(norms_trial.size(), 
