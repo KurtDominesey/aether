@@ -16,6 +16,7 @@
 #include <deal.II/grid/grid_out.h>
 
 #include "base/mgxs.h"
+#include "base/lapack_full_matrix.h"
 #include "sn/quadrature.h"
 #include "sn/quadrature_lib.h"
 #include "sn/fixed_source_problem.h"
@@ -171,9 +172,11 @@ using DoF = std::tuple<
 >;
 
 template <int dim>
-struct CompareDoF {
-  bool operator()(const DoF<dim> &a, const DoF<dim> &b) {
-    const double tol = 1e-12;
+struct DoFSorter {
+  DoFSorter(const double tol=1e-12) : tol(tol) {}
+  const double tol;
+
+  bool operator()(const DoF<dim> &a, const DoF<dim> &b) const {
     const dealii::Point<dim> &ca = std::get<1>(a)->center();
     const dealii::Point<dim> &cb = std::get<1>(b)->center();
     for (int d = dim-1; d >= 0; --d) {
@@ -209,8 +212,7 @@ std::vector<unsigned int> sort_dofs(dealii::DoFHandler<dim> &dof_handler) {
       dofs.emplace_back(points[i], cell, i);
     }
   }
-  CompareDoF<dim> comparator;
-  std::stable_sort(dofs.begin(), dofs.end(), comparator);
+  std::stable_sort(dofs.begin(), dofs.end(), DoFSorter<dim>());
   for (unsigned int i = 0; i < dof_handler.n_dofs(); ++i)
     renumbering[i] = std::get<2>(dofs[i]);
   return renumbering;
@@ -220,6 +222,7 @@ using Param2D1D = std::tuple<bool, bool, int, bool>;
 
 class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
  protected:
+  const int num_modes = 30;
   const bool is_rodded = std::get<0>(GetParam());
   const bool axial_polar = std::get<1>(GetParam());
   const bool is_minimax = std::get<3>(GetParam());
@@ -284,14 +287,14 @@ class QuadratureAligner {
   QuadratureAligner(const aether::sn::QAngle<3> &q3,
                     const aether::sn::QAngle<2> &q2,
                     const aether::sn::QAngle<1> &q1,
-                    const double tol) :
+                    const double tol=1e-12) :
       q3(q3), q2(q2), q1(q1),
       qp(q3.get_tensor_basis()[0]), qa(q3.get_tensor_basis()[1]), 
       halfpol(qp.size()/2), tol(tol), 
       cache(q3.size(), std::make_pair(q3.size(), q3.size())) {};
 
-  void operator()(const int n3, int &n1, int &n2) const {
-    std::tie(n1, n2) = cache[n3];
+  const std::pair<int, int>& operator()(const int n3) const {
+    auto [n1, n2] = cache[n3];
     if (n1 == q3.size() || n2 == q3.size()) {  //  invalid, not in cache
       const dealii::Point<2> &a3 = q3.angle(n3);
       int np = n3 % qp.size();
@@ -320,6 +323,7 @@ class QuadratureAligner {
       AssertIndexRange(n2, q2.size());
       cache[n3] = std::make_pair(n1, n2);
     }
+    return cache[n3];
   };
 
  protected:
@@ -332,6 +336,179 @@ class QuadratureAligner {
   const double tol;
   mutable std::vector<std::pair<int, int>> cache;
 };
+
+/**
+ * Matrix pre-/post-processor for computing the SVD in the L2 norm.
+ */
+template <int dim>
+class SvdL2PP {
+ public:
+  SvdL2PP(const dealii::DoFHandler<dim> &dof_handler,
+          const std::vector<aether::sn::CellMatrices<dim>> &matrices,
+          const std::vector<double> &q_weights,
+          const std::vector<double> &u_widths) :
+          dof_handler(dof_handler), 
+          q_weights_sqrt(q_weights),
+          u_widths_sqrt(u_widths) {
+    for (double &weight : q_weights_sqrt)
+      weight = std::sqrt(weight);
+    for (double &width : u_widths_sqrt)
+      width = std::sqrt(width);
+    mass_cho.resize(matrices.size());
+    for (int i = 0; i < matrices.size(); ++i)
+      mass_cho[i].cholesky(matrices[i].mass);
+    mass_cho_inv = mass_cho;
+    for (int i = 0; i < matrices.size(); ++i)
+      mass_cho_inv[i].gauss_jordan();
+  }
+
+  void preprocess(dealii::LAPACKFullMatrix_<double> &matrix) {
+    process(matrix, true);
+  }
+
+  void postprocess(dealii::LAPACKFullMatrix_<double> &matrix) {
+    process(matrix, false);
+  }
+
+ protected:
+  void process(dealii::LAPACKFullMatrix_<double> &matrix, bool before) {
+    const int num_vecs = dim == 1 ? matrix.m() : matrix.n();
+    const int dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
+    dealii::Vector<double> vec_c(dofs_per_cell);
+    for (int v = 0; v < num_vecs; ++v) {
+      for (int g = 0; g < u_widths_sqrt.size(); ++g) {
+        int gg = g * q_weights_sqrt.size() * dof_handler.n_dofs();
+        for (int n = 0; n < q_weights_sqrt.size(); ++n) {
+          int nn = n * dof_handler.n_dofs() + gg;
+          for (int c = 0; c < mass_cho.size(); ++c) {
+            int cc = c * dofs_per_cell + nn;
+            for (int i = 0; i < dofs_per_cell; ++i) {
+              double &el = dim == 1 ? matrix(v, cc+i) : matrix(cc+i, v);
+              vec_c[i] = el;
+              el = 0;
+            }
+            for (int i = 0; i < dofs_per_cell; ++i) {
+              double &el = dim == 1 ? matrix(v, cc+i) : matrix(cc+i, v);
+              for (int j = 0; j < dofs_per_cell; ++j) {
+                el += vec_c[j] * (before
+                    ? mass_cho[c][i][j] * q_weights_sqrt[n] / u_widths_sqrt[g]
+                    : mass_cho_inv[c][i][j] / q_weights_sqrt[n] * u_widths_sqrt[g]
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const dealii::DoFHandler<dim> &dof_handler;
+  std::vector<double> q_weights_sqrt;
+  std::vector<double> u_widths_sqrt;
+  std::vector<dealii::FullMatrix<double>> mass_cho;
+  std::vector<dealii::FullMatrix<double>> mass_cho_inv;
+};
+
+TEST_P(Test2D1D, Svd) {
+  AssertThrow(num_groups1 > 1 && num_groups > 1, dealii::ExcNotImplemented());
+  dealii::BlockVector<double> psi(
+      num_groups, quadrature3.size()*dof_handler3.n_dofs());
+  dealii::BlockVector<double> phi(num_groups, dof_handler3.n_dofs());
+  aether::sn::DiscreteToMoment<3> d2m(quadrature3);
+  // Load 3D ref. soln.
+  std::string name_h5 = "RodTest3DFixedSource";
+  name_h5 += is_rodded ? "Rodded" : "Unrodded";
+  H5::File file_h5(dir_out+name_h5+".h5", H5::File::FileAccessMode::open);
+  for (int g = 0; g < num_groups; ++g) {
+    const std::string name_g = "g" + std::to_string(g+1);
+    psi.block(g) = file_h5.open_dataset(name_g).read<dealii::Vector<double>>();
+    d2m.vmult(phi.block(g), psi.block(g));
+  }
+  // Make "snapshot" matrix
+  dealii::LAPACKFullMatrix_<double> psi_rect(
+      num_groups2*quadrature2.size()*dof_handler2.n_dofs(),
+      num_groups1*quadrature1.size()*dof_handler1.n_dofs());
+  const QuadratureAligner q_align(quadrature3, quadrature2, quadrature1);
+  for (int g = 0; g < num_groups; ++g) {
+    int g1 = num_groups1 > 1 ? g : 0;
+    int g2 = num_groups2 > 1 ? g : 0;
+    int gg1 = g1 * quadrature1.size() * dof_handler1.n_dofs();
+    int gg2 = g2 * quadrature2.size() * dof_handler2.n_dofs();
+    for (int n = 0; n < quadrature3.size(); ++n) {
+      auto [n1, n2] = q_align(n);
+      n1 *= dof_handler1.n_dofs();
+      n2 *= dof_handler2.n_dofs();
+      int nn = n * dof_handler3.n_dofs();
+      for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
+        int ii = i * dof_handler2.n_dofs();
+        for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
+          psi_rect(gg2+n2+order2[j], gg1+n1+order1[i]) =
+              psi.block(g)[nn+order3[ii+j]];
+        }
+      }
+    }
+  }
+  std::vector<double> u_widths1(num_groups1, 1.);
+  std::vector<double> u_widths2(num_groups2, 1.);
+  aether::sn::Transport<1> transport1(dof_handler1, quadrature1);
+  aether::sn::Transport<2> transport2(dof_handler2, quadrature2);
+  SvdL2PP svd_pp1(dof_handler1, transport1.cell_matrices, 
+                  quadrature1.get_weights(), u_widths1);
+  SvdL2PP svd_pp2(dof_handler2, transport2.cell_matrices, 
+                  quadrature2.get_weights(), u_widths2);
+  svd_pp1.preprocess(psi_rect);
+  svd_pp2.preprocess(psi_rect);
+  std::cout << "do svd\n";
+  psi_rect.compute_svd(/*thin svd*/'S');
+  std::cout << "did svd\n";
+  dealii::LAPACKFullMatrix_<double> basis2 = psi_rect.get_svd_u();
+  dealii::LAPACKFullMatrix_<double> basis1 = psi_rect.get_svd_vt();
+  svd_pp1.postprocess(basis1);
+  svd_pp2.postprocess(basis2);
+  // Compute error
+  aether::pgd::sn::Transport<3> transport3(dof_handler3, quadrature3);
+  std::ofstream csv_out(dir_out+test_name()+".csv");
+  csv_out << std::setprecision(std::numeric_limits<double>::max_digits10)
+          << std::scientific
+          << "err_psi,err_phi\n";
+  for (int m = 0; m <= num_modes; ++m) {
+    std::cout << "singular value " << m << ": " 
+              << psi_rect.singular_value(m) << "\n";
+    double err_psi = 0;
+    double err_phi = 0;
+    for (int g = 0; g < num_groups; ++g) {
+      int du = 1; // lethargy width
+      err_phi += transport3.inner_product(phi.block(g), phi.block(g)) / du;
+      err_psi += transport3.inner_product(psi.block(g), psi.block(g)) / du;
+      if (m == num_modes)
+        continue;
+      int g1 = num_groups1 == 1 ? 0 : g;
+      int g2 = num_groups2 == 1 ? 0 : g;
+      g1 *= quadrature1.size() * dof_handler1.n_dofs();
+      g2 *= quadrature2.size() * dof_handler2.n_dofs();
+      for (int n = 0; n < quadrature3.size(); ++n) {
+        auto [n1, n2] = q_align(n);
+        n1 *= dof_handler1.n_dofs();
+        n2 *= dof_handler2.n_dofs();
+        int nn = n * dof_handler3.n_dofs();
+        for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
+          int ii = i * dof_handler2.n_dofs();
+          for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
+            const double v = psi_rect.singular_value(m) *
+                             basis1(m, g1+n1+order1[i]) *
+                             basis2(g2+n2+order2[j], m);
+            psi.block(g)[nn+order3[ii+j]] -= v;
+            phi.block(g)[order3[ii+j]] -= quadrature3.weight(n) * v;
+          }
+        }
+      }
+    }
+    err_psi = std::sqrt(err_psi);
+    err_phi = std::sqrt(err_phi);
+    csv_out << err_psi << "," << err_phi << "\n";
+  }
+  csv_out.close();
+}
 
 TEST_P(Test2D1D, FixedSource) {
   aether::sn::FixedSourceProblem<1, 1, aether::pgd::sn::Transport<1>, 
@@ -387,7 +564,6 @@ TEST_P(Test2D1D, FixedSource) {
       num_groups1 == num_groups2);
   fs1.is_minimax = is_minimax;
   fs2.is_minimax = is_minimax;
-  const int num_modes = 30;
   const double tol = 1e-2;
   std::vector<std::chrono::duration<double>> runtimes(num_modes+1);
   runtimes[0] = std::chrono::duration<double>::zero();
@@ -420,7 +596,7 @@ TEST_P(Test2D1D, FixedSource) {
     d2m.vmult(phi_ref.block(g), psi_ref.block(g));
   }
   dealii::BlockVector<double> phi(phi_ref);
-  const QuadratureAligner q_align(quadrature3, quadrature2, quadrature1, 1e-12);
+  const QuadratureAligner q_align(quadrature3, quadrature2, quadrature1);
   std::ofstream csv_out(dir_out+test_name()+".csv");
   csv_out << std::setprecision(std::numeric_limits<double>::max_digits10)
           << std::scientific
@@ -446,8 +622,8 @@ TEST_P(Test2D1D, FixedSource) {
               fs2.prods[m].phi.block(g2)[order2[j]];
         }
       }
-      for (int n = 0, n1, n2; n < quadrature3.size(); ++n) {
-        q_align(n, n1, n2);
+      for (int n = 0; n < quadrature3.size(); ++n) {
+        auto [n1, n2] = q_align(n);
         n1 *= dof_handler1.n_dofs();
         n2 *= dof_handler2.n_dofs();
         int nn = n * dof_handler3.n_dofs();
