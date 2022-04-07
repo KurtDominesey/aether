@@ -410,7 +410,6 @@ class SvdL2PP {
 };
 
 TEST_P(Test2D1D, Svd) {
-  AssertThrow(num_groups1 > 1 && num_groups > 1, dealii::ExcNotImplemented());
   dealii::BlockVector<double> psi(
       num_groups, quadrature3.size()*dof_handler3.n_dofs());
   dealii::BlockVector<double> phi(num_groups, dof_handler3.n_dofs());
@@ -424,11 +423,94 @@ TEST_P(Test2D1D, Svd) {
     psi.block(g) = file_h5.open_dataset(name_g).read<dealii::Vector<double>>();
     d2m.vmult(phi.block(g), psi.block(g));
   }
-  // Make "snapshot" matrix
+  // Make some useful objects for later
+  const QuadratureAligner q_align(quadrature3, quadrature2, quadrature1);
+  aether::sn::Transport<1> transport1(dof_handler1, quadrature1);
+  aether::sn::Transport<2> transport2(dof_handler2, quadrature2);
+  aether::pgd::sn::Transport<3> transport3(dof_handler3, quadrature3);
+  std::ofstream csv_out(dir_out+test_name()+".csv");
+  csv_out << std::setprecision(std::numeric_limits<double>::max_digits10)
+          << std::scientific
+          << "err_psi,err_phi\n";
+  if (num_groups1 > 1 && num_groups2 > 1) {  
+    // Do groupwise SVD
+    AssertDimension(num_groups1, num_groups2);
+    AssertDimension(num_groups1, num_groups);
+    std::vector<double> u_width(1, 1.);
+    SvdL2PP svd_pp1(dof_handler1, transport1.cell_matrices, 
+                    quadrature1.get_weights(), u_width);
+    SvdL2PP svd_pp2(dof_handler2, transport2.cell_matrices, 
+                    quadrature2.get_weights(), u_width);
+    dealii::Table<2, double> errs_psi(num_groups, num_modes+1);
+    dealii::Table<2, double> errs_phi(num_groups, num_modes+1);
+    for (int g = 0; g < num_groups; ++g) {
+      // Make "snapshot" matrix
+      dealii::LAPACKFullMatrix_<double> psi_rect(
+          quadrature2.size()*dof_handler2.n_dofs(),
+          quadrature1.size()*dof_handler1.n_dofs());
+      for (int n = 0; n < quadrature3.size(); ++n) {
+        auto [n1, n2] = q_align(n);
+        n1 *= dof_handler1.n_dofs();
+        n2 *= dof_handler2.n_dofs();
+        int nn = n * dof_handler3.n_dofs();
+        for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
+          int ii = i * dof_handler2.n_dofs();
+          for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
+            psi_rect(n2+order2[j], n1+order1[i]) =
+                psi.block(g)[nn+order3[ii+j]];
+          }
+        }
+      }
+      svd_pp1.preprocess(psi_rect);
+      svd_pp2.preprocess(psi_rect);
+      std::cout << "do svd\n";
+      psi_rect.compute_svd(/*thin svd*/'S');
+      std::cout << "did svd\n";
+      dealii::LAPACKFullMatrix_<double> basis2 = psi_rect.get_svd_u();
+      dealii::LAPACKFullMatrix_<double> basis1 = psi_rect.get_svd_vt();
+      svd_pp1.postprocess(basis1);
+      svd_pp2.postprocess(basis2);
+      for (int m = 0; m <= num_modes; ++m) {
+        errs_phi(g, m) = transport3.inner_product(phi.block(g), phi.block(g));
+        errs_psi(g, m) = transport3.inner_product(psi.block(g), psi.block(g));
+        if (m == num_modes)
+          continue;
+        for (int n = 0; n < quadrature3.size(); ++n) {
+          auto [n1, n2] = q_align(n);
+          n1 *= dof_handler1.n_dofs();
+          n2 *= dof_handler2.n_dofs();
+          int nn = n * dof_handler3.n_dofs();
+          for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
+            int ii = i * dof_handler2.n_dofs();
+            for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
+              const double v = psi_rect.singular_value(m) *
+                               basis1(m, n1+order1[i]) *
+                               basis2(n2+order2[j], m);
+              psi.block(g)[nn+order3[ii+j]] -= v;
+              phi.block(g)[order3[ii+j]] -= quadrature3.weight(n) * v;
+            }
+          }
+        }
+      }
+    }
+    for (int m = 0; m <= num_modes; ++m) {
+      double err_psi = 0;
+      double err_phi = 0;
+      for (int g = 0; g < num_groups; ++g) {
+        err_psi += errs_psi(g, m);
+        err_phi += errs_phi(g, m);
+      }
+      err_psi = std::sqrt(err_psi);
+      err_phi = std::sqrt(err_phi);
+      csv_out << err_psi << "," << err_phi << "\n";
+    }
+    csv_out.close();
+    return;
+  }
+  // Make "snapshot" matrix (for non-groupwise SVD)
   dealii::LAPACKFullMatrix_<double> psi_rect(
       num_groups2*quadrature2.size()*dof_handler2.n_dofs(),
       num_groups1*quadrature1.size()*dof_handler1.n_dofs());
-  const QuadratureAligner q_align(quadrature3, quadrature2, quadrature1);
   for (int g = 0; g < num_groups; ++g) {
     int g1 = num_groups1 > 1 ? g : 0;
     int g2 = num_groups2 > 1 ? g : 0;
@@ -450,8 +532,6 @@ TEST_P(Test2D1D, Svd) {
   }
   std::vector<double> u_widths1(num_groups1, 1.);
   std::vector<double> u_widths2(num_groups2, 1.);
-  aether::sn::Transport<1> transport1(dof_handler1, quadrature1);
-  aether::sn::Transport<2> transport2(dof_handler2, quadrature2);
   SvdL2PP svd_pp1(dof_handler1, transport1.cell_matrices, 
                   quadrature1.get_weights(), u_widths1);
   SvdL2PP svd_pp2(dof_handler2, transport2.cell_matrices, 
@@ -466,11 +546,6 @@ TEST_P(Test2D1D, Svd) {
   svd_pp1.postprocess(basis1);
   svd_pp2.postprocess(basis2);
   // Compute error
-  aether::pgd::sn::Transport<3> transport3(dof_handler3, quadrature3);
-  std::ofstream csv_out(dir_out+test_name()+".csv");
-  csv_out << std::setprecision(std::numeric_limits<double>::max_digits10)
-          << std::scientific
-          << "err_psi,err_phi\n";
   for (int m = 0; m <= num_modes; ++m) {
     std::cout << "singular value " << m << ": " 
               << psi_rect.singular_value(m) << "\n";
