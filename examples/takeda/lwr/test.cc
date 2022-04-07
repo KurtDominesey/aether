@@ -1,6 +1,10 @@
+#include <chrono>
 #include <regex>
 
+#include <hdf5.h>
+
 #include <deal.II/base/mpi.h>
+#include <deal.II/base/hdf5.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_renumbering.h>
@@ -44,6 +48,10 @@ enum Benchmark : int {
 enum MgDim  : int {
   BOTH, ONE, TWO
 };
+
+namespace H5 = dealii::HDF5;
+
+const std::string dir_out = "out/";
 
 const int fe_degree = 1;
 const int num_groups = 2;
@@ -125,14 +133,18 @@ TEST_P(Test3D, FixedSource) {
     prob.fixed_source.within_groups[g].transport.vmult(
         uncollided.block(g), src.block(g), false);
   fixed_src_gs.vmult(flux, uncollided);
+  // Save angular flux, plot scalar flux
+  H5::File h5_out(dir_out+test_name()+".h5", H5::File::FileAccessMode::create);
   dealii::DataOut<3> data_out;
   data_out.attach_dof_handler(dof_handler);
   for (int g = 0; g < num_groups; ++g) {
+    const std::string name_dataset = "g" + std::to_string(g+1);
+    h5_out.write_dataset(name_dataset, flux.block(g));
     prob.d2m.vmult(phi.block(g), flux.block(g));
-    data_out.add_data_vector(phi.block(g), "g"+std::to_string(g+1));
+    data_out.add_data_vector(phi.block(g), name_dataset);
   }
   data_out.build_patches();
-  std::ofstream vtu_out("out/" + test_name() + ".vtu");
+  std::ofstream vtu_out(dir_out + test_name() + ".vtu");
   data_out.write_vtu(vtu_out);
 }
 
@@ -305,47 +317,138 @@ TEST_P(Test2D1D, FixedSource) {
       num_groups1 == num_groups2);
   fs1.is_minimax = is_minimax;
   fs2.is_minimax = is_minimax;
-  const int num_modes = 5;
+  const int num_modes = 10;
+  const double tol = 1e-2;
+  std::vector<std::chrono::duration<double>> runtimes(num_modes+1);
+  runtimes[0] = std::chrono::duration<double>::zero();
   for (int m = 0; m < num_modes; ++m) {
     std::cout << "mode " << m << "\n";
+    const auto start = std::chrono::steady_clock::now();
     nonlinear2D1D.enrich();
     for (int nl = 0; nl < 10; ++nl) {
       double r = nonlinear2D1D.iter();
+      if (r < tol)
+        break;
     }
+    const auto end = std::chrono::steady_clock::now();
+    runtimes[m+1] = end - start;
   }
   // Expand solution
+  aether::sn::QPglc<3> quadrature3(4, 4);
   dealii::Triangulation<3> mesh3;
   create_mesh(mesh3);
   dealii::FE_DGQ<3> fe3(fe_degree);
   dealii::DoFHandler<3> dof_handler3;
   dof_handler3.initialize(mesh3, fe3);
+  aether::pgd::sn::Transport<3> transport3(dof_handler3, quadrature3);
+  aether::sn::DiscreteToMoment<3> d2m(quadrature3);
   // Sort all the DoFs into a known order
   std::vector<unsigned int> order3(dof_handler3.n_dofs());
   sort_dofs<3>(dof_handler3, order3);
-  dof_handler3.renumber_dofs(order3);
-  dealii::BlockVector<double> phi(num_groups, 
-      dof_handler1.n_dofs()*dof_handler2.n_dofs());
-  for (int m = 0; m < num_modes; ++m) {
+  std::vector<unsigned int> reorder3(dof_handler3.n_dofs());
+  for (int i = 0; i < dof_handler3.n_dofs(); ++i)
+    reorder3[order3[i]] = i;
+  // dof_handler3.renumber_dofs(order3);
+  AssertThrow(
+      dof_handler3.n_dofs() == dof_handler1.n_dofs()*dof_handler2.n_dofs(),
+      dealii::ExcInvalidState()
+  );
+  dealii::BlockVector<double> psi_ref(num_groups,
+      quadrature3.size()*dof_handler3.n_dofs());
+  dealii::BlockVector<double> phi_ref(num_groups, dof_handler3.n_dofs());
+  // Compute error
+  std::string name_ref = "RodTest3DFixedSource";
+  name_ref += is_rodded ? "Rodded" : "Unrodded";
+  H5::File h5_ref(dir_out+name_ref+".h5", H5::File::FileAccessMode::open);
+  for (int g = 0; g < num_groups; ++g) {
+    const std::string name_g = "g" + std::to_string(g+1);
+    psi_ref.block(g) = 
+        h5_ref.open_dataset(name_g).read<dealii::Vector<double>>();
+    d2m.vmult(phi_ref.block(g), psi_ref.block(g));
+  }
+  dealii::BlockVector<double> phi(phi_ref);
+  const dealii::Quadrature<1> &q_polar = quadrature3.get_tensor_basis()[0];
+  const dealii::Quadrature<1> &q_azim  = quadrature3.get_tensor_basis()[1];
+  const int half_polar = q_polar.size() / 2;
+  const double qtol = 1e-12;  // tolerance for quadrature angles
+  std::ofstream csv_out(dir_out+test_name()+".csv");
+  csv_out << std::setprecision(std::numeric_limits<double>::max_digits10)
+          << std::scientific
+          << "runtime,err_psi,err_phi\n";
+  for (int m = 0; m <= num_modes; ++m) {
+    double err_psi = 0;
+    double err_phi = 0;
     for (int g = 0; g < num_groups; ++g) {
+      int du = 1; // lethargy width
+      err_phi += 
+          transport3.inner_product(phi_ref.block(g), phi_ref.block(g)) / du;
+      err_psi += 
+          transport3.inner_product(psi_ref.block(g), psi_ref.block(g)) / du;
+      if (m == num_modes)
+        continue;
       int g1 = num_groups1 == 1 ? 0 : g;
       int g2 = num_groups2 == 1 ? 0 : g;
       for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
         int ii = i * dof_handler2.n_dofs();
         for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-          phi.block(g)[ii+j] += fs1.prods[m].phi.block(g1)[reorder1[i]] *
-                                fs2.prods[m].phi.block(g2)[reorder2[j]];
+          phi_ref.block(g)[reorder3[ii+j]] -=
+              fs1.prods[m].phi.block(g1)[reorder1[i]] *
+              fs2.prods[m].phi.block(g2)[reorder2[j]];
+        }
+      }
+      for (int n = 0; n < quadrature3.size(); ++n) {
+        const dealii::Point<2> &qn = quadrature3.angle(n);
+        int n_polar = n % q_polar.size();
+        int n_azim  = n / q_polar.size();
+        int n1 = n_polar;
+        int n2 = n_azim;
+        if (axial_polar) {
+          AssertThrow(std::abs(qn[0]-quadrature1.angle(n1)[0]) < qtol, 
+                      dealii::ExcMessage("Different polar angles"));
+          AssertThrow(std::abs(qn[1]-quadrature2.angle(n2)[1]) < qtol, 
+                      dealii::ExcMessage("Different azimuthal angles"));
+        } else {
+          n1 = n_polar >= half_polar;
+          n2 = n_azim * half_polar + (n1 ? 
+               n_polar - half_polar : half_polar - 1 - n_polar);
+          AssertThrow(qn[0] * quadrature1.angle(n1)[0] > 0, 
+                      dealii::ExcMessage("Opposite polar orientations"));
+          AssertThrow(std::abs(std::abs(qn[0])-quadrature2.angle(n2)[0]) < qtol
+                      && std::abs(qn[1]-quadrature2.angle(n2)[1]) < qtol,
+                      dealii::ExcMessage("Different angles"));
+        }
+        n1 *= dof_handler1.n_dofs();
+        n2 *= dof_handler2.n_dofs();
+        int nn = n * dof_handler3.n_dofs();
+        for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
+          int ii = i * dof_handler2.n_dofs();
+          for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
+            psi_ref.block(g)[nn+reorder3[ii+j]] -=
+                fs1.prods[m].psi.block(g1)[n1+reorder1[i]] *
+                fs2.prods[m].psi.block(g2)[n2+reorder2[j]];
+          }
         }
       }
     }
+    err_psi = std::sqrt(err_psi);
+    err_phi = std::sqrt(err_phi);
+    csv_out << runtimes[m].count() << "," << err_psi << "," << err_phi << "\n";
   }
-  // Plot flux
+  csv_out.close();
+  phi -= phi_ref;  // ROM phi = FOM phi - (FOM phi - ROM phi)
+  // Plot flux and errors
+  dealii::BlockVector<double> psi_err(num_groups, dof_handler3.n_dofs());
   dealii::DataOut<3> data_out3;
   data_out3.attach_dof_handler(dof_handler3);
   for (int g = 0; g < num_groups; ++g) {
-    data_out3.add_data_vector(phi.block(g), "g"+std::to_string(g+1));
+    const std::string suffix = "-g"+std::to_string(g+1);
+    data_out3.add_data_vector(phi.block(g), "phi"+suffix);
+    data_out3.add_data_vector(phi_ref.block(g), "phi"+suffix+"-err");
+    d2m.vmult(psi_err.block(g), psi_ref.block(g));
+    data_out3.add_data_vector(psi_err.block(g), "psi"+suffix+"-err");
   }
   data_out3.build_patches();
-  std::ofstream vtu_out3("out/" + test_name() + "-3D.vtu");
+  std::ofstream vtu_out3(dir_out + test_name() + "-3D.vtu");
   data_out3.write_vtu(vtu_out3);
   // Plot modes
   dealii::DataOut<1> data_out1;
