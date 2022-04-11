@@ -76,10 +76,14 @@ void FixedSource2D1D<dim, qdim>::normalize(
     }
   }
   if (!groupwise) {
-    norms_trial.assign(norms_trial.size(), 
-        std::accumulate(norms_trial.begin(), norms_trial.end(), 0.));
-    norms_test.assign(norms_test.size(), 
-        std::accumulate(norms_test.begin(), norms_test.end(), 0.));
+    double norm_trial = 0;
+    double norm_test = 0;
+    for (int g = 0; g < mgxs_rom.num_groups; ++g) {
+      norm_trial += std::pow(norms_trial[g], 2);
+      norm_test += std::pow(norms_test[g], 2);
+    }
+    norms_trial.assign(norms_trial.size(), std::sqrt(norm_trial));
+    norms_test.assign(norms_test.size(), std::sqrt(norm_test));
   }
   // for (int g = (dim % 2); g < mgxs_rom.num_groups; g += 2) {
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
