@@ -191,9 +191,21 @@ void FixedSource2D1D<dim, qdim>::set_source(
     const std::vector<std::vector<double>> &coeffs_src) {
   AssertDimension(coeffs_src.size(), srcs.size());
   src = 0;
-  for (int s = 0; s < srcs.size(); ++s)
-    for (int g = 0; g < mgxs_rom.num_groups; ++g)
-      src.block(g).add(coeffs_src[s][g], srcs[s].block(g));
+  for (int s = 0; s < srcs.size(); ++s) {
+    if (mgxs_rom.num_groups == coeffs_src[s].size()) {
+      for (int g = 0; g < mgxs_rom.num_groups; ++g)
+        src.block(g).add(coeffs_src[s][g], srcs[s].block(g));
+    } else if (coeffs_src[s].size() == 1) {
+      for (int g = 0; g < mgxs_rom.num_groups; ++g)
+        src.block(g).add(coeffs_src[s][0], srcs[s].block(g));
+    } else if (mgxs_rom.num_groups == 1) {
+      double coeff = std::accumulate(
+          coeffs_src[s].begin(), coeffs_src[s].end(), 0.);
+      src.block(0).add(coeff, srcs[s].block(0));
+    } else {
+      AssertThrow(false, dealii::ExcInvalidState());
+    }
+  }
 }
 
 template <int dim, int qdim>
