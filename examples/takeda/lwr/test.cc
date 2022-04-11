@@ -39,14 +39,16 @@ int main (int argc, char **argv) {
 
 namespace takeda::lwr {
 
-enum Benchmark : int {
-  LWR = 1,
-  FBR_SMALL,
-  FBR_HET_Z,
-  FBR_HEX_Z
+static const Lwr lwr1(0);  // case 1: unrodded
+static const Lwr lwr2(1);  // case 2: rodded
+static const Fbr fbr1(0);  // case 1: unrodded
+static const Fbr fbr2(1);  // case 2: half-rodded
+static const PinC5G7 pin_uo2("uo2");
+static const std::vector<const Benchmark2D1D*> benchmarks{
+  &lwr1, &lwr2, &fbr1, &fbr2, &pin_uo2
 };
 
-enum MgDim  : int {
+enum MgDim : int {
   BOTH, ONE, TWO
 };
 
@@ -55,23 +57,22 @@ namespace H5 = dealii::HDF5;
 const std::string dir_out = "out/";
 
 const int fe_degree = 1;
-const int num_groups = 2;
-const int num_areas = 3;
-const int num_segments = 2;
-
 
 ///////////////////////
 // 3D Test (Ref. Soln.)
 ///////////////////////
 
-class Test3D : public ::testing::TestWithParam<bool> {
+class Test3D : public ::testing::TestWithParam<const Benchmark2D1D*> {
  protected:
+  const Benchmark2D1D &bm = *GetParam();
+  const aether::Mgxs mgxs = bm.create_mgxs();
+  const int num_groups = mgxs.num_groups;
   dealii::Triangulation<3> mesh;
   dealii::DoFHandler<3> dof_handler;
   std::vector<std::vector<dealii::BlockVector<double>>> bc;
 
   void SetUp() override {
-    create_mesh(mesh);
+    bm.create_mesh3(mesh);
     dealii::FE_DGQ<3> fe(fe_degree);
     dof_handler.initialize(mesh, fe);
   }
@@ -105,7 +106,9 @@ double cosine_source(double val, const dealii::Point<dim> &p) {
 }
 
 TEST_P(Test3D, FixedSource) {
-  auto mgxs = create_mgxs(GetParam());
+  dealii::GridOut grid_out;
+  std::ofstream grid_file("out/mesh3.vtu");
+  grid_out.write_vtu(mesh, grid_file);
   aether::sn::QPglc<3> quadrature(4, 4);
   bc.resize(num_groups, std::vector<dealii::BlockVector<double>>(1,
       dealii::BlockVector<double>(
@@ -114,22 +117,36 @@ TEST_P(Test3D, FixedSource) {
       )
   ));
   aether::sn::FixedSourceProblem<3> prob(dof_handler, quadrature, mgxs, bc);
-  dealii::SolverControl control_wg(100, 1e-2);
+  dealii::ReductionControl control_wg(250, 1e-6, 1e-2);
   dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg,
       dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(32));
+  auto print_wg = [] (
+      const unsigned int it, const double val, const dealii::Vector<double>&) 
+      -> dealii::SolverControl::State {
+    std::cout << "WG " << it << ": " << val << "\n";
+    return dealii::SolverControl::State::success;
+  };
+  solver_wg.connect(print_wg);
   aether::sn::FixedSourceGS fixed_src_gs(prob.fixed_source, solver_wg);
   dealii::BlockVector<double> src(
       num_groups, quadrature.size()*dof_handler.n_dofs());
   dealii::BlockVector<double> phi(num_groups, dof_handler.n_dofs());
   for (int g = 0; g < num_groups; ++g) {
-    double intensity = mgxs.chi[g][0];
-    const dealii::ScalarFunctionFromFunctionObject<3> func(
-        [intensity] (const dealii::Point<3> &p, unsigned int=0) {
-            return uniform_source<3>(intensity, p);});
-    std::map<dealii::types::material_id, const dealii::Function<3>*> funcs;
-    funcs[0] = &func;
+    std::map<unsigned int, const std::unique_ptr<dealii::Function<3>>> funcs;
+    std::map<unsigned int, const dealii::Function<3>*> func_ptrs;
+    for (int j = 0; j < 1 /*mgxs.num_materials*/; ++j) {
+      double chi = mgxs.chi[g][j];
+      if (chi == 0)
+        continue;
+      // funcs.emplace(j, bm.create_source3(chi));
+      funcs.emplace(j, 
+          std::make_unique<dealii::Functions::ConstantFunction<3>>(chi));
+    }
+    for (auto it = funcs.begin(); it != funcs.end(); ++it) {
+      func_ptrs[it->first] = it->second.get();
+    }
     dealii::VectorTools::interpolate_based_on_material_id(
-        dealii::MappingQGeneric<3>(fe_degree), dof_handler, funcs, 
+        dealii::MappingQGeneric<3>(fe_degree), dof_handler, func_ptrs, 
         phi.block(g));
     prob.m2d.vmult(src.block(g), phi.block(g));
   }
@@ -138,7 +155,11 @@ TEST_P(Test3D, FixedSource) {
   for (int g = 0; g < num_groups; ++g)
     prob.fixed_source.within_groups[g].transport.vmult(
         uncollided.block(g), src.block(g), false);
-  fixed_src_gs.vmult(flux, uncollided);
+  dealii::SolverControl control(50, 1e-6*uncollided.l2_norm());
+  dealii::SolverGMRES<dealii::BlockVector<double>> solver(control,
+      dealii::SolverGMRES<dealii::BlockVector<double>>::AdditionalData(7));
+  solver.solve(prob.fixed_source, flux, uncollided, fixed_src_gs);
+  // fixed_src_gs.vmult(flux, uncollided);
   // Save angular flux, plot scalar flux
   H5::File h5_out(dir_out+test_name()+".h5", H5::File::FileAccessMode::create);
   dealii::DataOut<3> data_out;
@@ -154,9 +175,9 @@ TEST_P(Test3D, FixedSource) {
   data_out.write_vtu(vtu_out);
 }
 
-INSTANTIATE_TEST_CASE_P(Rod, Test3D, ::testing::Bool(),
-    [](const testing::TestParamInfo<bool>& info) {
-  return info.param ? "Rodded" : "Unrodded";
+INSTANTIATE_TEST_CASE_P(Rod, Test3D, ::testing::ValuesIn(benchmarks),
+    [](const testing::TestParamInfo<const Benchmark2D1D*>& info) {
+  return info.param->to_string();
 });
 
 
@@ -218,18 +239,22 @@ std::vector<unsigned int> sort_dofs(dealii::DoFHandler<dim> &dof_handler) {
   return renumbering;
 }
 
-using Param2D1D = std::tuple<bool, bool, int, bool>;
+using Param2D1D = std::tuple<const Benchmark2D1D*, bool, int, bool>;
 
 class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
  protected:
-  const int num_modes = 30;
-  const bool is_rodded = std::get<0>(GetParam());
+  const int num_modes = 10;
+  const Benchmark2D1D &bm = *std::get<0>(GetParam());
   const bool axial_polar = std::get<1>(GetParam());
-  const bool is_minimax = std::get<3>(GetParam());
   const int mg_dim = std::get<2>(GetParam());
+  const bool is_minimax = std::get<3>(GetParam());
+  const aether::Mgxs mgxs = bm.create_mgxs();
+  const int num_groups = mgxs.num_groups;
   const int num_groups2 = (mg_dim == BOTH || mg_dim == TWO) ? num_groups : 1;
   const int num_groups1 = (mg_dim == BOTH || mg_dim == ONE) ? num_groups : 1;
-  const aether::Mgxs mgxs = create_mgxs(is_rodded);
+  const std::vector<std::vector<int>> &materials = bm.get_materials();
+  const int num_segments = materials.size();
+  const int num_areas = materials[0].size();
   aether::Mgxs mgxs1{num_groups1, num_segments, 1};
   aether::Mgxs mgxs2{num_groups2, num_areas, 1};
   const aether::sn::QPglc<2> quadrature2{axial_polar ? 0 : 4, 4};
@@ -263,13 +288,21 @@ class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
   };
   
   void SetUp() override {
+    if (num_groups == num_groups1)
+      mgxs1.group_widths = mgxs.group_widths;
+    else
+      mgxs1.group_widths.assign(mgxs1.num_groups, 1.);
+    if (num_groups == num_groups2)
+      mgxs2.group_widths = mgxs.group_widths;
+    else
+      mgxs2.group_widths.assign(mgxs2.num_groups, 1.);
     AssertThrow(axial_polar == !quadrature1.is_degenerate(), 
         dealii::ExcInvalidState());
     AssertThrow(axial_polar == quadrature2.is_degenerate(), 
         dealii::ExcInvalidState());
-    create_mesh(mesh1);
-    create_mesh(mesh2);
-    create_mesh(mesh3);
+    bm.create_mesh1(mesh1);
+    bm.create_mesh2(mesh2);
+    bm.create_mesh3(mesh3);
     dof_handler1.initialize(mesh1, fe1);
     dof_handler2.initialize(mesh2, fe2);
     dof_handler3.initialize(mesh3, fe3);
@@ -362,17 +395,18 @@ class SvdL2PP {
       mass_cho_inv[i].gauss_jordan();
   }
 
-  void preprocess(dealii::LAPACKFullMatrix_<double> &matrix) {
-    process(matrix, true);
+  void preprocess(dealii::LAPACKFullMatrix_<double> &matrix, bool t=false) {
+    process(matrix, t, true);
   }
 
-  void postprocess(dealii::LAPACKFullMatrix_<double> &matrix) {
-    process(matrix, false);
+  void postprocess(dealii::LAPACKFullMatrix_<double> &matrix, bool t=false) {
+    process(matrix, t, false);
   }
 
  protected:
-  void process(dealii::LAPACKFullMatrix_<double> &matrix, bool before) {
-    const int num_vecs = dim == 1 ? matrix.m() : matrix.n();
+  void process(dealii::LAPACKFullMatrix_<double> &matrix, bool t, bool before) {
+    const bool which = (dim == 1) != t;
+    const int num_vecs = which ? matrix.m() : matrix.n();
     const int dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
     dealii::Vector<double> vec_c(dofs_per_cell);
     for (int v = 0; v < num_vecs; ++v) {
@@ -383,12 +417,12 @@ class SvdL2PP {
           for (int c = 0; c < mass_cho.size(); ++c) {
             int cc = c * dofs_per_cell + nn;
             for (int i = 0; i < dofs_per_cell; ++i) {
-              double &el = dim == 1 ? matrix(v, cc+i) : matrix(cc+i, v);
+              double &el = which ? matrix(v, cc+i) : matrix(cc+i, v);
               vec_c[i] = el;
               el = 0;
             }
             for (int i = 0; i < dofs_per_cell; ++i) {
-              double &el = dim == 1 ? matrix(v, cc+i) : matrix(cc+i, v);
+              double &el = which ? matrix(v, cc+i) : matrix(cc+i, v);
               for (int j = 0; j < dofs_per_cell; ++j) {
                 el += vec_c[j] * (before
                     ? mass_cho[c][i][j] * q_weights_sqrt[n] / u_widths_sqrt[g]
@@ -416,7 +450,7 @@ TEST_P(Test2D1D, Svd) {
   aether::sn::DiscreteToMoment<3> d2m(quadrature3);
   // Load 3D ref. soln.
   std::string name_h5 = "RodTest3DFixedSource";
-  name_h5 += is_rodded ? "Rodded" : "Unrodded";
+  name_h5 += bm.to_string();
   H5::File file_h5(dir_out+name_h5+".h5", H5::File::FileAccessMode::open);
   for (int g = 0; g < num_groups; ++g) {
     const std::string name_g = "g" + std::to_string(g+1);
@@ -508,9 +542,12 @@ TEST_P(Test2D1D, Svd) {
     return;
   }
   // Make "snapshot" matrix (for non-groupwise SVD)
-  dealii::LAPACKFullMatrix_<double> psi_rect(
-      num_groups2*quadrature2.size()*dof_handler2.n_dofs(),
-      num_groups1*quadrature1.size()*dof_handler1.n_dofs());
+  const int size2 = num_groups2 * quadrature2.size() * dof_handler2.n_dofs();
+  const int size1 = num_groups1 * quadrature1.size() * dof_handler1.n_dofs();
+  const bool t = size2 < size1;  // transpose
+  // For a m x n matrix, if m < n, the call to BLAS (gesdd) segfaults.
+  dealii::LAPACKFullMatrix_<double> psi_rect(t ? size1 : size2, 
+                                             t ? size2 : size1);
   for (int g = 0; g < num_groups; ++g) {
     int g1 = num_groups1 > 1 ? g : 0;
     int g2 = num_groups2 > 1 ? g : 0;
@@ -518,13 +555,14 @@ TEST_P(Test2D1D, Svd) {
     int gg2 = g2 * quadrature2.size() * dof_handler2.n_dofs();
     for (int n = 0; n < quadrature3.size(); ++n) {
       auto [n1, n2] = q_align(n);
-      n1 *= dof_handler1.n_dofs();
-      n2 *= dof_handler2.n_dofs();
+      n1 = n1 * dof_handler1.n_dofs() + gg1;
+      n2 = n2 * dof_handler2.n_dofs() + gg2;
       int nn = n * dof_handler3.n_dofs();
       for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
         int ii = i * dof_handler2.n_dofs();
         for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-          psi_rect(gg2+n2+order2[j], gg1+n1+order1[i]) =
+          psi_rect(t ? n1+order1[i] : n2+order2[j], 
+                   t ? n2+order2[j] : n1+order1[i]) =
               psi.block(g)[nn+order3[ii+j]];
         }
       }
@@ -536,15 +574,17 @@ TEST_P(Test2D1D, Svd) {
                   quadrature1.get_weights(), u_widths1);
   SvdL2PP svd_pp2(dof_handler2, transport2.cell_matrices, 
                   quadrature2.get_weights(), u_widths2);
-  svd_pp1.preprocess(psi_rect);
-  svd_pp2.preprocess(psi_rect);
+  svd_pp1.preprocess(psi_rect, t);
+  svd_pp2.preprocess(psi_rect, t);
   std::cout << "do svd\n";
   psi_rect.compute_svd(/*thin svd*/'S');
   std::cout << "did svd\n";
-  dealii::LAPACKFullMatrix_<double> basis2 = psi_rect.get_svd_u();
-  dealii::LAPACKFullMatrix_<double> basis1 = psi_rect.get_svd_vt();
-  svd_pp1.postprocess(basis1);
-  svd_pp2.postprocess(basis2);
+  dealii::LAPACKFullMatrix_<double> basis2 = 
+      t ? psi_rect.get_svd_vt() : psi_rect.get_svd_u();
+  dealii::LAPACKFullMatrix_<double> basis1 = 
+      t ? psi_rect.get_svd_u() : psi_rect.get_svd_vt();
+  svd_pp1.postprocess(basis1, t);
+  svd_pp2.postprocess(basis2, t);
   // Compute error
   for (int m = 0; m <= num_modes; ++m) {
     std::cout << "singular value " << m << ": " 
@@ -563,15 +603,16 @@ TEST_P(Test2D1D, Svd) {
       g2 *= quadrature2.size() * dof_handler2.n_dofs();
       for (int n = 0; n < quadrature3.size(); ++n) {
         auto [n1, n2] = q_align(n);
-        n1 *= dof_handler1.n_dofs();
-        n2 *= dof_handler2.n_dofs();
+        n1 = n1 * dof_handler1.n_dofs() + g1;
+        n2 = n2 * dof_handler2.n_dofs() + g2;
         int nn = n * dof_handler3.n_dofs();
         for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
           int ii = i * dof_handler2.n_dofs();
           for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-            const double v = psi_rect.singular_value(m) *
-                             basis1(m, g1+n1+order1[i]) *
-                             basis2(g2+n2+order2[j], m);
+            const double v = 
+                psi_rect.singular_value(m) *
+                basis1(t ? n1+order1[i] : m, t ? m : n1+order1[i]) *
+                basis2(t ? m : n2+order2[j], t ? n2+order2[j] : m);
             psi.block(g)[nn+order3[ii+j]] -= v;
             phi.block(g)[order3[ii+j]] -= quadrature3.weight(n) * v;
           }
@@ -585,7 +626,7 @@ TEST_P(Test2D1D, Svd) {
   csv_out.close();
 }
 
-TEST_P(Test2D1D, FixedSource) {
+TEST_P(Test2D1D, Pgd) {
   aether::sn::FixedSourceProblem<1, 1, aether::pgd::sn::Transport<1>, 
                                        aether::pgd::sn::TransportBlock<1> >
       problem1(dof_handler1, quadrature1, mgxs1, bc1);
@@ -604,9 +645,10 @@ TEST_P(Test2D1D, FixedSource) {
       if (num_groups2 == num_groups)
         intensity = std::sqrt(intensity);
     }
-    const dealii::ScalarFunctionFromFunctionObject<1> func1(
-        [intensity] (const dealii::Point<1> &p, unsigned int=0) {
-          return uniform_source<1>(intensity, p);});
+    // const dealii::ScalarFunctionFromFunctionObject<1> func1(
+    //     [intensity] (const dealii::Point<1> &p, unsigned int=0) {
+    //       return uniform_source<1>(intensity, p);});
+    const dealii::Functions::ConstantFunction<1> func1(intensity);
     std::map<dealii::types::material_id, const dealii::Function<1>*> funcs1;
     funcs1[0] = &func1;
     dealii::VectorTools::interpolate_based_on_material_id(
@@ -620,9 +662,10 @@ TEST_P(Test2D1D, FixedSource) {
       if (num_groups1 == num_groups)
         intensity = std::sqrt(intensity);
     }
-    const dealii::ScalarFunctionFromFunctionObject<2> func2(
-        [intensity] (const dealii::Point<2> &p, unsigned int=0) {
-          return uniform_source<2>(intensity, p);});
+    // const dealii::ScalarFunctionFromFunctionObject<2> func2(
+    //     [intensity] (const dealii::Point<2> &p, unsigned int=0) {
+    //       return uniform_source<2>(intensity, p);});
+    const dealii::Functions::ConstantFunction<2> func2(intensity);
     std::map<dealii::types::material_id, const dealii::Function<2>*> funcs2;
     funcs2[0] = &func2;
     dealii::VectorTools::interpolate_based_on_material_id(
@@ -634,7 +677,7 @@ TEST_P(Test2D1D, FixedSource) {
       problem1.fixed_source, srcs1, problem1.transport, mgxs1);
   aether::pgd::sn::FixedSource2D1D<2> fs2(
       problem2.fixed_source, srcs2, problem2.transport, mgxs2);
-  std::vector<std::vector<int>> materials{{0, 1, 2}, {1, 1, 2}};
+  // std::vector<std::vector<int>> materials{{0, 1, 2}, {1, 1, 2}};
   aether::pgd::sn::Nonlinear2D1D nonlinear2D1D(fs1, fs2, materials, mgxs,
       num_groups1 == num_groups2);
   fs1.is_minimax = is_minimax;
@@ -653,6 +696,7 @@ TEST_P(Test2D1D, FixedSource) {
     }
     const auto end = std::chrono::steady_clock::now();
     runtimes[m+1] = end - start;
+    // nonlinear2D1D.reweight();
   }
   // Expand solution
   aether::pgd::sn::Transport<3> transport3(dof_handler3, quadrature3);
@@ -662,7 +706,7 @@ TEST_P(Test2D1D, FixedSource) {
   dealii::BlockVector<double> phi_ref(num_groups, dof_handler3.n_dofs());
   // Compute error against ref. soln.
   std::string name_ref = "RodTest3DFixedSource";
-  name_ref += is_rodded ? "Rodded" : "Unrodded";
+  name_ref += bm.to_string();
   H5::File h5_ref(dir_out+name_ref+".h5", H5::File::FileAccessMode::open);
   for (int g = 0; g < num_groups; ++g) {
     const std::string name_g = "g" + std::to_string(g+1);
@@ -754,13 +798,12 @@ TEST_P(Test2D1D, FixedSource) {
 }
 
 INSTANTIATE_TEST_CASE_P(Params, Test2D1D, ::testing::Combine(
-    ::testing::Bool(), ::testing::Bool(), ::testing::Range(0, 3), 
+    ::testing::ValuesIn(benchmarks), ::testing::Bool(), ::testing::Range(0, 3), 
     ::testing::Values(false)  // just Galerkin, no Minimax for now
   ),
   [] (const testing::TestParamInfo<Param2D1D>& info) {
     std::string name;
-    name += "Rod";
-    name += std::get<0>(info.param) ? "Y" : "N";
+    name += std::get<0>(info.param)->to_string();
     name += "Pol";
     name += std::get<1>(info.param) ? "1" : "2";
     name += "Mg";
