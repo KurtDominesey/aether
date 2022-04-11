@@ -54,21 +54,25 @@ void FixedSource2D1D<dim, qdim>::enrich() {
 }
 
 template <int dim, int qdim>
-void FixedSource2D1D<dim, qdim>::normalize(bool groupwise, bool discrete) {
+void FixedSource2D1D<dim, qdim>::normalize(
+    bool groupwise, bool discrete, int m) {
+  if (m == -1)
+    m += prods.size();
+  Products &prod = prods[m];
   // double norm = 0;  //prods.back().psi.l2_norm();
   std::vector<double> norms_trial(mgxs_rom.num_groups);
   std::vector<double> norms_test(mgxs_rom.num_groups);
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
     if (discrete) {  // l2 norm (of a vector)
-      norms_trial[g] = prods.back().psi.block(g).l2_norm();
-      norms_test[g] = prods.back().psi.block(g).l2_norm();
+      norms_trial[g] = prod.psi.block(g).l2_norm();
+      norms_test[g] = prod.psi.block(g).l2_norm();
     } else {  // L2 norm (of a function)
       norms_trial[g] = std::sqrt(transport.inner_product(
-          prods.back().psi.block(g), 
-          prods.back().psi.block(g)));
+          prod.psi.block(g), 
+          prod.psi.block(g)));
       norms_test[g] = std::sqrt(transport.inner_product(
-          prods.back().test.block(g), 
-          prods.back().test.block(g)));
+          prod.test.block(g), 
+          prod.test.block(g)));
     }
   }
   if (!groupwise) {
@@ -79,10 +83,10 @@ void FixedSource2D1D<dim, qdim>::normalize(bool groupwise, bool discrete) {
   }
   // for (int g = (dim % 2); g < mgxs_rom.num_groups; g += 2) {
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
-    prods.back().psi.block(g) /= norms_trial[g];
-    prods.back().phi.block(g) /= norms_trial[g];
-    prods.back().streamed.block(g) /= norms_trial[g];
-    prods.back().test.block(g) /= norms_test[g];
+    prod.psi.block(g) /= norms_trial[g];
+    prod.phi.block(g) /= norms_trial[g];
+    prod.streamed.block(g) /= norms_trial[g];
+    prod.test.block(g) /= norms_test[g];
   }
 }
 

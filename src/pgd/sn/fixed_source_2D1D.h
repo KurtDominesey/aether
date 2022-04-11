@@ -18,6 +18,8 @@
 
 namespace aether::pgd::sn {
 
+class Nonlinear2D1D;  // forward declaration of friend class
+
 struct Products {
   Products(int groups, int ords, int dofs)
   : psi(groups, ords*dofs), phi(groups, dofs), streamed(groups, ords*dofs),
@@ -36,7 +38,7 @@ class FixedSource2D1D {
                   const Transport<dim, qdim> &transport,
                   Mgxs &mgxs_rom);
   void enrich();
-  void normalize(bool groupwise, bool discrete=true);
+  void normalize(bool groupwise, bool discrete=true, int m=-1);
   void setup(std::vector<InnerProducts2D1D> coeffs_flux,
              const std::vector<std::vector<double>> &coeffs_src,
              const std::vector<std::vector<int>> &materials,
@@ -82,6 +84,7 @@ class FixedSource2D1D {
   std::vector<int> dof_zones;
   dealii::Vector<double> scaling;
   const Transport<dim, qdim> &transport;
+  friend class Nonlinear2D1D;
 };
 
 }  // namespace aether::pgd::sn
