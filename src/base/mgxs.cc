@@ -4,6 +4,7 @@ namespace aether {
 
 Mgxs& Mgxs::operator=(const Mgxs &other) {
   group_structure = other.group_structure;
+  group_widths = other.group_widths;
   total = other.total;
   chi = other.chi;
   nu_fission = other.nu_fission;
@@ -56,9 +57,13 @@ void read_mgxs(
   const int num_groups =  file.get_attribute<int>("energy_groups");
   const int num_materials = materials.size();
   const int num_legendre = 1;
-  if (read_structure)
+  if (read_structure) {
     mgxs.group_structure =
         file.open_dataset("group structure").read<std::vector<double>>();
+    for (int g = 0; g < num_groups; ++g)
+      mgxs.group_widths[num_groups-1-g] = 
+          std::log(mgxs.group_structure[g+1]/mgxs.group_structure[g]);
+  }
   std::vector<std::vector<double>> total_pivot(
     num_materials, std::vector<double>(num_groups));
   auto chi_pivot = total_pivot;

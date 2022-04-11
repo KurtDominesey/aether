@@ -25,6 +25,7 @@ struct Mgxs {
       : num_groups(num_groups), 
         num_materials(num_materials),
         group_structure(num_groups + 1),
+        group_widths(num_groups),
         total(num_groups, std::vector<double>(num_materials)),
         chi(num_groups, std::vector<double>(num_materials)),
         nu_fission(num_groups, std::vector<double>(num_materials)),
@@ -36,8 +37,12 @@ struct Mgxs {
   const int num_materials;
   //! Deep-copy operator
   Mgxs& operator=(const Mgxs& other);
-  //! Group boundaries in eV (electron volts).
+  //! Group boundaries in eV (electron volts), running from thermal to fast
+  //! groups.
   std::vector<double> group_structure;
+  //! Group widths in lethargy (nondimensional), running from fast to thermal
+  //! groups (opposite order of `group_structure`).
+  std::vector<double> group_widths;
   //! Total cross-sections by group and material.
   std::vector<std::vector<double>> total;
   //! Fission neutron yield by group and material.
