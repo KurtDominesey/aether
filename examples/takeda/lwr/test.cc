@@ -477,11 +477,14 @@ TEST_P(Test2D1D, Svd) {
                     quadrature2.get_weights(), u_width);
     dealii::Table<2, double> errs_psi(num_groups, num_modes+1);
     dealii::Table<2, double> errs_phi(num_groups, num_modes+1);
+    const int size2 = quadrature2.size() * dof_handler2.n_dofs();
+    const int size1 = quadrature1.size() * dof_handler1.n_dofs();
+    const bool t = size2 < size1;  // transpose
     for (int g = 0; g < num_groups; ++g) {
       // Make "snapshot" matrix
-      dealii::LAPACKFullMatrix_<double> psi_rect(
-          quadrature2.size()*dof_handler2.n_dofs(),
-          quadrature1.size()*dof_handler1.n_dofs());
+      // (For a m x n matrix, if m < n, the call to BLAS (gesdd) segfaults.)
+      dealii::LAPACKFullMatrix_<double> psi_rect(t ? size1 : size2,
+                                                 t ? size2 : size1);
       for (int n = 0; n < quadrature3.size(); ++n) {
         auto [n1, n2] = q_align(n);
         n1 *= dof_handler1.n_dofs();
@@ -490,20 +493,23 @@ TEST_P(Test2D1D, Svd) {
         for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
           int ii = i * dof_handler2.n_dofs();
           for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-            psi_rect(n2+order2[j], n1+order1[i]) =
+            psi_rect(t ? n1+order1[i] : n2+order2[j], 
+                     t ? n2+order2[j] : n1+order1[i]) =
                 psi.block(g)[nn+order3[ii+j]];
           }
         }
       }
-      svd_pp1.preprocess(psi_rect);
-      svd_pp2.preprocess(psi_rect);
+      svd_pp1.preprocess(psi_rect, t);
+      svd_pp2.preprocess(psi_rect, t);
       std::cout << "do svd\n";
       psi_rect.compute_svd(/*thin svd*/'S');
       std::cout << "did svd\n";
-      dealii::LAPACKFullMatrix_<double> basis2 = psi_rect.get_svd_u();
-      dealii::LAPACKFullMatrix_<double> basis1 = psi_rect.get_svd_vt();
-      svd_pp1.postprocess(basis1);
-      svd_pp2.postprocess(basis2);
+      dealii::LAPACKFullMatrix_<double> basis2 = 
+          t ? psi_rect.get_svd_vt() : psi_rect.get_svd_u();
+      dealii::LAPACKFullMatrix_<double> basis1 = 
+          t ? psi_rect.get_svd_u() : psi_rect.get_svd_vt();
+      svd_pp1.postprocess(basis1, t);
+      svd_pp2.postprocess(basis2, t);
       for (int m = 0; m <= num_modes; ++m) {
         errs_phi(g, m) = transport3.inner_product(phi.block(g), phi.block(g));
         errs_psi(g, m) = transport3.inner_product(psi.block(g), psi.block(g));
@@ -517,9 +523,10 @@ TEST_P(Test2D1D, Svd) {
           for (int i = 0; i < dof_handler1.n_dofs(); ++i) {
             int ii = i * dof_handler2.n_dofs();
             for (int j = 0; j < dof_handler2.n_dofs(); ++j) {
-              const double v = psi_rect.singular_value(m) *
-                               basis1(m, n1+order1[i]) *
-                               basis2(n2+order2[j], m);
+              const double v = 
+                  psi_rect.singular_value(m) *
+                  basis1(t ? n1+order1[i] : m, t ? m : n1+order1[i]) *
+                  basis2(t ? m : n2+order2[j], t ? n2+order2[j] : m);
               psi.block(g)[nn+order3[ii+j]] -= v;
               phi.block(g)[order3[ii+j]] -= quadrature3.weight(n) * v;
             }
