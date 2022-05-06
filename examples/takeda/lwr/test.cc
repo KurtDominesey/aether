@@ -194,7 +194,7 @@ using DoF = std::tuple<
 
 template <int dim>
 struct DoFSorter {
-  DoFSorter(const double tol=1e-12) : tol(tol) {}
+  DoFSorter(const double tol=1e-6) : tol(tol) {}
   const double tol;
 
   bool operator()(const DoF<dim> &a, const DoF<dim> &b) const {
