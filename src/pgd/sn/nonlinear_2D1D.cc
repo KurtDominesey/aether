@@ -27,7 +27,7 @@ double Nonlinear2D1D::iter() {
   two_d.set_inner_prods();
   one_d.setup(two_d.iprods_flux, two_d.iprods_src, materials, mgxs);
   double r1 = one_d.solve();
-  double r = std::sqrt(r2*r2+r1*r1);
+  double r = r1; //std::sqrt(r2*r2+r1*r1);
   std::cout << "2D: " << r2 << "  "
             << "1D: " << r1 << "  "
             << "2D/1D: " << r << "\n";
