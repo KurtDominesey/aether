@@ -363,15 +363,21 @@ void FixedSource2D1D<dim, qdim>::set_mgxs(
 template <int dim, int qdim>
 void FixedSource2D1D<dim, qdim>::check_mgxs() {
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
+    double leakage_trans = 0;
+    if (transport.quadrature.is_degenerate()) {
+      // take credit for transverse leakage
+      leakage_trans = fixed_src.within_groups[g].transport.leakage_trans;
+    }
     for (int j = 0; j < mgxs_rom.num_materials; ++j) {
-      double total = mgxs_rom.total[g][j];
+      double total = mgxs_rom.total[g][j] + leakage_trans;
       double scatter = 0;
       for (int gp = 0; gp < mgxs_rom.num_groups; ++gp) {
         scatter += mgxs_rom.scatter[g][gp][j];
       }
-      if (transport.quadrature.is_degenerate()) {
-        // take credit for transverse leakage
-
+      double ratio = scatter / total;
+      // std::cout << "material " << j << ", c=" << ratio << "\n";
+      if (ratio > 0.99) {
+        // mgxs_rom.total[g][j] = (1./0.99) * scatter;
       }
     }
   }
@@ -384,12 +390,15 @@ double FixedSource2D1D<dim, qdim>::solve() {
     solve_adjoint();
   } else {
     prods.back().test = prods.back().psi;
+    // for (int g = 0; g < mgxs_rom.num_groups; ++g)
+    //   prods.back().test.block(g) /= mgxs_rom.group_widths[g];
   }
   return res_fwd;
 }
 
 template <int dim, int qdim>
 double FixedSource2D1D<dim, qdim>::solve_forward() {
+  check_mgxs();
   uncollided = 0;
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
     fixed_src.within_groups[g].transport.vmult(
