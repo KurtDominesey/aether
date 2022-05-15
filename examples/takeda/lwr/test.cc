@@ -44,8 +44,9 @@ static const Lwr lwr2(1);  // case 2: rodded
 static const Fbr fbr1(0);  // case 1: unrodded
 static const Fbr fbr2(1);  // case 2: half-rodded
 static const PinC5G7 pin_uo2("uo2");
+static const PinC5G7 pin_mox("mox43");
 static const std::vector<const Benchmark2D1D*> benchmarks{
-  &lwr1, &lwr2, &fbr1, &fbr2, &pin_uo2
+  &lwr1, &lwr2, &fbr1, &fbr2, &pin_uo2, &pin_mox
 };
 
 enum MgDim : int {
@@ -243,7 +244,7 @@ using Param2D1D = std::tuple<const Benchmark2D1D*, bool, int, bool>;
 
 class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
  protected:
-  const int num_modes = 10;
+  const int num_modes = 30;
   const Benchmark2D1D &bm = *std::get<0>(GetParam());
   const bool axial_polar = std::get<1>(GetParam());
   const int mg_dim = std::get<2>(GetParam());
