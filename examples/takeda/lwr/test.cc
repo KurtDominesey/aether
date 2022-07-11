@@ -176,7 +176,7 @@ TEST_P(Test3D, FixedSource) {
   data_out.write_vtu(vtu_out);
 }
 
-INSTANTIATE_TEST_CASE_P(Rod, Test3D, ::testing::ValuesIn(benchmarks),
+INSTANTIATE_TEST_CASE_P(Benchmarks, Test3D, ::testing::ValuesIn(benchmarks),
     [](const testing::TestParamInfo<const Benchmark2D1D*>& info) {
   return info.param->to_string();
 });
@@ -297,6 +297,10 @@ class Test2D1D : public ::testing::TestWithParam<Param2D1D> {
       mgxs2.group_widths = mgxs.group_widths;
     else
       mgxs2.group_widths.assign(mgxs2.num_groups, 1.);
+    if (mgxs1.group_widths.size() == mgxs2.group_widths.size()) {
+      mgxs1.group_widths.assign(mgxs1.num_groups, 1.);
+      mgxs2.group_widths.assign(mgxs2.num_groups, 1.);
+    }
     AssertThrow(axial_polar == !quadrature1.is_degenerate(), 
         dealii::ExcInvalidState());
     AssertThrow(axial_polar == quadrature2.is_degenerate(), 
@@ -450,7 +454,7 @@ TEST_P(Test2D1D, Svd) {
   dealii::BlockVector<double> phi(num_groups, dof_handler3.n_dofs());
   aether::sn::DiscreteToMoment<3> d2m(quadrature3);
   // Load 3D ref. soln.
-  std::string name_h5 = "RodTest3DFixedSource";
+  std::string name_h5 = "BenchmarksTest3DFixedSource";
   name_h5 += bm.to_string();
   H5::File file_h5(dir_out+name_h5+".h5", H5::File::FileAccessMode::open);
   for (int g = 0; g < num_groups; ++g) {
@@ -471,7 +475,7 @@ TEST_P(Test2D1D, Svd) {
     // Do groupwise SVD
     AssertDimension(num_groups1, num_groups2);
     AssertDimension(num_groups1, num_groups);
-    std::vector<double> u_width(1, 1.);
+    std::vector<double> u_width(1, 1.);  // doesn't matter for groupwise SVD
     SvdL2PP svd_pp1(dof_handler1, transport1.cell_matrices, 
                     quadrature1.get_weights(), u_width);
     SvdL2PP svd_pp2(dof_handler2, transport2.cell_matrices, 
@@ -576,12 +580,10 @@ TEST_P(Test2D1D, Svd) {
       }
     }
   }
-  std::vector<double> u_widths1(num_groups1, 1.);
-  std::vector<double> u_widths2(num_groups2, 1.);
   SvdL2PP svd_pp1(dof_handler1, transport1.cell_matrices, 
-                  quadrature1.get_weights(), u_widths1);
+                  quadrature1.get_weights(), mgxs1.group_widths);
   SvdL2PP svd_pp2(dof_handler2, transport2.cell_matrices, 
-                  quadrature2.get_weights(), u_widths2);
+                  quadrature2.get_weights(), mgxs2.group_widths);
   svd_pp1.preprocess(psi_rect, t);
   svd_pp2.preprocess(psi_rect, t);
   std::cout << "do svd\n";
@@ -600,7 +602,7 @@ TEST_P(Test2D1D, Svd) {
     double err_psi = 0;
     double err_phi = 0;
     for (int g = 0; g < num_groups; ++g) {
-      int du = 1; // lethargy width
+      int du = mgxs.group_widths[g]; // lethargy width
       err_phi += transport3.inner_product(phi.block(g), phi.block(g)) / du;
       err_psi += transport3.inner_product(psi.block(g), psi.block(g)) / du;
       if (m == num_modes)
@@ -713,7 +715,7 @@ TEST_P(Test2D1D, Pgd) {
       num_groups, quadrature3.size()*dof_handler3.n_dofs());
   dealii::BlockVector<double> phi_ref(num_groups, dof_handler3.n_dofs());
   // Compute error against ref. soln.
-  std::string name_ref = "RodTest3DFixedSource";
+  std::string name_ref = "BenchmarksTest3DFixedSource";
   name_ref += bm.to_string();
   H5::File h5_ref(dir_out+name_ref+".h5", H5::File::FileAccessMode::open);
   for (int g = 0; g < num_groups; ++g) {
@@ -732,7 +734,7 @@ TEST_P(Test2D1D, Pgd) {
     double err_psi = 0;
     double err_phi = 0;
     for (int g = 0; g < num_groups; ++g) {
-      int du = 1; // lethargy width
+      int du = mgxs.group_widths[g]; // lethargy width
       err_phi += 
           transport3.inner_product(phi_ref.block(g), phi_ref.block(g)) / du;
       err_psi += 

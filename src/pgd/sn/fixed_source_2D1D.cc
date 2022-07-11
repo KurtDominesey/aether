@@ -13,7 +13,7 @@ FixedSource2D1D<dim, qdim>::FixedSource2D1D(
       transport(transport),
       dof_zones(transport.dof_handler.n_dofs()), 
       mgxs_rom(mgxs_rom),
-      control_wg(100, 1e-3, 1e-7),
+      control_wg(250, 1e-3, 1e-7),
       solver_wg(control_wg, SolverWG::AdditionalData(32)),
       control(100, 1e-2, 1e-6),
       solver(control, Solver::AdditionalData(32)),
@@ -127,7 +127,7 @@ void FixedSource2D1D<dim, qdim>::set_inner_prod_flux(
   dealii::BlockVector<double> mode_g(test_g);
   bool degenerate = transport.quadrature.is_degenerate();
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
-    double du = 1;  // lethargy width
+    double du = mgxs_rom.group_widths[g];  // lethargy width
     iprod.stream_trans[g] += transport.inner_product(
         test.block(g), prod.streamed.block(g)) / du;
     test_g = test.block(g);
@@ -154,13 +154,13 @@ void FixedSource2D1D<dim, qdim>::set_inner_prod_flux(
             iprod.rxn.total[g][matl] += test.block(g)[nn+dof_indices[i]] *
                                         transport.cell_matrices[c].mass[i][j] *
                                         prod.psi.block(g)[nn+dof_indices[j]] *
-                                        transport.quadrature.weight(n);
+                                        transport.quadrature.weight(n) / du;
             for (int gp = 0; gp < mgxs_rom.num_groups; ++gp) {
               iprod.rxn.scatter[g][gp][matl] += 
                   test.block(g)[nn+dof_indices[i]] *
                   transport.cell_matrices[c].mass[i][j] *
                   prod.phi.block(gp)[dof_indices[j]] *
-                  transport.quadrature.weight(n);
+                  transport.quadrature.weight(n) / du;
             }
           }
         }
@@ -175,7 +175,7 @@ void FixedSource2D1D<dim, qdim>::set_inner_prod_src(
     const dealii::BlockVector<double> &src_s,
     std::vector<double> &iprod) {
   for (int g = 0; g < mgxs_rom.num_groups; ++g) {
-    double du = 1;  // lethargy widths
+    double du = mgxs_rom.group_widths[g];  // lethargy widths
     iprod[g] = transport.inner_product(test.block(g), src_s.block(g)) / du;
   }
 }

@@ -201,7 +201,13 @@ std::unique_ptr<dealii::Function<dim>> Lwr::create_source(
 }
 
 aether::Mgxs Lwr::create_mgxs() const {
+  const int num_groups = 2;
   aether::Mgxs mgxs(2/*groups*/, 3/*materials*/, 1/*legendre moment*/);
+  mgxs.group_structure = {1e-5, 6.8256e-1, 1e7};
+  for (int g = 0; g < num_groups; ++g) {
+    mgxs.group_widths[num_groups-1-g] = 
+        std::log(mgxs.group_structure[g+1]/mgxs.group_structure[g]);
+  }
   mgxs.total[0] = {2.23775e-1, 2.50367e-1, is_rodded ? 8.52325e-2 : 1.28407e-2};
   mgxs.total[1] = {1.03864,    1.64482,    is_rodded ? 2.17460e-1 : 1.20676e-2};
   mgxs.scatter[0][0] = {1.92423e-1, 1.93446e-1, is_rodded ? 6.77241e-2 : 1.27700e-2};
@@ -452,13 +458,10 @@ class PinC5G7 : public Benchmark2D1D {
   };
   const std::string fuel;  // name in c5g7.h5, e.g. "uo2" or "mox43"
 
-  // const double height = 64.26;
-  // const double height_pin = 42.84;
-  // const unsigned int nz = 51;  // each layer is 1.26 cm thick (before refinement)
-  const double height = 9;
-  const double height_pin = 6;
-  const unsigned int nz = 30;
-  const int num_refined = 0;
+  const double height = 64.26;
+  const double height_pin = 42.84;
+  const unsigned int nz = 51;  // each layer is 0.56 cm thick (before refinement)
+  const int num_refined = 1;
 
   PinC5G7(const std::string fuel) : fuel(fuel) {};
 
