@@ -124,7 +124,7 @@ TEST_P(Test3D, FixedSource) {
   aether::sn::FixedSourceProblem<3> prob(dof_handler, quadrature, mgxs, bc);
   dealii::ReductionControl control_wg(250, 1e-6, 1e-2);
   dealii::SolverGMRES<dealii::Vector<double>> solver_wg(control_wg,
-      dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(32));
+      dealii::SolverGMRES<dealii::Vector<double>>::AdditionalData(17));
   auto print_wg = [] (
       const unsigned int it, const double val, const dealii::Vector<double>&) 
       -> dealii::SolverControl::State {

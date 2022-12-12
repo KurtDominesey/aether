@@ -13,10 +13,10 @@ FixedSource2D1D<dim, qdim>::FixedSource2D1D(
       transport(transport),
       dof_zones(transport.dof_handler.n_dofs()), 
       mgxs_rom(mgxs_rom),
-      control_wg(250, 1e-3, 1e-7),
-      solver_wg(control_wg, SolverWG::AdditionalData(32)),
-      control(100, 1e-2, 1e-6),
-      solver(control, Solver::AdditionalData(32)),
+      control_wg(500, 1e-4, 1e-6),
+      solver_wg(control_wg, SolverWG::AdditionalData(27)),
+      control(100, 1e-3, 1e-5),
+      solver(control, Solver::AdditionalData(27)),
       fixed_src_gs(fixed_src, solver_wg) {
   scaling.reinit(transport.dof_handler.n_dofs());
   src.reinit(mgxs_rom.num_groups, 
