@@ -43,10 +43,14 @@ static const Lwr lwr1(0);  // case 1: unrodded
 static const Lwr lwr2(1);  // case 2: rodded
 static const Fbr fbr1(0);  // case 1: unrodded
 static const Fbr fbr2(1);  // case 2: half-rodded
-static const PinC5G7 pin_uo2("uo2");
-static const PinC5G7 pin_mox("mox43");
+static const PinC5G7 pin_uo2_1("uo2", 1);
+static const PinC5G7 pin_uo2_2("uo2", 2);
+static const PinC5G7 pin_uo2_3("uo2", 3);
+// static const PinC5G7 pin_mox("mox43");
 static const std::vector<const Benchmark2D1D*> benchmarks{
-  &lwr1, &lwr2, &fbr1, &fbr2, &pin_uo2, &pin_mox
+  &lwr1, &lwr2, 
+  // &fbr1, &fbr2, 
+  &pin_uo2_1, &pin_uo2_2, &pin_uo2_3
 };
 
 enum MgDim : int {

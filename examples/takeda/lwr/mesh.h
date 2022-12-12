@@ -457,13 +457,16 @@ class PinC5G7 : public Benchmark2D1D {
     {WATER, WATER}
   };
   const std::string fuel;  // name in c5g7.h5, e.g. "uo2" or "mox43"
+  const int scale;  // true scale is `scale`:9
 
-  const double height = 64.26;
-  const double height_pin = 42.84;
-  const unsigned int nz = 51;  // each layer is 0.56 cm thick (before refinement)
+  PinC5G7(const std::string fuel, const double scale) : 
+      fuel(fuel), scale(scale) {};
+
+  const double segment = 21.42;  // one ninth of original height (192.78 cm)
+  const double height_pin = scale * segment;
+  const double height = height_pin + segment;
+  const unsigned int nz = (scale + 1) * 68;
   const int num_refined = 1;
-
-  PinC5G7(const std::string fuel) : fuel(fuel) {};
 
   template <int dim>
   std::unique_ptr<dealii::Function<dim>>
@@ -580,6 +583,7 @@ std::string PinC5G7::to_string() const {
     name += "Mox43";
   else 
     AssertThrow(false, dealii::ExcNotImplemented());
+  name += "Hgt" + std::to_string(scale);
   return name;
 }
 
