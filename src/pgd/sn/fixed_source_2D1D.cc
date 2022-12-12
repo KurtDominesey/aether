@@ -79,8 +79,9 @@ void FixedSource2D1D<dim, qdim>::normalize(
     double norm_trial = 0;
     double norm_test = 0;
     for (int g = 0; g < mgxs_rom.num_groups; ++g) {
-      norm_trial += std::pow(norms_trial[g], 2);
-      norm_test += std::pow(norms_test[g], 2);
+      double du = mgxs_rom.group_widths[g];  // lethargy width
+      norm_trial += std::pow(norms_trial[g], 2) / du;
+      norm_test += std::pow(norms_test[g], 2) / du;
     }
     norms_trial.assign(norms_trial.size(), std::sqrt(norm_trial));
     norms_test.assign(norms_test.size(), std::sqrt(norm_test));
