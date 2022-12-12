@@ -51,15 +51,18 @@ InnerProducts operator*(const InnerProducts &a, const InnerProducts&b);
 struct InnerProducts2D1D {
   InnerProducts2D1D(int num_groups, int num_zones) :
       stream_co(num_groups), 
-      stream_trans(num_groups), 
+      stream_trans(num_groups),
+      mass(num_groups),
       rxn(num_groups, num_zones, 1) {};
   std::vector<double> stream_co;  // coaxial or coplanar
   std::vector<double> stream_trans;  // transverse
+  std::vector<double> mass;
   Mgxs rxn;
   InnerProducts2D1D& operator=(const double v) {
     for (int g = 0; g < rxn.num_groups; ++g) {
       stream_co[g] = v;
       stream_trans[g] = v;
+      mass[g] = v;
       for (int j = 0; j < rxn.num_materials; ++j) {
         rxn.total[g][j] = v;
         rxn.nu_fission[g][j] = v;

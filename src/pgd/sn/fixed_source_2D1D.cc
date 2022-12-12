@@ -167,6 +167,8 @@ void FixedSource2D1D<dim, qdim>::set_inner_prod_flux(
         }
       }
     }
+    iprod.mass[g] = std::accumulate(
+        iprod.rxn.total[g].begin(), iprod.rxn.total[g].end(), iprod.mass[g]);
   }
 }
 
