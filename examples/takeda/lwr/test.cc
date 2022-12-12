@@ -641,6 +641,20 @@ TEST_P(Test2D1D, Svd) {
 }
 
 TEST_P(Test2D1D, Pgd) {
+  dealii::GridOut grid_out;
+  dealii::GridOutFlags::Svg svg;
+  svg.coloring = dealii::GridOutFlags::Svg::Coloring::material_id;
+  svg.margin = false;
+  svg.label_cell_index = false;
+  svg.label_level_number = false;
+  svg.label_level_subdomain_id = false;
+  svg.label_material_id = false;
+  svg.label_subdomain_id = false;
+  svg.draw_colorbar = false;
+  svg.draw_legend = false;
+  grid_out.set_flags(svg);
+  std::ofstream grid_file(dir_out + test_name() + "-mesh2.svg");
+  grid_out.write_svg(mesh2, grid_file);
   aether::sn::FixedSourceProblem<1, 1, aether::pgd::sn::Transport<1>, 
                                        aether::pgd::sn::TransportBlock<1> >
       problem1(dof_handler1, quadrature1, mgxs1, bc1);
