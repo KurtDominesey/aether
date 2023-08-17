@@ -1,0 +1,3 @@
+[submodule "bundled/dealii"]
+	path = bundled/dealii
+	url = https://github.com/KurtDominesey/dealii.git
