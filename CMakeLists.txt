@@ -29,9 +29,12 @@ project(aether)
 find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
 
+find_package(HDF5 REQUIRED COMPONENTS CXX)
+include_directories(${HDF5_INCLUDE_DIRS})
+
 set(main "src/main.cc")
 file(GLOB_RECURSE source "src/[!main]*.cc" "src/*/*.cc" )
-include_directories(${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/src)
 
 set(exec "aether.exe")
 set(test "test.exe")
@@ -39,7 +42,7 @@ add_executable(${exec} ${main})
 add_executable(${test} ${source})
 
 target_compile_options(${test} PUBLIC ${GTEST_CFLAGS})
-target_link_libraries(${test} ${GTEST_BOTH_LIBRARIES})
+target_link_libraries(${test} ${GTEST_BOTH_LIBRARIES} ${HDF5_LIBRARIES})
 
 DEAL_II_SETUP_TARGET(${test})
 DEAL_II_SETUP_TARGET(${exec})
